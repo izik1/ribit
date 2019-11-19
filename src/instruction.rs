@@ -10,15 +10,20 @@ pub enum Instruction {
     JType(JTypeInstruction),
 }
 
+// FIXME: rs is actually 5 bits each.
+
 #[derive(Debug)]
 pub struct RTypeInstruction {
-    rs: u8, // 7:4 -> rs2, 3:0 -> rs1
-    rd: u8,
-    opcode: RTypeOpcode,
+    pub rs: u8, // 7:4 -> rs2, 3:0 -> rs1
+    pub rd: u8,
+    pub(crate) opcode: RTypeOpcode,
 }
 
 impl RTypeInstruction {
     pub(crate) fn new(rs: u8, rd: u8, opcode: RTypeOpcode) -> Self {
+        debug_assert!(rd < 32);
+        let rd = rd & 0b1111;
+
         Self { rs, rd, opcode }
     }
 
@@ -30,14 +35,18 @@ impl RTypeInstruction {
 }
 
 pub struct ITypeInstruction {
-    imm: u16,
-    rs1: u8,
-    rd: u8,
-    opcode: ITypeOpcode,
+    pub(crate) imm: u16,
+    pub(crate) rs1: u8,
+    pub(crate) rd: u8,
+    pub(crate) opcode: ITypeOpcode,
 }
 
 impl ITypeInstruction {
     pub(crate) fn new(imm: u16, rs1: u8, rd: u8, opcode: ITypeOpcode) -> Self {
+        debug_assert!(rd < 32);
+        let rd = rd & 0b1111;
+        let rs1 = rs1 & 0b1111;
+
         Self {
             imm,
             rs1,
@@ -60,9 +69,9 @@ impl ITypeInstruction {
 }
 
 pub struct STypeInstruction {
-    imm: u16,
-    rs: u8, // 7:4 -> rs2, 3:0 -> rs1
-    opcode: STypeOpcode,
+    pub(crate) imm: u16,
+    pub(crate) rs: u8, // 7:4 -> rs2, 3:0 -> rs1
+    pub(crate) opcode: STypeOpcode,
 }
 
 impl STypeInstruction {
@@ -71,8 +80,10 @@ impl STypeInstruction {
     }
 
     pub(crate) fn from_instruction(instruction: u32, opcode: STypeOpcode) -> STypeInstruction {
+        // fixme: these should each be 5 bits
         let rs = decode_rs(instruction);
 
+        // fixme: sign extend
         let imm = (((instruction >> 19) & 0b0000_1111_1110_0000)
             | ((instruction >> 07) & 0b0000_0000_0001_1111)) as u16;
 
@@ -81,9 +92,9 @@ impl STypeInstruction {
 }
 
 pub struct BTypeInstruction {
-    rs: u8, // 7:4 -> rs2, 3:0 -> rs1
-    imm: u16,
-    opcode: BTypeOpcode,
+    pub(crate) rs: u8, // 7:4 -> rs2, 3:0 -> rs1
+    pub(crate) imm: u16,
+    pub(crate) opcode: BTypeOpcode,
 }
 
 impl BTypeInstruction {
@@ -100,14 +111,16 @@ pub struct UTypeInstruction {
 
 impl UTypeInstruction {
     pub(crate) fn new(imm: u32, rd: u8, opcode: UTypeOpcode) -> Self {
+        debug_assert!(rd < 32);
+        let rd = rd & 0b1111;
         Self { imm, rd, opcode }
     }
 }
 
 pub struct JTypeInstruction {
-    imm: u32,
-    rd: u8,
-    opcode: JTypeOpcode,
+    pub(crate) imm: u32,
+    pub(crate) rd: u8,
+    pub(crate) opcode: JTypeOpcode,
 }
 
 impl JTypeInstruction {

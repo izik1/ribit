@@ -18,14 +18,18 @@ pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> 
     let opcode = (instruction & 0b0111_1111) as u8;
     let instruction =
         match (opcode, funct3, funct7) {
+            // todo: sign extend imm
             (0b110_1111, _, _) => Instruction::JType(JTypeInstruction::from_instruction(
                 instruction,
                 JTypeOpcode::JAL,
             )),
+
+            // todo: sign extend & set lsb to 0
             (0b110_0111, 0b000, _) => Instruction::IType(ITypeInstruction::from_instruction(
                 instruction,
                 ITypeOpcode::JALR,
             )),
+
             (0b110_0011, _, _) => Instruction::BType(decode_branch(instruction)?),
             (0b000_0011, 0b000, _) => Instruction::IType(ITypeInstruction::from_instruction(
                 instruction,

@@ -1,0 +1,8 @@
+JIT calling convention, register allocation, etc
+
+typedef riscv_jit_fn = unsafe extern "C" fn(registers: *mut u32, pc: &mut u32);
+
+register allocation should be done via a simple ring buffer
+* make sure that reads from and writes to 0 get voided in the the JIT
+* don't do anything fancy like register renaming, or figuring out if a register is dead (no more reads before the next write) at first
+* ensure that all registers are written back at the end though

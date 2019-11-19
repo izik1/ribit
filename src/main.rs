@@ -1,3 +1,4 @@
 fn main() {
-    println!("Hello, world!");
+    use rv32i_mc_interpreter::instruction::Instruction;
+    println!("{}", std::mem::size_of::<Instruction>());
 }

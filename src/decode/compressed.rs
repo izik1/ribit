@@ -1,4 +1,4 @@
-use crate::{DecodeError, instruction::*};
+use crate::{instruction::*, DecodeError};
 
 fn decode_register(instruction: u16) -> u8 {
     ((instruction & 0b111) | 0b1_1000) as u8

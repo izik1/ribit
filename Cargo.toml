@@ -1,9 +1,10 @@
 [package]
 name = "rv32i-mc-interpreter"
 version = "0.1.0"
-authors = ["Zachery Gyurkovitz <zgyurkovitz@gmail.com>"]
+authors = ["Skyler Ross <orangesnowfox@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+assembler = "0.10.1"
