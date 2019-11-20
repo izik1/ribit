@@ -3,23 +3,23 @@ use crate::decode::{decode_rd, decode_rs, sign_extend};
 use crate::opcode;
 use crate::register::RiscVRegister;
 pub enum Instruction {
-    R(RTypeInstruction),
-    I(ITypeInstruction),
-    S(STypeInstruction),
-    B(BTypeInstruction),
-    U(UTypeInstruction),
-    J(JTypeInstruction),
+    R(R),
+    I(I),
+    S(S),
+    B(B),
+    U(U),
+    J(J),
 }
 
 #[derive(Debug)]
-pub struct RTypeInstruction {
+pub struct R {
     pub(crate) rs1: Option<RiscVRegister>,
     pub(crate) rs2: Option<RiscVRegister>,
     pub(crate) rd: Option<RiscVRegister>,
     pub(crate) opcode: opcode::R,
 }
 
-impl RTypeInstruction {
+impl R {
     pub(crate) fn new(
         rs1: Option<RiscVRegister>,
         rs2: Option<RiscVRegister>,
@@ -46,14 +46,14 @@ impl RTypeInstruction {
     }
 }
 
-pub struct ITypeInstruction {
+pub struct I {
     pub(crate) imm: u16,
     pub(crate) rs1: Option<RiscVRegister>,
     pub(crate) rd: Option<RiscVRegister>,
     pub(crate) opcode: opcode::I,
 }
 
-impl ITypeInstruction {
+impl I {
     pub(crate) fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
@@ -81,14 +81,14 @@ impl ITypeInstruction {
     }
 }
 
-pub struct STypeInstruction {
+pub struct S {
     pub(crate) imm: u16,
     pub(crate) rs1: Option<RiscVRegister>,
     pub(crate) rs2: Option<RiscVRegister>,
     pub(crate) opcode: opcode::S,
 }
 
-impl STypeInstruction {
+impl S {
     pub(crate) fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
@@ -120,14 +120,14 @@ impl STypeInstruction {
     }
 }
 
-pub struct BTypeInstruction {
+pub struct B {
     pub(crate) rs1: Option<RiscVRegister>,
     pub(crate) rs2: Option<RiscVRegister>,
     pub(crate) imm: u16,
     pub(crate) opcode: opcode::B,
 }
 
-impl BTypeInstruction {
+impl B {
     pub(crate) fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
@@ -143,25 +143,25 @@ impl BTypeInstruction {
     }
 }
 
-pub struct UTypeInstruction {
+pub struct U {
     imm: u32,
     rd: Option<RiscVRegister>,
     opcode: opcode::U,
 }
 
-impl UTypeInstruction {
+impl U {
     pub(crate) fn new(imm: u32, rd: Option<RiscVRegister>, opcode: opcode::U) -> Self {
         Self { imm, rd, opcode }
     }
 }
 
-pub struct JTypeInstruction {
+pub struct J {
     pub(crate) imm: u32,
     pub(crate) rd: Option<RiscVRegister>,
     pub(crate) opcode: opcode::J,
 }
 
-impl JTypeInstruction {
+impl J {
     pub(crate) fn new(imm: u32, rd: Option<RiscVRegister>, opcode: opcode::J) -> Self {
         Self { imm, rd, opcode }
     }

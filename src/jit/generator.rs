@@ -8,9 +8,7 @@ use assembler::InstructionStream;
 use crate::register::{NativeRegister, RiscVRegister};
 
 use crate::{
-    instruction::{
-        BTypeInstruction, ITypeInstruction, Instruction, JTypeInstruction, STypeInstruction,
-    },
+    instruction::{self, Instruction},
     opcode,
 };
 
@@ -58,7 +56,7 @@ pub(super) fn generate_basic_block_end(
     let branch_instruction = branch.instruction;
 
     match branch_instruction {
-        Instruction::J(JTypeInstruction {
+        Instruction::J(instruction::J {
             imm,
             rd,
             opcode: opcode::J::JAL,
@@ -77,7 +75,7 @@ pub(super) fn generate_basic_block_end(
             block.ret();
         }
 
-        Instruction::I(ITypeInstruction {
+        Instruction::I(instruction::I {
             imm,
             rd,
             opcode: opcode::I::JALR,
@@ -113,11 +111,11 @@ pub(super) fn generate_basic_block_end(
 
 fn generate_branch(
     block: &mut InstructionStream,
-    instruction: BTypeInstruction,
+    instruction: instruction::B,
     reg_manager: &mut super::alloc::RegisterManager,
     continue_pc: u32,
 ) {
-    let BTypeInstruction {
+    let instruction::B {
         rs1,
         rs2,
         imm,
@@ -195,7 +193,7 @@ fn generate_instruction(
     match instruction {
         Instruction::J(_)
         | Instruction::B(_)
-        | Instruction::I(ITypeInstruction {
+        | Instruction::I(instruction::I {
             opcode: opcode::I::JALR,
             ..
         }) => unreachable!("blocks cannot contain a branch"),
@@ -211,11 +209,11 @@ fn generate_instruction(
 // todo: broken
 fn generate_stype_instruction(
     block: &mut InstructionStream,
-    instruction: STypeInstruction,
+    instruction: instruction::S,
     reg_manager: &mut RegisterManager,
     next_start_address: u32,
 ) {
-    let STypeInstruction {
+    let instruction::S {
         imm: _imm,
         rs1,
         rs2,

@@ -31,6 +31,8 @@ impl InstructionInfo {
     }
 }
 
+// todo: rename to `RuntimeContext` and create a `BuildContext`
+
 pub struct JitContext {
     buffer: ExecutableAnonymousMemoryMap,
     blocks: Vec<BasicBlock>,
@@ -85,8 +87,9 @@ impl Default for JitContext {
 mod test {
     use super::{InstructionInfo, JitContext};
     use crate::{
-        instruction::{Instruction, RiscVRegister},
+        instruction::{self, Instruction},
         opcode,
+        register::RiscVRegister,
     };
 
     fn init() -> ([u32; 32], Vec<u8>) {
@@ -99,13 +102,12 @@ mod test {
 
     #[test]
     fn jal_basic() {
-        use crate::instruction::JTypeInstruction;
         let mut ctx = JitContext::new();
 
         ctx.generate_basic_block(
             vec![],
             InstructionInfo::new(
-                Instruction::J(JTypeInstruction {
+                Instruction::J(instruction::J {
                     imm: 4096,
                     rd: Some(RiscVRegister::X4),
                     opcode: opcode::J::JAL,
@@ -133,13 +135,12 @@ mod test {
 
     #[test]
     fn jalr_basic() {
-        use crate::instruction::ITypeInstruction;
         let mut ctx = JitContext::new();
 
         ctx.generate_basic_block(
             vec![],
             InstructionInfo::new(
-                Instruction::I(ITypeInstruction {
+                Instruction::I(instruction::I {
                     imm: 4096,
                     rd: Some(RiscVRegister::X4),
                     rs1: Some(RiscVRegister::X1),
@@ -171,13 +172,12 @@ mod test {
 
     #[test]
     fn reg0_unwritable_imm() {
-        use crate::instruction::JTypeInstruction;
         let mut ctx = JitContext::new();
 
         ctx.generate_basic_block(
             vec![],
             InstructionInfo::new(
-                Instruction::J(JTypeInstruction {
+                Instruction::J(instruction::J {
                     imm: 4096,
                     rd: None,
                     opcode: opcode::J::JAL,
