@@ -117,7 +117,10 @@ impl RegisterManager {
     pub fn free(&mut self, rv32_reg: u8, basic_block: &mut InstructionStream) -> Option<NativeRegister> {
         let idx = self.used_registers.iter().position(|(_, rv_reg)| *rv_reg == rv32_reg)?;
 
-        self.used_registers.remove(idx).map(|it| it.0)
+        let native_reg = self.used_registers.remove(idx).map(|it| it.0)?;
+
+        generate_register_writeback(basic_block, native_reg, rv32_reg);
+        Some(native_reg)
     }
 
     pub fn free_first(

@@ -3,7 +3,7 @@ use assembler::mnemonic_parameter_types::{
     memory::Memory,
     registers::{Register32Bit, Register64Bit},
 };
-use assembler::{ExecutableAnonymousMemoryMap, InstructionStream};
+use assembler::InstructionStream;
 
 use crate::instruction::{
     BTypeInstruction, ITypeInstruction, ITypeOpcode, Instruction, JTypeInstruction, JTypeOpcode,
@@ -65,7 +65,6 @@ pub(super) fn generate_basic_block_end(
     branch: InstructionInfo,
     reg_manager: &mut super::alloc::RegisterManager,
 ) {
-    let start_address = branch.start_address;
     let next_start_address = branch.end_address();
 
     let branch_instruction = branch.instruction;
@@ -211,11 +210,11 @@ fn generate_instruction(
             ..
         }) => unreachable!("blocks cannot contain a branch"),
 
-        _ => todo!("implement remaining instructions"),
-
         Instruction::SType(instruction) => {
             generate_stype_instruction(block, instruction, reg_manager, next_start_address)
         }
+
+        _ => todo!("implement remaining instructions"),
     }
 }
 

@@ -114,7 +114,7 @@ pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> 
             (0b011_0011, 0b100, 0b000_0000) => Instruction::RType(
                 RTypeInstruction::from_instruction(instruction, RTypeOpcode::XOR),
             ),
-            (0b011_0011, 0b101, 0b010_0000) => Instruction::RType(
+            (0b011_0011, 0b101, 0b000_0000) => Instruction::RType(
                 RTypeInstruction::from_instruction(instruction, RTypeOpcode::SRL),
             ),
             (0b011_0011, 0b101, 0b010_0000) => Instruction::RType(

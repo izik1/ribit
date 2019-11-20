@@ -3,7 +3,6 @@
 pub mod decode;
 pub mod jit;
 
-use decode::{decode_rd, decode_rs};
 pub mod instruction;
 
 const XLEN: usize = 32;

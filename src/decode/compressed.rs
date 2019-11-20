@@ -32,7 +32,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
         }
 
         // C.FLD requires D extension
-        (0b00, 0b010) => return Err(DecodeError),
+        (0b00, 0b001) => return Err(DecodeError),
         // C.FSD requires D extension
         (0b00, 0b101) => return Err(DecodeError),
 
@@ -59,7 +59,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
 
         (0b00, 0b100) => return Err(DecodeError), // reserved
         (0b01, 0b000) | (0b01, 0b010) => {
-            let imm = (((instruction >> 7) & 0b0010_0000) | ((instruction >> 2) & 0b0001_1111));
+            let imm = ((instruction >> 7) & 0b0010_0000) | ((instruction >> 2) & 0b0001_1111);
             let r = ((instruction >> 7) & 0b0001_1111) as u8;
 
             // FIXME: need to sign extend imm
@@ -102,11 +102,11 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
             match r {
                 2 => {
                     // 000a_0000_0bcd_de00 -> 0000_00ad_dceb_0000
-                    let imm = (((imm >> 4) & 0b0001_0000_0000)
+                    let imm = ((imm >> 4) & 0b0001_0000_0000)
                         | ((imm >> 2) & 0b0000_0001_0000)
                         | ((imm << 1) & 0b0000_0100_0000)
                         | ((imm << 4) & 0b0000_0001_1000)
-                        | ((imm << 3) & 0b0000_0010_0000));
+                        | ((imm << 3) & 0b0000_0010_0000);
                     // FIXME: Sign extend imm
                     Instruction::IType(ITypeInstruction::new(imm, 2, 2, ITypeOpcode::ADDI))
                 }
@@ -114,8 +114,8 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
                 _ => {
                     let imm = imm as u32;
                     // 000a_0000_0bbb_bb00 -> 00ab_bbbb_0000_0000_0000
-                    let imm = (((imm << 05) & 0b0010_0000_0000_0000_0000)
-                        | ((imm << 10) & 0b0001_1111_0000_0000_0000));
+                    let imm = ((imm << 05) & 0b0010_0000_0000_0000_0000)
+                        | ((imm << 10) & 0b0001_1111_0000_0000_0000);
 
                     // FIXME: C.LUI loads the non-zero 6-bit immediate field into bits 17–12 of the destination register, clears the
                     // bottom 12 bits, and sign-extends bit 17 into all higher bits of the destination.
@@ -125,11 +125,11 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
         }
 
         (0b01, 0b100) => {
-            let imm = (((instruction >> 7) & 0b0010_0000) | ((instruction >> 2) & 0b0001_1111));
+            let imm = ((instruction >> 7) & 0b0010_0000) | ((instruction >> 2) & 0b0001_1111);
             let r = decode_register(instruction >> 7);
             let rs2 = decode_register(instruction >> 2);
 
-            let imm5 = (imm >> 5);
+            let imm5 = imm >> 5;
 
             let rs = (rs2 << 4) | r;
 
@@ -155,11 +155,11 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
         (0b01, 0b110) | (0b01, 0b111) => {
             let rs1 = decode_register(instruction >> 7);
             // 000a_bbxx_xccd_de00 -> 0b000a_cceb_bdd0
-            let imm = (((instruction >> 4) & 0b0001_0000_0000)
+            let imm = ((instruction >> 4) & 0b0001_0000_0000)
                 | ((instruction >> 7) & 0b0000_0001_1000)
                 | ((instruction << 1) & 0b0000_1100_0000)
                 | ((instruction >> 1) & 0b0000_0000_1100)
-                | ((instruction << 3) & 0b0000_0010_0000));
+                | ((instruction << 3) & 0b0000_0010_0000);
 
             // FIXME: sign extend imm
 
@@ -252,7 +252,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
             let rs2 = (rs2 << 4) as u8;
 
             // xxxa_aaab_bxxx_xxxx -> bbaa_aa00
-            let imm = (((instruction >> 7) & 0b0011_1100) | ((instruction >> 1) & 0b1100_0000));
+            let imm = ((instruction >> 7) & 0b0011_1100) | ((instruction >> 1) & 0b1100_0000);
 
             Instruction::SType(STypeInstruction::new(imm, rs2, STypeOpcode::SW))
         }

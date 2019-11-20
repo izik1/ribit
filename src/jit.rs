@@ -1,6 +1,6 @@
 use crate::instruction::Instruction;
 
-use assembler::{ExecutableAnonymousMemoryMap, InstructionStream};
+use assembler::ExecutableAnonymousMemoryMap;
 use std::ops::Range;
 
 use assembler::mnemonic_parameter_types::registers::Register32Bit as AssemblerReg32;
