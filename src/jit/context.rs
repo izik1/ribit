@@ -2,7 +2,9 @@ use std::ops::Range;
 
 use assembler::ExecutableAnonymousMemoryMap;
 
+use super::generator::BlockBuilder;
 use crate::instruction;
+
 pub struct Runtime {
     buffer: ExecutableAnonymousMemoryMap,
     blocks: Vec<super::BasicBlock>,
@@ -54,7 +56,7 @@ impl Runtime {
             .buffer
             .instruction_stream(&assembler::InstructionStreamHints::default());
 
-        let mut build_context = super::BlockBuilder::start(stream, check_ranges);
+        let mut build_context = BlockBuilder::start(stream, check_ranges);
 
         for instruction in block_instrs {
             build_context.make_instruction(instruction)

@@ -1,4 +1,4 @@
-use super::BlockBuilder;
+use super::{alloc::RegisterManager, BasicBlock, CheckRanges};
 
 use assembler::mnemonic_parameter_types::{
     memory::Memory,
@@ -11,6 +11,47 @@ use crate::{
     instruction::{self, Instruction},
     opcode, register,
 };
+
+pub struct BlockBuilder<'a> {
+    stream: assembler::InstructionStream<'a>,
+    register_manager: RegisterManager,
+    check_ranges: CheckRanges,
+}
+
+impl<'a> BlockBuilder<'a> {
+    pub(super) fn start(
+        stream: assembler::InstructionStream<'a>,
+        check_ranges: CheckRanges,
+    ) -> Self {
+        Self {
+            stream,
+            register_manager: RegisterManager::new(),
+            check_ranges,
+        }
+    }
+
+    pub fn make_instruction(&mut self, instruction: instruction::Info) {
+        generate_instruction(self, instruction);
+    }
+
+    pub fn complete(mut self, branch_instruction: instruction::Info) -> BasicBlock {
+        end_basic_block(&mut self, branch_instruction);
+
+        // deconstruct self to avoid drop panic.
+        let BlockBuilder {
+            stream,
+            register_manager,
+            ..
+        } = self;
+
+        assert!(register_manager.is_cleared());
+
+        let funct: BasicBlock = unsafe { std::mem::transmute(stream.start_instruction_pointer()) };
+        stream.finish();
+
+        funct
+    }
+}
 
 pub(super) fn generate_register_writeback(
     basic_block: &mut InstructionStream,
@@ -46,7 +87,7 @@ pub(super) fn generate_register_write_imm(
     );
 }
 
-pub(super) fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
+fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
     let next_start_address = branch.end_address();
 
     let branch_instruction = branch.instruction;
@@ -184,7 +225,7 @@ fn generate_branch(builder: &mut BlockBuilder, instruction: instruction::B, cont
     builder.stream.ret()
 }
 
-pub(super) fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::Info) {
+fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::Info) {
     let next_start_address = instruction.end_address();
     let instruction::Info {
         instruction,

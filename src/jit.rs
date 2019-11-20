@@ -10,44 +10,6 @@ type BasicBlock =
 
 type CheckRanges = extern "sysv64" fn(pc: u32, ctx: &mut context::Runtime, address: u32) -> bool;
 
-struct BlockBuilder<'a> {
-    stream: assembler::InstructionStream<'a>,
-    register_manager: alloc::RegisterManager,
-    check_ranges: CheckRanges,
-}
-
-impl<'a> BlockBuilder<'a> {
-    fn start(stream: assembler::InstructionStream<'a>, check_ranges: CheckRanges) -> Self {
-        Self {
-            stream,
-            register_manager: alloc::RegisterManager::new(),
-            check_ranges,
-        }
-    }
-
-    fn make_instruction(&mut self, instruction: instruction::Info) {
-        generator::generate_instruction(self, instruction);
-    }
-
-    fn complete(mut self, branch_instruction: instruction::Info) -> BasicBlock {
-        generator::end_basic_block(&mut self, branch_instruction);
-
-        // deconstruct self to avoid drop panic.
-        let BlockBuilder {
-            stream,
-            register_manager,
-            ..
-        } = self;
-
-        assert!(register_manager.is_cleared());
-
-        let funct: BasicBlock = unsafe { std::mem::transmute(stream.start_instruction_pointer()) };
-        stream.finish();
-
-        funct
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::context;
