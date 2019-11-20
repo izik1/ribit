@@ -2,14 +2,33 @@ pub mod compressed;
 
 use crate::DecodeError;
 
+use std::num::NonZeroU8;
+
 use crate::instruction::*;
 
-pub fn decode_rs(instruction: u32) -> u8 {
-    (instruction >> 15) as u8
+#[inline]
+fn decode_register(instruction: u32) -> Option<RiscVRegister> {
+    NonZeroU8::new((instruction as u8) & 0b1_1111).and_then(RiscVRegister::new)
 }
 
-pub fn decode_rd(instruction: u32) -> u8 {
-    ((instruction >> 7) & 0b1111) as u8
+pub fn decode_rs(instruction: u32) -> (Option<RiscVRegister>, Option<RiscVRegister>) {
+    let rs1 = decode_register(instruction >> 15);
+    let rs2 = decode_register(instruction >> 24);
+    (rs1, rs2)
+}
+
+pub fn decode_rd(instruction: u32) -> Option<RiscVRegister> {
+    decode_register(instruction >> 7)
+}
+
+pub const fn sign_extend(value: u16, data_bits: u8) -> u16 {
+    let mask = 16 - data_bits;
+    (((value << mask) as i16) >> mask) as u16
+}
+
+pub const fn sign_extend_32(value: u32, data_bits: u8) -> u32 {
+    let mask = 32 - data_bits;
+    (((value << mask) as i32) >> mask) as u32
 }
 
 pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> {
@@ -180,18 +199,19 @@ fn decode_branch(instruction: u32) -> Result<BTypeInstruction, DecodeError> {
         | ((instruction >> 20) & 0b0000_0111_1100_0000)
         | ((instruction >> 07) & 0b0000_0000_0011_1110)) as u16;
 
-    let rs = (instruction >> 17) as u8;
-    let opcode = match (instruction >> 12) & 0b111 {
+    let (rs1, rs2) = decode_rs(instruction);
+    let opcode = match ((instruction >> 12) & 0b111) as u8 {
         0b000 => BTypeOpcode::BEQ,
         0b001 => BTypeOpcode::BNE,
         0b100 => BTypeOpcode::BLT,
         0b101 => BTypeOpcode::BGE,
         0b110 => BTypeOpcode::BLTU,
         0b111 => BTypeOpcode::BGEU,
-        _ => return Err(DecodeError),
+        0b010 | 0b011 => return Err(DecodeError),
+        0x08..=0xff => unreachable!(),
     };
 
-    Ok(BTypeInstruction::new(imm, rs, opcode))
+    Ok(BTypeInstruction::new(imm, rs1, rs2, opcode))
 }
 
 #[cfg(test)]

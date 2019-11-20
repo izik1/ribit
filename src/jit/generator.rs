@@ -7,20 +7,16 @@ use assembler::InstructionStream;
 
 use crate::instruction::{
     BTypeInstruction, ITypeInstruction, ITypeOpcode, Instruction, JTypeInstruction, JTypeOpcode,
-    STypeInstruction,
+    RiscVRegister, STypeInstruction,
 };
 
 pub(super) fn generate_register_writeback(
     basic_block: &mut InstructionStream,
     native_reg: NativeRegister,
-    rv_reg: u8,
+    rv_reg: RiscVRegister,
 ) {
-    debug_assert_ne!(rv_reg, 0);
-
-    let offset = rv_reg as u32 * 4;
-
     basic_block.mov_Any32BitMemory_Register32Bit(
-        Memory::base_64_displacement(Register64Bit::RDI, offset.into()),
+        Memory::base_64_displacement(Register64Bit::RDI, rv_reg.as_offset().into()),
         native_reg.as_assembly_reg32(),
     );
 }
@@ -28,34 +24,22 @@ pub(super) fn generate_register_writeback(
 pub(super) fn generate_register_read(
     basic_block: &mut InstructionStream,
     native_reg: NativeRegister,
-    rv_reg: u8,
+    rv_reg: RiscVRegister,
 ) {
-    debug_assert_ne!(rv_reg, 0);
-
-    let offset = rv_reg as u32 * 4;
-
     basic_block.mov_Register32Bit_Any32BitMemory(
         native_reg.as_assembly_reg32(),
-        Memory::base_64_displacement(Register64Bit::RDI, offset.into()),
+        Memory::base_64_displacement(Register64Bit::RDI, rv_reg.as_offset().into()),
     );
 }
 
 // todo: support native_register arguments
 pub(super) fn generate_register_write_imm(
     basic_block: &mut InstructionStream,
-    rv_reg: u8,
+    rv_reg: RiscVRegister,
     value: u32,
 ) {
-    debug_assert_ne!(rv_reg, 0);
-    if rv_reg == 0 {
-        // x0 is like `/dev/zero`, ignores all writes, and all reads return 0
-        return;
-    }
-
-    let offset = rv_reg as u32 * 4;
-
     basic_block.mov_Any32BitMemory_Immediate32Bit(
-        Memory::base_64_displacement(Register64Bit::RDI, offset.into()),
+        Memory::base_64_displacement(Register64Bit::RDI, rv_reg.as_offset().into()),
         value.into(),
     );
 }
@@ -80,7 +64,7 @@ pub(super) fn generate_basic_block_end(
             // before we return, and before we `generate_register_write_imm` we need to make sure that all the registers are done.
             reg_manager.free_all(block);
 
-            if rd != 0 {
+            if let Some(rd) = rd {
                 generate_register_write_imm(block, rd, next_start_address);
             }
 
@@ -98,17 +82,16 @@ pub(super) fn generate_basic_block_end(
             // before we return, and before we `generate_register_write_imm` we need to make sure that all the registers are done.
             reg_manager.free_all(block);
 
-            if rd != 0 {
+            if let Some(rd) = rd {
                 generate_register_write_imm(block, rd, next_start_address);
             }
 
             block.mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, (imm as i16).into());
 
-            if rs1 != 0 {
-                let offset = rs1 as u32 * 4;
+            if let Some(rs1) = rs1 {
                 block.add_Register32Bit_Any32BitMemory(
                     Register32Bit::EAX,
-                    Memory::base_64_displacement(Register64Bit::RDI, offset.into()),
+                    Memory::base_64_displacement(Register64Bit::RDI, rs1.as_offset().into()),
                 );
             }
 
@@ -132,9 +115,12 @@ fn generate_branch(
     continue_pc: u32,
 ) {
     use crate::instruction::BTypeOpcode;
-    let BTypeInstruction { rs, imm, opcode } = instruction;
-    let rs1 = rs & 0xf;
-    let rs2 = rs >> 4;
+    let BTypeInstruction {
+        rs1,
+        rs2,
+        imm,
+        opcode,
+    } = instruction;
 
     let jump_addr = continue_pc.wrapping_add(imm as i16 as u32);
 
@@ -151,6 +137,8 @@ fn generate_branch(
     // ret
 
     // fixme: need to handle x0
+    let rs1 = rs1.expect("todo");
+    let rs2 = rs2.expect("todo");
     let native_rs1 = reg_manager.alloc(rs1, &[rs1, rs2], block);
     let native_rs2 = reg_manager.alloc(rs2, &[rs1, rs2], block);
 
@@ -226,16 +214,22 @@ fn generate_stype_instruction(
     next_start_address: u32,
 ) {
     use crate::instruction::STypeOpcode;
-    let STypeInstruction {imm: _imm, rs, opcode: _opcode} = instruction;
-    let rs1 = rs & 0xf;
-    let rs2 = rs >> 4;
+    let STypeInstruction {
+        imm: _imm,
+        rs1,
+        rs2,
+        opcode: _opcode,
+    } = instruction;
 
     // todo: handle rs1 == 0 || rs2 == 0
-    let _native_rs1 = reg_manager.alloc(rs1, &[rs1, rs2], block);
-    let _native_rs2 = reg_manager.alloc(rs2, &[rs1, rs2], block);
+
+    if let (Some(rs1), Some(rs2)) = (rs1, rs2) {
+        let _native_rs1 = reg_manager.alloc(rs1, &[rs1, rs2], block);
+        let _native_rs2 = reg_manager.alloc(rs2, &[rs1, rs2], block);
+    }
 
     todo!("store instruction");
-    
+
     // todo: handle blocks getting tainted
 }
 

@@ -1,4 +1,4 @@
-#![feature(vec_remove_item)]
+#![feature(vec_remove_item, bool_to_option)]
 
 pub mod decode;
 pub mod jit;

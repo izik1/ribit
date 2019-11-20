@@ -8,7 +8,8 @@ use assembler::mnemonic_parameter_types::registers::Register32Bit as AssemblerRe
 mod alloc;
 mod generator;
 
-type BasicBlock = unsafe extern "sysv64" fn(regs: *mut u32, ctx: &mut JitContext, memory: *mut u8) -> u32;
+type BasicBlock =
+    unsafe extern "sysv64" fn(regs: *mut u32, ctx: &mut JitContext, memory: *mut u8) -> u32;
 
 pub struct InstructionInfo {
     instruction: Instruction,
@@ -58,9 +59,14 @@ pub struct JitContext {
 
 impl JitContext {
     // todo: clean
-    pub fn execute_basic_block(&mut self, pc: &mut u32, regs: &mut [u32; crate::XLEN], memory: &mut [u8]) {
+    pub fn execute_basic_block(
+        &mut self,
+        pc: &mut u32,
+        regs: &mut [u32; crate::XLEN],
+        memory: &mut [u8],
+    ) {
         // assert 16 MiB of memory for now
-        assert_eq!(memory.len(), 1024*1024*16);
+        assert_eq!(memory.len(), 1024 * 1024 * 16);
 
         if let Some(block_num) = self.ranges.iter().position(|range| range.start == *pc) {
             let block = &self.blocks[block_num];
