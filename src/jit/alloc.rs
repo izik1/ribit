@@ -25,6 +25,10 @@ impl RegisterManager {
         }
     }
 
+    pub fn is_cleared(&self) -> bool {
+        self.used_registers.is_empty()
+    }
+
     pub fn try_alloc_specific(
         &mut self,
         native_reg: NativeRegister,

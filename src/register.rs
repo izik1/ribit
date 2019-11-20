@@ -2,6 +2,8 @@ pub(crate) use assembler::mnemonic_parameter_types::registers::Register32Bit as 
 
 use std::num::NonZeroU8;
 
+// todo: get rid of "Register" suffix
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct RiscVRegister(NonZeroU8);
 

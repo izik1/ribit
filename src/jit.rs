@@ -1,91 +1,56 @@
-use crate::instruction::Instruction;
-
-use assembler::ExecutableAnonymousMemoryMap;
-use std::ops::Range;
+use crate::instruction;
 
 mod alloc;
 mod generator;
 
+pub mod context;
+
 type BasicBlock =
-    unsafe extern "sysv64" fn(regs: *mut u32, ctx: &mut JitContext, memory: *mut u8) -> u32;
+    unsafe extern "sysv64" fn(regs: *mut u32, ctx: &mut context::Runtime, memory: *mut u8) -> u32;
 
-pub struct InstructionInfo {
-    instruction: Instruction,
-    start_address: u32,
-    len: u32,
+type CheckRanges = extern "sysv64" fn(pc: u32, ctx: &mut context::Runtime, address: u32) -> bool;
+
+struct BlockBuilder<'a> {
+    stream: assembler::InstructionStream<'a>,
+    register_manager: alloc::RegisterManager,
+    check_ranges: CheckRanges,
 }
 
-impl InstructionInfo {
-    #[must_use]
-    pub fn end_address(&self) -> u32 {
-        self.start_address.wrapping_add(self.len)
-    }
-
-    #[must_use]
-    pub fn new(instruction: Instruction, start_address: u32, len: u32) -> Self {
+impl<'a> BlockBuilder<'a> {
+    fn start(stream: assembler::InstructionStream<'a>, check_ranges: CheckRanges) -> Self {
         Self {
-            instruction,
-            start_address,
-            len,
-        }
-    }
-}
-
-// todo: rename to `RuntimeContext` and create a `BuildContext`
-
-pub struct JitContext {
-    buffer: ExecutableAnonymousMemoryMap,
-    blocks: Vec<BasicBlock>,
-    ranges: Vec<Range<u32>>,
-}
-
-impl JitContext {
-    // todo: clean
-    pub fn execute_basic_block(
-        &mut self,
-        pc: &mut u32,
-        regs: &mut [u32; crate::XLEN],
-        memory: &mut [u8],
-    ) {
-        // assert 16 MiB of memory for now
-        assert_eq!(memory.len(), 1024 * 1024 * 16);
-
-        if let Some(block_num) = self.ranges.iter().position(|range| range.start == *pc) {
-            let block = &self.blocks[block_num];
-            *pc = unsafe { block(regs.as_mut_ptr(), self, memory.as_mut_ptr()) }
-        } else {
-            todo!("put an error here")
+            stream,
+            register_manager: alloc::RegisterManager::new(),
+            check_ranges,
         }
     }
 
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            buffer: ExecutableAnonymousMemoryMap::new(4096 * 16, false, true).unwrap(),
-            blocks: vec![],
-            ranges: vec![],
-        }
+    fn make_instruction(&mut self, instruction: instruction::Info) {
+        generator::generate_instruction(self, instruction);
     }
 
-    // todo: signature
-    pub fn generate_basic_block(
-        &mut self,
-        block_instrs: Vec<InstructionInfo>,
-        branch: InstructionInfo,
-    ) {
-        generator::generate_basic_block(self, block_instrs, branch);
-    }
-}
+    fn complete(mut self, branch_instruction: instruction::Info) -> BasicBlock {
+        generator::end_basic_block(&mut self, branch_instruction);
 
-impl Default for JitContext {
-    fn default() -> Self {
-        Self::new()
+        // deconstruct self to avoid drop panic.
+        let BlockBuilder {
+            stream,
+            register_manager,
+            ..
+        } = self;
+
+        assert!(register_manager.is_cleared());
+
+        let funct: BasicBlock = unsafe { std::mem::transmute(stream.start_instruction_pointer()) };
+        stream.finish();
+
+        funct
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{InstructionInfo, JitContext};
+    use super::context;
     use crate::{
         instruction::{self, Instruction},
         opcode,
@@ -102,11 +67,11 @@ mod test {
 
     #[test]
     fn jal_basic() {
-        let mut ctx = JitContext::new();
+        let mut ctx = context::Runtime::new();
 
         ctx.generate_basic_block(
             vec![],
-            InstructionInfo::new(
+            instruction::Info::new(
                 Instruction::J(instruction::J {
                     imm: 4096,
                     rd: Some(RiscVRegister::X4),
@@ -135,11 +100,11 @@ mod test {
 
     #[test]
     fn jalr_basic() {
-        let mut ctx = JitContext::new();
+        let mut ctx = context::Runtime::new();
 
         ctx.generate_basic_block(
             vec![],
-            InstructionInfo::new(
+            instruction::Info::new(
                 Instruction::I(instruction::I {
                     imm: 4096,
                     rd: Some(RiscVRegister::X4),
@@ -172,11 +137,11 @@ mod test {
 
     #[test]
     fn reg0_unwritable_imm() {
-        let mut ctx = JitContext::new();
+        let mut ctx = context::Runtime::new();
 
         ctx.generate_basic_block(
             vec![],
-            InstructionInfo::new(
+            instruction::Info::new(
                 Instruction::J(instruction::J {
                     imm: 4096,
                     rd: None,

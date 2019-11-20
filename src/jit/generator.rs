@@ -1,4 +1,4 @@
-use super::{alloc::RegisterManager, BasicBlock, InstructionInfo, JitContext};
+use super::BlockBuilder;
 use assembler::mnemonic_parameter_types::{
     memory::Memory,
     registers::{Register32Bit, Register64Bit},
@@ -46,11 +46,8 @@ pub(super) fn generate_register_write_imm(
     );
 }
 
-pub(super) fn generate_basic_block_end(
-    block: &mut InstructionStream,
-    branch: InstructionInfo,
-    reg_manager: &mut super::alloc::RegisterManager,
-) {
+// todo: rename to `end_basic_block`
+pub(super) fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
     let next_start_address = branch.end_address();
 
     let branch_instruction = branch.instruction;
@@ -64,15 +61,17 @@ pub(super) fn generate_basic_block_end(
             let res_pc = next_start_address.wrapping_add(imm);
 
             // before we return, and before we `generate_register_write_imm` we need to make sure that all the registers are done.
-            reg_manager.free_all(block);
+            builder.register_manager.free_all(&mut builder.stream);
 
             if let Some(rd) = rd {
-                generate_register_write_imm(block, rd, next_start_address);
+                generate_register_write_imm(&mut builder.stream, rd, next_start_address);
             }
 
-            block.mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, res_pc.into());
+            builder
+                .stream
+                .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, res_pc.into());
 
-            block.ret();
+            builder.stream.ret();
         }
 
         Instruction::I(instruction::I {
@@ -82,39 +81,39 @@ pub(super) fn generate_basic_block_end(
             rs1,
         }) => {
             // before we return, and before we `generate_register_write_imm` we need to make sure that all the registers are done.
-            reg_manager.free_all(block);
+            builder.register_manager.free_all(&mut builder.stream);
 
             if let Some(rd) = rd {
-                generate_register_write_imm(block, rd, next_start_address);
+                // todo: have this interact better with `builder.register_manager`
+                generate_register_write_imm(&mut builder.stream, rd, next_start_address);
             }
 
-            block.mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, (imm as i16).into());
+            builder
+                .stream
+                .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, (imm as i16).into());
 
             if let Some(rs1) = rs1 {
-                block.add_Register32Bit_Any32BitMemory(
+                builder.stream.add_Register32Bit_Any32BitMemory(
                     Register32Bit::EAX,
                     Memory::base_64_displacement(Register64Bit::RDI, rs1.as_offset().into()),
                 );
             }
 
-            block.btr_Register32Bit_Immediate8Bit(Register32Bit::EAX, 0_u8.into());
+            builder
+                .stream
+                .btr_Register32Bit_Immediate8Bit(Register32Bit::EAX, 0_u8.into());
 
-            block.ret();
+            builder.stream.ret();
         }
 
         Instruction::I(_) | Instruction::R(_) | Instruction::S(_) | Instruction::U(_) => {
             unreachable!("blocks can only end on a branch?")
         }
-        Instruction::B(instr) => generate_branch(block, instr, reg_manager, next_start_address),
+        Instruction::B(instr) => generate_branch(builder, instr, next_start_address),
     }
 }
 
-fn generate_branch(
-    block: &mut InstructionStream,
-    instruction: instruction::B,
-    reg_manager: &mut super::alloc::RegisterManager,
-    continue_pc: u32,
-) {
+fn generate_branch(builder: &mut BlockBuilder, instruction: instruction::B, continue_pc: u32) {
     let instruction::B {
         rs1,
         rs2,
@@ -139,52 +138,56 @@ fn generate_branch(
     // fixme: need to handle x0
     let rs1 = rs1.expect("todo");
     let rs2 = rs2.expect("todo");
-    let native_rs1 = reg_manager.alloc(rs1, &[rs1, rs2], block);
-    let native_rs2 = reg_manager.alloc(rs2, &[rs1, rs2], block);
+    let native_rs1 = builder
+        .register_manager
+        .alloc(rs1, &[rs1, rs2], &mut builder.stream);
+    let native_rs2 = builder
+        .register_manager
+        .alloc(rs2, &[rs1, rs2], &mut builder.stream);
 
-    block.mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, (continue_pc).into());
+    builder
+        .stream
+        .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, (continue_pc).into());
 
-    block.cmp_Register32Bit_Register32Bit(
+    builder.stream.cmp_Register32Bit_Register32Bit(
         native_rs1.as_assembly_reg32(),
         native_rs2.as_assembly_reg32(),
     );
 
     // hack: we don't know what registers were allocated for `native_rs1` and `native_rs2`, but we need to clobber ECX.
-    reg_manager.free_all(block);
+    builder.register_manager.free_all(&mut builder.stream);
 
-    block.mov_Register32Bit_Immediate32Bit(Register32Bit::ECX, jump_addr.into());
+    builder
+        .stream
+        .mov_Register32Bit_Immediate32Bit(Register32Bit::ECX, jump_addr.into());
 
     match opcode {
-        opcode::B::BEQ => {
-            block.cmove_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX)
-        }
-        opcode::B::BNE => {
-            block.cmovne_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX)
-        }
-        opcode::B::BLT => {
-            block.cmovl_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX)
-        }
-        opcode::B::BGE => {
-            block.cmovge_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX)
-        }
-        opcode::B::BLTU => {
-            block.cmovb_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX)
-        }
-        opcode::B::BGEU => {
-            block.cmovae_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX)
-        }
+        opcode::B::BEQ => builder
+            .stream
+            .cmove_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
+        opcode::B::BNE => builder
+            .stream
+            .cmovne_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
+        opcode::B::BLT => builder
+            .stream
+            .cmovl_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
+        opcode::B::BGE => builder
+            .stream
+            .cmovge_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
+        opcode::B::BLTU => builder
+            .stream
+            .cmovb_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
+        opcode::B::BGEU => builder
+            .stream
+            .cmovae_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
     }
 
-    block.ret()
+    builder.stream.ret()
 }
 
-fn generate_instruction(
-    block: &mut InstructionStream,
-    instruction: InstructionInfo,
-    reg_manager: &mut RegisterManager,
-) {
+pub(super) fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::Info) {
     let next_start_address = instruction.end_address();
-    let InstructionInfo {
+    let instruction::Info {
         instruction,
         start_address,
         ..
@@ -199,7 +202,7 @@ fn generate_instruction(
         }) => unreachable!("blocks cannot contain a branch"),
 
         Instruction::S(instruction) => {
-            generate_stype_instruction(block, instruction, reg_manager, next_start_address)
+            generate_stype_instruction(builder, instruction, next_start_address)
         }
 
         _ => todo!("implement remaining instructions"),
@@ -208,9 +211,8 @@ fn generate_instruction(
 
 // todo: broken
 fn generate_stype_instruction(
-    block: &mut InstructionStream,
+    builder: &mut BlockBuilder,
     instruction: instruction::S,
-    reg_manager: &mut RegisterManager,
     next_start_address: u32,
 ) {
     let instruction::S {
@@ -223,88 +225,15 @@ fn generate_stype_instruction(
     // todo: handle rs1 == 0 || rs2 == 0
 
     if let (Some(rs1), Some(rs2)) = (rs1, rs2) {
-        let _native_rs1 = reg_manager.alloc(rs1, &[rs1, rs2], block);
-        let _native_rs2 = reg_manager.alloc(rs2, &[rs1, rs2], block);
+        let _native_rs1 = builder
+            .register_manager
+            .alloc(rs1, &[rs1, rs2], &mut builder.stream);
+        let _native_rs2 = builder
+            .register_manager
+            .alloc(rs2, &[rs1, rs2], &mut builder.stream);
     }
 
     todo!("store instruction");
 
     // todo: handle blocks getting tainted
-}
-
-pub(super) fn generate_basic_block(
-    ctx: &mut JitContext,
-    block_instrs: Vec<InstructionInfo>,
-    branch: InstructionInfo,
-) {
-    let start_pc = block_instrs
-        .first()
-        .unwrap_or_else(|| &branch)
-        .start_address;
-    let end_pc = branch.end_address();
-
-    let mut block = ctx
-        .buffer
-        .instruction_stream(&assembler::InstructionStreamHints::default());
-    let mut reg_manager = RegisterManager::new();
-
-    for instruction in block_instrs {
-        generate_instruction(&mut block, instruction, &mut reg_manager)
-    }
-
-    generate_basic_block_end(&mut block, branch, &mut reg_manager);
-
-    let funct: BasicBlock = unsafe { std::mem::transmute(block.start_instruction_pointer()) };
-    block.finish();
-
-    let insert_idx = ctx
-        .ranges
-        .binary_search_by_key(&start_pc, |range| range.start)
-        .unwrap_or_else(|e| e);
-
-    ctx.blocks.insert(insert_idx, funct);
-    ctx.ranges.insert(insert_idx, start_pc..end_pc);
-}
-
-extern "sysv64" fn check_ranges(pc: u32, ctx: &mut JitContext, address: u32) -> bool {
-    let mut early_exit = false;
-
-    let mut range_start: Option<usize> = None;
-    let mut range_end: Option<usize> = None;
-
-    for (idx, range) in ctx.ranges.iter().enumerate() {
-        if range.contains(&address) {
-            early_exit |= range.contains(&pc) && pc <= address;
-            range_start = range_start.or(Some(idx));
-        }
-
-        if !range.contains(&address) && range_start != None {
-            range_end = Some(idx);
-            break;
-        }
-    }
-
-    if let Some(range_start) = range_start {
-        let range_end = range_end.unwrap_or_else(|| ctx.ranges.len());
-
-        if range_start > range_end {
-            unsafe { std::hint::unreachable_unchecked() }
-        }
-
-        if range_end > ctx.ranges.len() {
-            unsafe { std::hint::unreachable_unchecked() }
-        }
-
-        ctx.ranges
-            .splice(range_start..range_end, std::iter::empty());
-
-        if range_end > ctx.blocks.len() {
-            unsafe { std::hint::unreachable_unchecked() }
-        }
-
-        ctx.blocks
-            .splice(range_start..range_end, std::iter::empty());
-    }
-
-    early_exit
 }
