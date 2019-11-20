@@ -1,7 +1,7 @@
 use crate::decode::{decode_rd, decode_rs, sign_extend};
 
 use crate::opcode;
-use crate::register::RiscVRegister;
+use crate::register::RiscV as RiscVRegister;
 
 // todo: decide on visibility of fields
 

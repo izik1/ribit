@@ -6,24 +6,24 @@ use std::num::NonZeroU8;
 
 use crate::instruction::{self, Instruction};
 
-use crate::register::RiscVRegister;
+use crate::register;
 
 use crate::opcode;
 
 #[inline]
-fn decode_register(instruction: u32) -> Option<RiscVRegister> {
-    NonZeroU8::new((instruction as u8) & 0b1_1111).and_then(RiscVRegister::new)
+fn decode_register(instruction: u32) -> Option<register::RiscV> {
+    NonZeroU8::new((instruction as u8) & 0b1_1111).and_then(register::RiscV::new)
 }
 
 #[must_use]
-pub fn decode_rs(instruction: u32) -> (Option<RiscVRegister>, Option<RiscVRegister>) {
+pub fn decode_rs(instruction: u32) -> (Option<register::RiscV>, Option<register::RiscV>) {
     let rs1 = decode_register(instruction >> 15);
     let rs2 = decode_register(instruction >> 24);
     (rs1, rs2)
 }
 
 #[must_use]
-pub fn decode_rd(instruction: u32) -> Option<RiscVRegister> {
+pub fn decode_rd(instruction: u32) -> Option<register::RiscV> {
     decode_register(instruction >> 7)
 }
 

@@ -1,21 +1,21 @@
 use super::BlockBuilder;
+
 use assembler::mnemonic_parameter_types::{
     memory::Memory,
     registers::{Register32Bit, Register64Bit},
 };
-use assembler::InstructionStream;
 
-use crate::register::{NativeRegister, RiscVRegister};
+use assembler::InstructionStream;
 
 use crate::{
     instruction::{self, Instruction},
-    opcode,
+    opcode, register,
 };
 
 pub(super) fn generate_register_writeback(
     basic_block: &mut InstructionStream,
-    native_reg: NativeRegister,
-    rv_reg: RiscVRegister,
+    native_reg: register::Native,
+    rv_reg: register::RiscV,
 ) {
     basic_block.mov_Any32BitMemory_Register32Bit(
         Memory::base_64_displacement(Register64Bit::RDI, rv_reg.as_offset().into()),
@@ -25,8 +25,8 @@ pub(super) fn generate_register_writeback(
 
 pub(super) fn generate_register_read(
     basic_block: &mut InstructionStream,
-    native_reg: NativeRegister,
-    rv_reg: RiscVRegister,
+    native_reg: register::Native,
+    rv_reg: register::RiscV,
 ) {
     basic_block.mov_Register32Bit_Any32BitMemory(
         native_reg.as_assembly_reg32(),
@@ -37,7 +37,7 @@ pub(super) fn generate_register_read(
 // todo: support native_register arguments
 pub(super) fn generate_register_write_imm(
     basic_block: &mut InstructionStream,
-    rv_reg: RiscVRegister,
+    rv_reg: register::RiscV,
     value: u32,
 ) {
     basic_block.mov_Any32BitMemory_Immediate32Bit(
@@ -46,7 +46,6 @@ pub(super) fn generate_register_write_imm(
     );
 }
 
-// todo: rename to `end_basic_block`
 pub(super) fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
     let next_start_address = branch.end_address();
 

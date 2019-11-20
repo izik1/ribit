@@ -3,7 +3,7 @@ use crate::{
     opcode, DecodeError,
 };
 
-use crate::register::RiscVRegister;
+use crate::register::RiscV as RiscVRegister;
 
 use super::{sign_extend, sign_extend_32};
 

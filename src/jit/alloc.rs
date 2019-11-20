@@ -3,11 +3,11 @@ use std::collections::VecDeque;
 use assembler::InstructionStream;
 
 use crate::jit::generator::{generate_register_read, generate_register_writeback};
-use crate::register::{NativeRegister, RiscVRegister};
+use crate::register;
 
 pub(super) struct RegisterManager {
-    free_registers: Vec<NativeRegister>,
-    used_registers: VecDeque<(NativeRegister, RiscVRegister)>,
+    free_registers: Vec<register::Native>,
+    used_registers: VecDeque<(register::Native, register::RiscV)>,
 }
 
 impl RegisterManager {
@@ -15,11 +15,11 @@ impl RegisterManager {
         Self {
             free_registers: vec![
                 // don't allocate RDX, RDX is an arg.
-                // NativeRegister::RDX,
-                NativeRegister::RCX,
-                NativeRegister::R8,
-                NativeRegister::R9,
-                // NativeRegister::RAX,
+                // register::Native::RDX,
+                register::Native::RCX,
+                register::Native::R8,
+                register::Native::R9,
+                // register::Native::RAX,
             ],
             used_registers: VecDeque::new(),
         }
@@ -31,10 +31,10 @@ impl RegisterManager {
 
     pub fn try_alloc_specific(
         &mut self,
-        native_reg: NativeRegister,
-        rv_reg: RiscVRegister,
+        native_reg: register::Native,
+        rv_reg: register::RiscV,
         basic_block: &mut InstructionStream,
-    ) -> Result<(), RiscVRegister> {
+    ) -> Result<(), register::RiscV> {
         if let Some(rv_reg) = self.find_rv32_register(native_reg) {
             return Err(rv_reg);
         }
@@ -46,8 +46,8 @@ impl RegisterManager {
 
     pub fn alloc_specific(
         &mut self,
-        native_reg: NativeRegister,
-        rv_reg: RiscVRegister,
+        native_reg: register::Native,
+        rv_reg: register::RiscV,
         basic_block: &mut InstructionStream,
     ) {
         // todo: proper error handling?
@@ -59,11 +59,11 @@ impl RegisterManager {
         self.used_registers.push_back((native_reg, rv_reg));
     }
 
-    fn is_free(&self, reg: NativeRegister) -> bool {
+    fn is_free(&self, reg: register::Native) -> bool {
         self.free_registers.iter().any(|it| *it == reg)
     }
 
-    fn find_rv32_register(&self, reg: NativeRegister) -> Option<RiscVRegister> {
+    fn find_rv32_register(&self, reg: register::Native) -> Option<register::RiscV> {
         self.used_registers
             .iter()
             .find_map(|(native_reg, alloced_reg)| {
@@ -75,7 +75,7 @@ impl RegisterManager {
             })
     }
 
-    fn find_native_register(&self, reg: RiscVRegister) -> Option<NativeRegister> {
+    fn find_native_register(&self, reg: register::RiscV) -> Option<register::Native> {
         self.used_registers
             .iter()
             .find_map(|(native_reg, alloced_reg)| {
@@ -89,9 +89,9 @@ impl RegisterManager {
 
     fn try_alloc(
         &mut self,
-        reg: RiscVRegister,
+        reg: register::RiscV,
         basic_block: &mut InstructionStream,
-    ) -> Option<NativeRegister> {
+    ) -> Option<register::Native> {
         self.find_native_register(reg).or_else(|| {
             let native_reg = self.free_registers.pop()?;
             generate_register_read(basic_block, native_reg, reg);
@@ -102,10 +102,10 @@ impl RegisterManager {
 
     pub fn alloc(
         &mut self,
-        reg: RiscVRegister,
-        keep_regs: &[RiscVRegister],
+        reg: register::RiscV,
+        keep_regs: &[register::RiscV],
         basic_block: &mut InstructionStream,
-    ) -> NativeRegister {
+    ) -> register::Native {
         if let Some(native_reg) = self.try_alloc(reg, basic_block) {
             return native_reg;
         }
@@ -121,9 +121,9 @@ impl RegisterManager {
 
     pub fn free(
         &mut self,
-        rv32_reg: RiscVRegister,
+        rv32_reg: register::RiscV,
         basic_block: &mut InstructionStream,
-    ) -> Option<NativeRegister> {
+    ) -> Option<register::Native> {
         let idx = self
             .used_registers
             .iter()
@@ -137,9 +137,9 @@ impl RegisterManager {
 
     pub fn free_first(
         &mut self,
-        keep_regs: &[RiscVRegister],
+        keep_regs: &[register::RiscV],
         basic_block: &mut InstructionStream,
-    ) -> Option<NativeRegister> {
+    ) -> Option<register::Native> {
         let idx = self
             .used_registers
             .iter()

@@ -5,11 +5,11 @@ use std::num::NonZeroU8;
 // todo: get rid of "Register" suffix
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-pub struct RiscVRegister(NonZeroU8);
+pub struct RiscV(NonZeroU8);
 
 // all of these functions are super trivial and should *always* be inlined.
 #[allow(clippy::inline_always)]
-impl RiscVRegister {
+impl RiscV {
     #[inline(always)]
     #[must_use]
     pub fn new(inner: NonZeroU8) -> Option<Self> {
@@ -71,7 +71,7 @@ impl RiscVRegister {
 }
 
 #[derive(Hash, Eq, PartialEq, Copy, Clone)]
-pub(crate) enum NativeRegister {
+pub(crate) enum Native {
     RDX,
     RCX,
     R8,
@@ -79,7 +79,7 @@ pub(crate) enum NativeRegister {
     // RAX,
 }
 
-impl NativeRegister {
+impl Native {
     pub fn as_assembly_reg32(self) -> AssemblerReg32 {
         match self {
             Self::RDX => AssemblerReg32::EDX,

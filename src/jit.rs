@@ -53,8 +53,7 @@ mod test {
     use super::context;
     use crate::{
         instruction::{self, Instruction},
-        opcode,
-        register::RiscVRegister,
+        opcode, register,
     };
 
     fn init() -> ([u32; 32], Vec<u8>) {
@@ -74,7 +73,7 @@ mod test {
             instruction::Info::new(
                 Instruction::J(instruction::J {
                     imm: 4096,
-                    rd: Some(RiscVRegister::X4),
+                    rd: Some(register::RiscV::X4),
                     opcode: opcode::J::JAL,
                 }),
                 0,
@@ -107,8 +106,8 @@ mod test {
             instruction::Info::new(
                 Instruction::I(instruction::I {
                     imm: 4096,
-                    rd: Some(RiscVRegister::X4),
-                    rs1: Some(RiscVRegister::X1),
+                    rd: Some(register::RiscV::X4),
+                    rs1: Some(register::RiscV::X1),
                     opcode: opcode::I::JALR,
                 }),
                 4,
