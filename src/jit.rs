@@ -94,107 +94,120 @@ impl JitContext {
     }
 }
 
-#[test]
-fn jal_basic() {
-    use crate::instruction::{JTypeInstruction, JTypeOpcode};
-    let mut ctx = JitContext::new();
+#[cfg(test)]
+mod test {
+    use super::{InstructionInfo, JitContext};
+    use crate::instruction::{Instruction, RiscVRegister};
 
-    ctx.generate_basic_block(
-        vec![],
-        InstructionInfo::new(
-            Instruction::JType(JTypeInstruction {
-                imm: 4096,
-                rd: 4,
-                opcode: JTypeOpcode::JAL,
-            }),
-            0,
-            4,
-        ),
-    );
+    fn init() -> ([u32; 32], Vec<u8>) {
+        let mut regs = [0xaaaaaaaa; 32];
+        regs[0] = 0;
+        let memory = vec![0xbb; 1024 * 1024 * 16];
 
-    let mut regs = [0xaaaaaaaa; 32];
-    regs[0] = 0;
-    let mut pc = 0;
+        (regs, memory)
+    }
 
-    ctx.execute_basic_block(&mut pc, &mut regs);
-    assert_eq!(pc, 4096 + 4);
+    #[test]
+    fn jal_basic() {
+        use crate::instruction::{JTypeInstruction, JTypeOpcode};
+        let mut ctx = JitContext::new();
 
-    assert_eq!(regs[0], 0);
+        ctx.generate_basic_block(
+            vec![],
+            InstructionInfo::new(
+                Instruction::JType(JTypeInstruction {
+                    imm: 4096,
+                    rd: Some(RiscVRegister::X4),
+                    opcode: JTypeOpcode::JAL,
+                }),
+                0,
+                4,
+            ),
+        );
 
-    for idx in (1..regs.len()) {
-        if idx == 4 {
-            assert_eq!(regs[idx], 4);
-        } else {
-            assert_eq!(regs[idx], 0xaaaaaaaa);
+        let (mut regs, mut memory) = init();
+
+        let mut pc = 0;
+
+        ctx.execute_basic_block(&mut pc, &mut regs, &mut memory);
+        assert_eq!(pc, 4096 + 4);
+
+        for idx in 1..regs.len() {
+            match idx {
+                0 => assert_eq!(regs[idx], 0),
+                4 => assert_eq!(regs[idx], 4),
+                _ => assert_eq!(regs[idx], 0xaaaaaaaa),
+            }
         }
     }
-}
 
-#[test]
-fn jalr_basic() {
-    use crate::instruction::{ITypeInstruction, ITypeOpcode};
-    let mut ctx = JitContext::new();
+    #[test]
+    fn jalr_basic() {
+        use crate::instruction::{ITypeInstruction, ITypeOpcode};
+        let mut ctx = JitContext::new();
 
-    ctx.generate_basic_block(
-        vec![],
-        InstructionInfo::new(
-            Instruction::IType(ITypeInstruction {
-                imm: 4096,
-                rd: 4,
-                rs1: 1,
-                opcode: ITypeOpcode::JALR,
-            }),
-            4,
-            4,
-        ),
-    );
+        ctx.generate_basic_block(
+            vec![],
+            InstructionInfo::new(
+                Instruction::IType(ITypeInstruction {
+                    imm: 4096,
+                    rd: Some(RiscVRegister::X4),
+                    rs1: Some(RiscVRegister::X1),
+                    opcode: ITypeOpcode::JALR,
+                }),
+                4,
+                4,
+            ),
+        );
 
-    let mut regs = [0xaaaaaaaa; 32];
-    regs[0] = 0;
-    regs[1] = 1024;
-    let mut pc = 4;
+        let (mut regs, mut memory) = init();
 
-    ctx.execute_basic_block(&mut pc, &mut regs);
-    assert_eq!(pc, 4096 + 1024);
+        regs[1] = 1024;
+        let mut pc = 4;
 
-    for idx in (0..regs.len()) {
-        match idx {
-            0 => assert_eq!(regs[idx], 0),
-            1 => assert_eq!(regs[idx], 1024),
-            4 => assert_eq!(regs[idx], 8),
-            _ => assert_eq!(regs[idx], 0xaaaaaaaa),
+        ctx.execute_basic_block(&mut pc, &mut regs, &mut memory);
+
+        assert_eq!(pc, 4096 + 1024);
+
+        for idx in 0..regs.len() {
+            match idx {
+                0 => assert_eq!(regs[idx], 0),
+                1 => assert_eq!(regs[idx], 1024),
+                4 => assert_eq!(regs[idx], 8),
+                _ => assert_eq!(regs[idx], 0xaaaaaaaa),
+            }
         }
     }
-}
 
-#[test]
-fn reg0_unwritable_imm() {
-    use crate::instruction::{JTypeInstruction, JTypeOpcode};
-    let mut ctx = JitContext::new();
+    #[test]
+    fn reg0_unwritable_imm() {
+        use crate::instruction::{JTypeInstruction, JTypeOpcode};
+        let mut ctx = JitContext::new();
 
-    ctx.generate_basic_block(
-        vec![],
-        InstructionInfo::new(
-            Instruction::JType(JTypeInstruction {
-                imm: 4096,
-                rd: 0,
-                opcode: JTypeOpcode::JAL,
-            }),
-            0,
-            4,
-        ),
-    );
+        ctx.generate_basic_block(
+            vec![],
+            InstructionInfo::new(
+                Instruction::JType(JTypeInstruction {
+                    imm: 4096,
+                    rd: None,
+                    opcode: JTypeOpcode::JAL,
+                }),
+                0,
+                4,
+            ),
+        );
 
-    let mut regs = [0xaaaaaaaa; 32];
-    regs[0] = 0;
-    let mut pc = 0;
+        let (mut regs, mut memory) = init();
+        let mut pc = 0;
 
-    ctx.execute_basic_block(&mut pc, &mut regs);
-    assert_eq!(pc, 4096 + 4);
+        ctx.execute_basic_block(&mut pc, &mut regs, &mut memory);
+        assert_eq!(pc, 4096 + 4);
 
-    assert_eq!(regs[0], 0);
-
-    for idx in (1..regs.len()) {
-        assert_eq!(regs[idx], 0xaaaaaaaa);
+        for idx in 0..regs.len() {
+            match idx {
+                0 => assert_eq!(regs[idx], 0),
+                _ => assert_eq!(regs[idx], 0xaaaaaaaa),
+            }
+        }
     }
 }
