@@ -1,4 +1,4 @@
-use crate::{instruction::*, DecodeError};
+use crate::{instruction::*, opcode, DecodeError};
 
 use super::{sign_extend, sign_extend_32};
 
@@ -46,7 +46,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
                 imm,
                 Some(RiscVRegister::X2),
                 Some(rd),
-                ITypeOpcode::ADDI,
+                opcode::I::ADDI,
             ))
         }
 
@@ -65,9 +65,9 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
                 | ((instruction >> 4) & 0b0100);
 
             if funct3 == 0b010 {
-                Instruction::I(ITypeInstruction::new(imm, rs1, r, ITypeOpcode::LW))
+                Instruction::I(ITypeInstruction::new(imm, rs1, r, opcode::I::LW))
             } else {
-                Instruction::S(STypeInstruction::new(imm, rs1, r, STypeOpcode::SW))
+                Instruction::S(STypeInstruction::new(imm, rs1, r, opcode::S::SW))
             }
         }
 
@@ -86,10 +86,10 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
             // FIXME: need to sign extend imm
             if funct3 == 0b000 {
                 // addi/noop
-                Instruction::I(ITypeInstruction::new(imm, r, r, ITypeOpcode::ADDI))
+                Instruction::I(ITypeInstruction::new(imm, r, r, opcode::I::ADDI))
             } else {
                 // C.LI
-                Instruction::I(ITypeInstruction::new(imm, None, r, ITypeOpcode::ADDI))
+                Instruction::I(ITypeInstruction::new(imm, None, r, opcode::I::ADDI))
             }
         }
 
@@ -108,7 +108,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
 
             let link_reg = (funct3 == 0b101).then(RiscVRegister::X1);
 
-            Instruction::J(JTypeInstruction::new(imm, link_reg, JTypeOpcode::JAL))
+            Instruction::J(JTypeInstruction::new(imm, link_reg, opcode::J::JAL))
         }
 
         (0b01, 0b011) => {
@@ -136,7 +136,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
                         imm,
                         Some(RiscVRegister::X2),
                         Some(RiscVRegister::X2),
-                        ITypeOpcode::ADDI,
+                        opcode::I::ADDI,
                     ))
                 }
 
@@ -148,7 +148,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
 
                     let imm = sign_extend_32(imm, 18);
 
-                    Instruction::U(UTypeInstruction::new(imm, r, UTypeOpcode::LUI))
+                    Instruction::U(UTypeInstruction::new(imm, r, opcode::U::LUI))
                 }
             }
         }
@@ -162,17 +162,17 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
 
             match (instruction >> 10) & 0b11 {
                 0b00 if imm5 == 0 => {
-                    Instruction::R(RTypeInstruction::new(r, rs2, r, RTypeOpcode::SRLI))
+                    Instruction::R(RTypeInstruction::new(r, rs2, r, opcode::R::SRLI))
                 }
                 0b01 if imm5 == 0 => {
-                    Instruction::R(RTypeInstruction::new(r, rs2, r, RTypeOpcode::SRAI))
+                    Instruction::R(RTypeInstruction::new(r, rs2, r, opcode::R::SRAI))
                 }
-                0b10 => Instruction::I(ITypeInstruction::new(imm, r, r, ITypeOpcode::ANDI)),
+                0b10 => Instruction::I(ITypeInstruction::new(imm, r, r, opcode::I::ANDI)),
                 0b11 if imm5 == 0 => match (instruction >> 5) & 0b11 {
-                    0b00 => Instruction::R(RTypeInstruction::new(r, rs2, r, RTypeOpcode::SUB)),
-                    0b01 => Instruction::R(RTypeInstruction::new(r, rs2, r, RTypeOpcode::XOR)),
-                    0b10 => Instruction::R(RTypeInstruction::new(r, rs2, r, RTypeOpcode::OR)),
-                    0b11 => Instruction::R(RTypeInstruction::new(r, rs2, r, RTypeOpcode::AND)),
+                    0b00 => Instruction::R(RTypeInstruction::new(r, rs2, r, opcode::R::SUB)),
+                    0b01 => Instruction::R(RTypeInstruction::new(r, rs2, r, opcode::R::XOR)),
+                    0b10 => Instruction::R(RTypeInstruction::new(r, rs2, r, opcode::R::OR)),
+                    0b11 => Instruction::R(RTypeInstruction::new(r, rs2, r, opcode::R::AND)),
                     _ => unreachable!(),
                 },
                 _ => return Err(DecodeError),
@@ -191,9 +191,9 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
             let imm = sign_extend(imm, 9);
 
             let opcode = if funct3 == 0b110 {
-                BTypeOpcode::BEQ
+                opcode::B::BEQ
             } else {
-                BTypeOpcode::BNE
+                opcode::B::BNE
             };
 
             Instruction::B(BTypeInstruction::new(imm, Some(rs1), None, opcode))
@@ -209,7 +209,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
 
             let r = decode_full_register(instruction >> 7);
 
-            Instruction::R(RTypeInstruction::new(r, rs2, r, RTypeOpcode::SLLI))
+            Instruction::R(RTypeInstruction::new(r, rs2, r, opcode::R::SLLI))
         }
 
         // C.FLDSP requires D extension
@@ -228,12 +228,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
                 return Err(DecodeError);
             }
 
-            Instruction::I(ITypeInstruction::new(
-                imm,
-                Some(r),
-                Some(r),
-                ITypeOpcode::LW,
-            ))
+            Instruction::I(ITypeInstruction::new(imm, Some(r), Some(r), opcode::I::LW))
         }
 
         (0b10, 0b100) => {
@@ -244,23 +239,21 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
             match (imm5, rs2, r) {
                 (false, None, None) => return Err(DecodeError),
                 (false, None, rs1) => {
-                    Instruction::I(ITypeInstruction::new(0, rs1, None, ITypeOpcode::JALR))
+                    Instruction::I(ITypeInstruction::new(0, rs1, None, opcode::I::JALR))
                 }
                 (false, rs2, rd) => {
-                    Instruction::R(RTypeInstruction::new(None, rs2, rd, RTypeOpcode::ADD))
+                    Instruction::R(RTypeInstruction::new(None, rs2, rd, opcode::R::ADD))
                 }
                 (true, None, None) => {
-                    Instruction::R(RTypeInstruction::new(None, None, None, RTypeOpcode::EBREAK))
+                    Instruction::R(RTypeInstruction::new(None, None, None, opcode::R::EBREAK))
                 }
                 (true, None, rs1) => Instruction::I(ITypeInstruction::new(
                     0,
                     rs1,
                     Some(RiscVRegister::X1),
-                    ITypeOpcode::JALR,
+                    opcode::I::JALR,
                 )),
-                (true, rs2, r) => {
-                    Instruction::R(RTypeInstruction::new(r, rs2, r, RTypeOpcode::ADD))
-                }
+                (true, rs2, r) => Instruction::R(RTypeInstruction::new(r, rs2, r, opcode::R::ADD)),
             }
         }
 
@@ -277,7 +270,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
                 imm,
                 Some(RiscVRegister::X2),
                 rs2,
-                STypeOpcode::SW,
+                opcode::S::SW,
             ))
         }
 

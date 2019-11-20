@@ -106,7 +106,10 @@ impl Default for JitContext {
 #[cfg(test)]
 mod test {
     use super::{InstructionInfo, JitContext};
-    use crate::instruction::{Instruction, RiscVRegister};
+    use crate::{
+        instruction::{Instruction, RiscVRegister},
+        opcode,
+    };
 
     fn init() -> ([u32; 32], Vec<u8>) {
         let mut regs = [0xaaaaaaaa; 32];
@@ -118,7 +121,7 @@ mod test {
 
     #[test]
     fn jal_basic() {
-        use crate::instruction::{JTypeInstruction, JTypeOpcode};
+        use crate::instruction::JTypeInstruction;
         let mut ctx = JitContext::new();
 
         ctx.generate_basic_block(
@@ -127,7 +130,7 @@ mod test {
                 Instruction::J(JTypeInstruction {
                     imm: 4096,
                     rd: Some(RiscVRegister::X4),
-                    opcode: JTypeOpcode::JAL,
+                    opcode: opcode::J::JAL,
                 }),
                 0,
                 4,
@@ -152,7 +155,7 @@ mod test {
 
     #[test]
     fn jalr_basic() {
-        use crate::instruction::{ITypeInstruction, ITypeOpcode};
+        use crate::instruction::ITypeInstruction;
         let mut ctx = JitContext::new();
 
         ctx.generate_basic_block(
@@ -162,7 +165,7 @@ mod test {
                     imm: 4096,
                     rd: Some(RiscVRegister::X4),
                     rs1: Some(RiscVRegister::X1),
-                    opcode: ITypeOpcode::JALR,
+                    opcode: opcode::I::JALR,
                 }),
                 4,
                 4,
@@ -190,7 +193,7 @@ mod test {
 
     #[test]
     fn reg0_unwritable_imm() {
-        use crate::instruction::{JTypeInstruction, JTypeOpcode};
+        use crate::instruction::JTypeInstruction;
         let mut ctx = JitContext::new();
 
         ctx.generate_basic_block(
@@ -199,7 +202,7 @@ mod test {
                 Instruction::J(JTypeInstruction {
                     imm: 4096,
                     rd: None,
-                    opcode: JTypeOpcode::JAL,
+                    opcode: opcode::J::JAL,
                 }),
                 0,
                 4,

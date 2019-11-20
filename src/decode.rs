@@ -6,6 +6,8 @@ use std::num::NonZeroU8;
 
 use crate::instruction::*;
 
+use crate::opcode;
+
 #[inline]
 fn decode_register(instruction: u32) -> Option<RiscVRegister> {
     NonZeroU8::new((instruction as u8) & 0b1_1111).and_then(RiscVRegister::new)
@@ -44,165 +46,165 @@ pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> 
         // todo: sign extend imm
         (0b110_1111, _, _) => Instruction::J(JTypeInstruction::from_instruction(
             instruction,
-            JTypeOpcode::JAL,
+            opcode::J::JAL,
         )),
 
         // todo: sign extend & set lsb to 0
         (0b110_0111, 0b000, _) => Instruction::I(ITypeInstruction::from_instruction(
             instruction,
-            ITypeOpcode::JALR,
+            opcode::I::JALR,
         )),
 
         (0b110_0011, _, _) => Instruction::B(decode_branch(instruction)?),
         (0b000_0011, 0b000, _) => Instruction::I(ITypeInstruction::from_instruction(
             instruction,
-            ITypeOpcode::LB,
+            opcode::I::LB,
         )),
         (0b000_0011, 0b001, _) => Instruction::I(ITypeInstruction::from_instruction(
             instruction,
-            ITypeOpcode::LH,
+            opcode::I::LH,
         )),
         (0b000_0011, 0b010, _) => Instruction::I(ITypeInstruction::from_instruction(
             instruction,
-            ITypeOpcode::LW,
+            opcode::I::LW,
         )),
         (0b000_0011, 0b100, _) => Instruction::I(ITypeInstruction::from_instruction(
             instruction,
-            ITypeOpcode::LBU,
+            opcode::I::LBU,
         )),
         (0b000_0011, 0b101, _) => Instruction::I(ITypeInstruction::from_instruction(
             instruction,
-            ITypeOpcode::LHU,
+            opcode::I::LHU,
         )),
         (0b010_0011, 0b000, _) => Instruction::S(STypeInstruction::from_instruction(
             instruction,
-            STypeOpcode::SB,
+            opcode::S::SB,
         )),
         (0b010_0011, 0b001, _) => Instruction::S(STypeInstruction::from_instruction(
             instruction,
-            STypeOpcode::SH,
+            opcode::S::SH,
         )),
         (0b010_0011, 0b010, _) => Instruction::S(STypeInstruction::from_instruction(
             instruction,
-            STypeOpcode::SW,
+            opcode::S::SW,
         )),
         (0b001_0011, 0b000, _) => Instruction::I(ITypeInstruction::from_instruction(
             instruction,
-            ITypeOpcode::ADDI,
+            opcode::I::ADDI,
         )),
         (0b001_0011, 0b010, _) => Instruction::I(ITypeInstruction::from_instruction(
             instruction,
-            ITypeOpcode::SLTI,
+            opcode::I::SLTI,
         )),
         (0b001_0011, 0b011, _) => Instruction::I(ITypeInstruction::from_instruction(
             instruction,
-            ITypeOpcode::SLTIU,
+            opcode::I::SLTIU,
         )),
         (0b001_0011, 0b100, _) => Instruction::I(ITypeInstruction::from_instruction(
             instruction,
-            ITypeOpcode::XORI,
+            opcode::I::XORI,
         )),
         (0b001_0011, 0b110, _) => Instruction::I(ITypeInstruction::from_instruction(
             instruction,
-            ITypeOpcode::ORI,
+            opcode::I::ORI,
         )),
         (0b001_0011, 0b111, _) => Instruction::I(ITypeInstruction::from_instruction(
             instruction,
-            ITypeOpcode::ANDI,
+            opcode::I::ANDI,
         )),
         (0b001_0011, 0b001, 0b000_0000) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::SLLI,
+            opcode::R::SLLI,
         )),
         (0b001_0011, 0b101, 0b000_0000) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::SRLI,
+            opcode::R::SRLI,
         )),
         (0b001_0011, 0b101, 0b010_0000) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::SRAI,
+            opcode::R::SRAI,
         )),
         (0b011_0011, 0b000, 0b000_0000) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::ADD,
+            opcode::R::ADD,
         )),
         (0b011_0011, 0b000, 0b010_0000) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::SUB,
+            opcode::R::SUB,
         )),
         (0b011_0011, 0b001, 0b000_0000) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::SLL,
+            opcode::R::SLL,
         )),
         (0b011_0011, 0b010, 0b000_0000) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::SLT,
+            opcode::R::SLT,
         )),
         (0b011_0011, 0b011, 0b000_0000) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::SLTU,
+            opcode::R::SLTU,
         )),
         (0b011_0011, 0b100, 0b000_0000) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::XOR,
+            opcode::R::XOR,
         )),
         (0b011_0011, 0b101, 0b000_0000) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::SRL,
+            opcode::R::SRL,
         )),
         (0b011_0011, 0b101, 0b010_0000) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::SRA,
+            opcode::R::SRA,
         )),
         (0b011_0011, 0b110, 0b000_0000) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::OR,
+            opcode::R::OR,
         )),
         (0b011_0011, 0b111, 0b000_0000) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::AND,
+            opcode::R::AND,
         )),
         (0b000_1111, 0b000, _) => Instruction::I(ITypeInstruction::from_instruction(
             instruction,
-            ITypeOpcode::FENCE,
+            opcode::I::FENCE,
         )),
         (0b111_0011, _, _) if instruction & !0b111_0011 == 0 => Instruction::R(
-            RTypeInstruction::from_instruction(instruction, RTypeOpcode::ECALL),
+            RTypeInstruction::from_instruction(instruction, opcode::R::ECALL),
         ),
         (0b111_0011, _, _) if instruction & !0b111_0011 == (1 << 20) => Instruction::R(
-            RTypeInstruction::from_instruction(instruction, RTypeOpcode::EBREAK),
+            RTypeInstruction::from_instruction(instruction, opcode::R::EBREAK),
         ),
         (0b011_0011, 0b000, _) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::MUL,
+            opcode::R::MUL,
         )),
         (0b011_0011, 0b001, _) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::MULH,
+            opcode::R::MULH,
         )),
         (0b011_0011, 0b010, _) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::MULHSU,
+            opcode::R::MULHSU,
         )),
         (0b011_0011, 0b011, _) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::MULHU,
+            opcode::R::MULHU,
         )),
         (0b011_0011, 0b100, _) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::DIV,
+            opcode::R::DIV,
         )),
         (0b011_0011, 0b101, _) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::DIVU,
+            opcode::R::DIVU,
         )),
         (0b011_0011, 0b110, _) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::REM,
+            opcode::R::REM,
         )),
         (0b011_0011, 0b111, _) => Instruction::R(RTypeInstruction::from_instruction(
             instruction,
-            RTypeOpcode::REMU,
+            opcode::R::REMU,
         )),
         _ => return Err(DecodeError),
     };
@@ -218,12 +220,12 @@ fn decode_branch(instruction: u32) -> Result<BTypeInstruction, DecodeError> {
 
     let (rs1, rs2) = decode_rs(instruction);
     let opcode = match ((instruction >> 12) & 0b111) as u8 {
-        0b000 => BTypeOpcode::BEQ,
-        0b001 => BTypeOpcode::BNE,
-        0b100 => BTypeOpcode::BLT,
-        0b101 => BTypeOpcode::BGE,
-        0b110 => BTypeOpcode::BLTU,
-        0b111 => BTypeOpcode::BGEU,
+        0b000 => opcode::B::BEQ,
+        0b001 => opcode::B::BNE,
+        0b100 => opcode::B::BLT,
+        0b101 => opcode::B::BGE,
+        0b110 => opcode::B::BLTU,
+        0b111 => opcode::B::BGEU,
         0b010 | 0b011 => return Err(DecodeError),
         0x08..=0xff => unreachable!(),
     };
@@ -233,14 +235,13 @@ fn decode_branch(instruction: u32) -> Result<BTypeInstruction, DecodeError> {
 
 #[cfg(test)]
 mod test {
-    use crate::instruction::{Instruction, RTypeOpcode};
-
+    use crate::{instruction::Instruction, opcode};
     #[test]
     fn decode_ebreak() {
         let instruction =
             super::decode_instruction(0b0000_0000_0001_0000_0000_0000_0111_0011).unwrap();
         if let Instruction::R(instruction) = instruction {
-            assert_eq!(instruction.opcode, RTypeOpcode::EBREAK)
+            assert_eq!(instruction.opcode, opcode::R::EBREAK)
         } else {
             panic!("Instruction type wasn't RType!")
         }

@@ -5,10 +5,12 @@
     clippy::cast_sign_loss,
     clippy::cast_lossless
 )]
+
 pub mod decode;
 pub mod jit;
 
 pub mod instruction;
+pub mod opcode;
 
 const XLEN: usize = 32;
 

@@ -2,6 +2,7 @@ use crate::decode::{decode_rd, decode_rs, sign_extend};
 
 use std::num::NonZeroU8;
 
+use crate::opcode;
 pub enum Instruction {
     R(RTypeInstruction),
     I(ITypeInstruction),
@@ -82,7 +83,7 @@ pub struct RTypeInstruction {
     pub(crate) rs1: Option<RiscVRegister>,
     pub(crate) rs2: Option<RiscVRegister>,
     pub(crate) rd: Option<RiscVRegister>,
-    pub(crate) opcode: RTypeOpcode,
+    pub(crate) opcode: opcode::R,
 }
 
 impl RTypeInstruction {
@@ -90,7 +91,7 @@ impl RTypeInstruction {
         rs1: Option<RiscVRegister>,
         rs2: Option<RiscVRegister>,
         rd: Option<RiscVRegister>,
-        opcode: RTypeOpcode,
+        opcode: opcode::R,
     ) -> Self {
         Self {
             rs1,
@@ -100,7 +101,7 @@ impl RTypeInstruction {
         }
     }
 
-    pub(crate) fn from_instruction(instruction: u32, opcode: RTypeOpcode) -> Self {
+    pub(crate) fn from_instruction(instruction: u32, opcode: opcode::R) -> Self {
         let (rs1, rs2) = decode_rs(instruction);
         let rd = decode_rd(instruction);
         Self {
@@ -116,7 +117,7 @@ pub struct ITypeInstruction {
     pub(crate) imm: u16,
     pub(crate) rs1: Option<RiscVRegister>,
     pub(crate) rd: Option<RiscVRegister>,
-    pub(crate) opcode: ITypeOpcode,
+    pub(crate) opcode: opcode::I,
 }
 
 impl ITypeInstruction {
@@ -124,7 +125,7 @@ impl ITypeInstruction {
         imm: u16,
         rs1: Option<RiscVRegister>,
         rd: Option<RiscVRegister>,
-        opcode: ITypeOpcode,
+        opcode: opcode::I,
     ) -> Self {
         Self {
             imm,
@@ -134,7 +135,7 @@ impl ITypeInstruction {
         }
     }
 
-    pub(crate) fn from_instruction(instruction: u32, opcode: ITypeOpcode) -> Self {
+    pub(crate) fn from_instruction(instruction: u32, opcode: opcode::I) -> Self {
         let imm = ((instruction >> 20) & 0x0fff) as u16;
         let rs1 = decode_rs(instruction).0;
         let rd = decode_rd(instruction);
@@ -151,7 +152,7 @@ pub struct STypeInstruction {
     pub(crate) imm: u16,
     pub(crate) rs1: Option<RiscVRegister>,
     pub(crate) rs2: Option<RiscVRegister>,
-    pub(crate) opcode: STypeOpcode,
+    pub(crate) opcode: opcode::S,
 }
 
 impl STypeInstruction {
@@ -159,7 +160,7 @@ impl STypeInstruction {
         imm: u16,
         rs1: Option<RiscVRegister>,
         rs2: Option<RiscVRegister>,
-        opcode: STypeOpcode,
+        opcode: opcode::S,
     ) -> Self {
         Self {
             imm,
@@ -169,7 +170,7 @@ impl STypeInstruction {
         }
     }
 
-    pub(crate) fn from_instruction(instruction: u32, opcode: STypeOpcode) -> Self {
+    pub(crate) fn from_instruction(instruction: u32, opcode: opcode::S) -> Self {
         let (rs1, rs2) = decode_rs(instruction);
 
         let imm = (((instruction >> 19) & 0b0000_1111_1110_0000)
@@ -190,7 +191,7 @@ pub struct BTypeInstruction {
     pub(crate) rs1: Option<RiscVRegister>,
     pub(crate) rs2: Option<RiscVRegister>,
     pub(crate) imm: u16,
-    pub(crate) opcode: BTypeOpcode,
+    pub(crate) opcode: opcode::B,
 }
 
 impl BTypeInstruction {
@@ -198,7 +199,7 @@ impl BTypeInstruction {
         imm: u16,
         rs1: Option<RiscVRegister>,
         rs2: Option<RiscVRegister>,
-        opcode: BTypeOpcode,
+        opcode: opcode::B,
     ) -> Self {
         Self {
             imm,
@@ -212,11 +213,11 @@ impl BTypeInstruction {
 pub struct UTypeInstruction {
     imm: u32,
     rd: Option<RiscVRegister>,
-    opcode: UTypeOpcode,
+    opcode: opcode::U,
 }
 
 impl UTypeInstruction {
-    pub(crate) fn new(imm: u32, rd: Option<RiscVRegister>, opcode: UTypeOpcode) -> Self {
+    pub(crate) fn new(imm: u32, rd: Option<RiscVRegister>, opcode: opcode::U) -> Self {
         Self { imm, rd, opcode }
     }
 }
@@ -224,15 +225,15 @@ impl UTypeInstruction {
 pub struct JTypeInstruction {
     pub(crate) imm: u32,
     pub(crate) rd: Option<RiscVRegister>,
-    pub(crate) opcode: JTypeOpcode,
+    pub(crate) opcode: opcode::J,
 }
 
 impl JTypeInstruction {
-    pub(crate) fn new(imm: u32, rd: Option<RiscVRegister>, opcode: JTypeOpcode) -> Self {
+    pub(crate) fn new(imm: u32, rd: Option<RiscVRegister>, opcode: opcode::J) -> Self {
         Self { imm, rd, opcode }
     }
 
-    pub(crate) fn from_instruction(instruction: u32, opcode: JTypeOpcode) -> Self {
+    pub(crate) fn from_instruction(instruction: u32, opcode: opcode::J) -> Self {
         let rd = decode_rd(instruction);
         // abbb_bbbb_bbbc_dddd_dddd_xxxx_xxxx_xxxx -> 000a_dddd_dddd_cbbb_bbbb_bbb0
         let imm = ((instruction >> 11) & 0b0001_0000_0000_0000_0000_0000)
@@ -242,71 +243,4 @@ impl JTypeInstruction {
 
         Self { imm, rd, opcode }
     }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum RTypeOpcode {
-    SLLI,
-    SRLI,
-    SRAI,
-    ADD,
-    SUB,
-    SLL,
-    SLT,
-    SLTU,
-    XOR,
-    SRL,
-    SRA,
-    OR,
-    AND,
-    ECALL,
-    EBREAK,
-    MUL,
-    MULH,
-    MULHSU,
-    MULHU,
-    DIV,
-    DIVU,
-    REM,
-    REMU,
-}
-
-pub enum STypeOpcode {
-    SB,
-    SH,
-    SW,
-}
-
-pub enum BTypeOpcode {
-    BEQ,
-    BNE,
-    BLT,
-    BGE,
-    BLTU,
-    BGEU,
-}
-
-pub enum ITypeOpcode {
-    FENCE,
-    ADDI,
-    SLTI,
-    SLTIU,
-    XORI,
-    ORI,
-    ANDI,
-    JALR,
-    LB,
-    LH,
-    LW,
-    LBU,
-    LHU,
-}
-
-pub enum UTypeOpcode {
-    LUI,
-    AUIPC,
-}
-
-pub enum JTypeOpcode {
-    JAL,
 }

@@ -5,9 +5,12 @@ use assembler::mnemonic_parameter_types::{
 };
 use assembler::InstructionStream;
 
-use crate::instruction::{
-    BTypeInstruction, ITypeInstruction, ITypeOpcode, Instruction, JTypeInstruction, JTypeOpcode,
-    RiscVRegister, STypeInstruction,
+use crate::{
+    instruction::{
+        BTypeInstruction, ITypeInstruction, Instruction, JTypeInstruction, RiscVRegister,
+        STypeInstruction,
+    },
+    opcode,
 };
 
 pub(super) fn generate_register_writeback(
@@ -57,7 +60,7 @@ pub(super) fn generate_basic_block_end(
         Instruction::J(JTypeInstruction {
             imm,
             rd,
-            opcode: JTypeOpcode::JAL,
+            opcode: opcode::J::JAL,
         }) => {
             let res_pc = next_start_address.wrapping_add(imm);
 
@@ -76,7 +79,7 @@ pub(super) fn generate_basic_block_end(
         Instruction::I(ITypeInstruction {
             imm,
             rd,
-            opcode: ITypeOpcode::JALR,
+            opcode: opcode::I::JALR,
             rs1,
         }) => {
             // before we return, and before we `generate_register_write_imm` we need to make sure that all the registers are done.
@@ -113,7 +116,6 @@ fn generate_branch(
     reg_manager: &mut super::alloc::RegisterManager,
     continue_pc: u32,
 ) {
-    use crate::instruction::BTypeOpcode;
     let BTypeInstruction {
         rs1,
         rs2,
@@ -154,22 +156,22 @@ fn generate_branch(
     block.mov_Register32Bit_Immediate32Bit(Register32Bit::ECX, jump_addr.into());
 
     match opcode {
-        BTypeOpcode::BEQ => {
+        opcode::B::BEQ => {
             block.cmove_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX)
         }
-        BTypeOpcode::BNE => {
+        opcode::B::BNE => {
             block.cmovne_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX)
         }
-        BTypeOpcode::BLT => {
+        opcode::B::BLT => {
             block.cmovl_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX)
         }
-        BTypeOpcode::BGE => {
+        opcode::B::BGE => {
             block.cmovge_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX)
         }
-        BTypeOpcode::BLTU => {
+        opcode::B::BLTU => {
             block.cmovb_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX)
         }
-        BTypeOpcode::BGEU => {
+        opcode::B::BGEU => {
             block.cmovae_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX)
         }
     }
@@ -193,7 +195,7 @@ fn generate_instruction(
         Instruction::J(_)
         | Instruction::B(_)
         | Instruction::I(ITypeInstruction {
-            opcode: ITypeOpcode::JALR,
+            opcode: opcode::I::JALR,
             ..
         }) => unreachable!("blocks cannot contain a branch"),
 
@@ -212,7 +214,6 @@ fn generate_stype_instruction(
     reg_manager: &mut RegisterManager,
     next_start_address: u32,
 ) {
-    use crate::instruction::STypeOpcode;
     let STypeInstruction {
         imm: _imm,
         rs1,
