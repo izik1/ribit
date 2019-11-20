@@ -1,5 +1,7 @@
 use crate::{instruction::*, opcode, DecodeError};
 
+use crate::register::RiscVRegister;
+
 use super::{sign_extend, sign_extend_32};
 
 fn decode_register(instruction: u16) -> RiscVRegister {

@@ -6,6 +6,8 @@ use std::num::NonZeroU8;
 
 use crate::instruction::*;
 
+use crate::register::RiscVRegister;
+
 use crate::opcode;
 
 #[inline]

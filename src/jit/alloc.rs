@@ -2,9 +2,8 @@ use std::collections::VecDeque;
 
 use assembler::InstructionStream;
 
-use super::NativeRegister;
-use crate::instruction::RiscVRegister;
 use crate::jit::generator::{generate_register_read, generate_register_writeback};
+use crate::register::{NativeRegister, RiscVRegister};
 
 pub(super) struct RegisterManager {
     free_registers: Vec<NativeRegister>,

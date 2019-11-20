@@ -1,14 +1,15 @@
-use super::{alloc::RegisterManager, BasicBlock, InstructionInfo, JitContext, NativeRegister};
+use super::{alloc::RegisterManager, BasicBlock, InstructionInfo, JitContext};
 use assembler::mnemonic_parameter_types::{
     memory::Memory,
     registers::{Register32Bit, Register64Bit},
 };
 use assembler::InstructionStream;
 
+use crate::register::{NativeRegister, RiscVRegister};
+
 use crate::{
     instruction::{
-        BTypeInstruction, ITypeInstruction, Instruction, JTypeInstruction, RiscVRegister,
-        STypeInstruction,
+        BTypeInstruction, ITypeInstruction, Instruction, JTypeInstruction, STypeInstruction,
     },
     opcode,
 };

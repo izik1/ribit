@@ -11,6 +11,7 @@ pub mod jit;
 
 pub mod instruction;
 pub mod opcode;
+pub mod register;
 
 const XLEN: usize = 32;
 

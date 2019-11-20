@@ -1,3 +1,6 @@
+// these opcode names are _exact_, and naming rules don't apply to them
+#![allow(clippy::pub_enum_variant_names)]
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum R {
     SLLI,

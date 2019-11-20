@@ -3,8 +3,6 @@ use crate::instruction::Instruction;
 use assembler::ExecutableAnonymousMemoryMap;
 use std::ops::Range;
 
-use assembler::mnemonic_parameter_types::registers::Register32Bit as AssemblerReg32;
-
 mod alloc;
 mod generator;
 
@@ -29,26 +27,6 @@ impl InstructionInfo {
             instruction,
             start_address,
             len,
-        }
-    }
-}
-
-#[derive(Hash, Eq, PartialEq, Copy, Clone)]
-enum NativeRegister {
-    RDX,
-    RCX,
-    R8,
-    R9,
-    // RAX,
-}
-
-impl NativeRegister {
-    fn as_assembly_reg32(self) -> AssemblerReg32 {
-        match self {
-            Self::RDX => AssemblerReg32::EDX,
-            Self::RCX => AssemblerReg32::ECX,
-            Self::R8 => AssemblerReg32::R8D,
-            Self::R9 => AssemblerReg32::R9D,
         }
     }
 }
