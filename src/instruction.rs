@@ -2,21 +2,23 @@ use crate::decode::{decode_rd, decode_rs, sign_extend};
 
 use std::num::NonZeroU8;
 
-// todo: asserts
 pub enum Instruction {
-    RType(RTypeInstruction),
-    IType(ITypeInstruction),
-    SType(STypeInstruction),
-    BType(BTypeInstruction),
-    UType(UTypeInstruction),
-    JType(JTypeInstruction),
+    R(RTypeInstruction),
+    I(ITypeInstruction),
+    S(STypeInstruction),
+    B(BTypeInstruction),
+    U(UTypeInstruction),
+    J(JTypeInstruction),
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct RiscVRegister(NonZeroU8);
 
+// all of these functions are super trivial and should *always* be inlined.
+#[allow(clippy::inline_always)]
 impl RiscVRegister {
     #[inline(always)]
+    #[must_use]
     pub fn new(inner: NonZeroU8) -> Option<Self> {
         (inner.get() < 32).then_with(|| Self(inner))
     }
@@ -24,18 +26,21 @@ impl RiscVRegister {
     /// # Safety
     /// Requires [`inner`] to be 1..=31
     #[inline(always)]
+    #[must_use]
     pub const unsafe fn new_unchecked(inner: u8) -> Self {
         Self(NonZeroU8::new_unchecked(inner))
     }
 
     #[inline(always)]
-    pub const fn get(&self) -> u8 {
+    #[must_use]
+    pub const fn get(self) -> u8 {
         self.0.get()
     }
 
     /// Returns the offset into a register array you'd have to find [`&self`]
     #[inline(always)]
-    pub const fn as_offset(&self) -> u32 {
+    #[must_use]
+    pub const fn as_offset(self) -> u32 {
         (self.0.get() << 2) as u32
     }
 
@@ -129,11 +134,11 @@ impl ITypeInstruction {
         }
     }
 
-    pub(crate) fn from_instruction(instruction: u32, opcode: ITypeOpcode) -> ITypeInstruction {
+    pub(crate) fn from_instruction(instruction: u32, opcode: ITypeOpcode) -> Self {
         let imm = ((instruction >> 20) & 0x0fff) as u16;
         let rs1 = decode_rs(instruction).0;
         let rd = decode_rd(instruction);
-        ITypeInstruction {
+        Self {
             imm,
             rs1,
             rd,
@@ -155,7 +160,7 @@ impl STypeInstruction {
         rs1: Option<RiscVRegister>,
         rs2: Option<RiscVRegister>,
         opcode: STypeOpcode,
-    ) -> STypeInstruction {
+    ) -> Self {
         Self {
             imm,
             rs1,
@@ -164,15 +169,15 @@ impl STypeInstruction {
         }
     }
 
-    pub(crate) fn from_instruction(instruction: u32, opcode: STypeOpcode) -> STypeInstruction {
+    pub(crate) fn from_instruction(instruction: u32, opcode: STypeOpcode) -> Self {
         let (rs1, rs2) = decode_rs(instruction);
 
         let imm = (((instruction >> 19) & 0b0000_1111_1110_0000)
-            | ((instruction >> 07) & 0b0000_0000_0001_1111)) as u16;
+            | ((instruction >> 7) & 0b0000_0000_0001_1111)) as u16;
 
         let imm = sign_extend(imm, 12);
 
-        STypeInstruction {
+        Self {
             rs1,
             rs2,
             imm,
@@ -232,8 +237,8 @@ impl JTypeInstruction {
         // abbb_bbbb_bbbc_dddd_dddd_xxxx_xxxx_xxxx -> 000a_dddd_dddd_cbbb_bbbb_bbb0
         let imm = ((instruction >> 11) & 0b0001_0000_0000_0000_0000_0000)
             | ((instruction >> 19) & 0b0000_0000_0000_0111_1111_1110)
-            | ((instruction >> 09) & 0b0000_0000_0000_1000_0000_0000)
-            | ((instruction >> 00) & 0b0000_1111_1111_0000_0000_0000);
+            | ((instruction >> 9) & 0b0000_0000_0000_1000_0000_0000)
+            | (instruction & 0b0000_1111_1111_0000_0000_0000);
 
         Self { imm, rd, opcode }
     }

@@ -1,5 +1,10 @@
 #![feature(vec_remove_item, bool_to_option)]
-
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless
+)]
 pub mod decode;
 pub mod jit;
 

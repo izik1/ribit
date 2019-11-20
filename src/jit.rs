@@ -18,10 +18,12 @@ pub struct InstructionInfo {
 }
 
 impl InstructionInfo {
+    #[must_use]
     pub fn end_address(&self) -> u32 {
         self.start_address.wrapping_add(self.len)
     }
 
+    #[must_use]
     pub fn new(instruction: Instruction, start_address: u32, len: u32) -> Self {
         Self {
             instruction,
@@ -41,7 +43,7 @@ enum NativeRegister {
 }
 
 impl NativeRegister {
-    fn as_assembly_reg32(&self) -> AssemblerReg32 {
+    fn as_assembly_reg32(self) -> AssemblerReg32 {
         match self {
             Self::RDX => AssemblerReg32::EDX,
             Self::RCX => AssemblerReg32::ECX,
@@ -76,6 +78,7 @@ impl JitContext {
         }
     }
 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             buffer: ExecutableAnonymousMemoryMap::new(4096 * 16, false, true).unwrap(),
@@ -91,6 +94,12 @@ impl JitContext {
         branch: InstructionInfo,
     ) {
         generator::generate_basic_block(self, block_instrs, branch);
+    }
+}
+
+impl Default for JitContext {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -115,7 +124,7 @@ mod test {
         ctx.generate_basic_block(
             vec![],
             InstructionInfo::new(
-                Instruction::JType(JTypeInstruction {
+                Instruction::J(JTypeInstruction {
                     imm: 4096,
                     rd: Some(RiscVRegister::X4),
                     opcode: JTypeOpcode::JAL,
@@ -149,7 +158,7 @@ mod test {
         ctx.generate_basic_block(
             vec![],
             InstructionInfo::new(
-                Instruction::IType(ITypeInstruction {
+                Instruction::I(ITypeInstruction {
                     imm: 4096,
                     rd: Some(RiscVRegister::X4),
                     rs1: Some(RiscVRegister::X1),
@@ -187,7 +196,7 @@ mod test {
         ctx.generate_basic_block(
             vec![],
             InstructionInfo::new(
-                Instruction::JType(JTypeInstruction {
+                Instruction::J(JTypeInstruction {
                     imm: 4096,
                     rd: None,
                     opcode: JTypeOpcode::JAL,

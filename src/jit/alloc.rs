@@ -32,9 +32,8 @@ impl RegisterManager {
         rv_reg: RiscVRegister,
         basic_block: &mut InstructionStream,
     ) -> Result<(), RiscVRegister> {
-        match self.find_rv32_register(native_reg) {
-            Some(rv_reg) => return Err(rv_reg),
-            None => {}
+        if let Some(rv_reg) = self.find_rv32_register(native_reg) {
+            return Err(rv_reg);
         }
 
         self.alloc_specific(native_reg, rv_reg, basic_block);

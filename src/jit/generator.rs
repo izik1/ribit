@@ -54,7 +54,7 @@ pub(super) fn generate_basic_block_end(
     let branch_instruction = branch.instruction;
 
     match branch_instruction {
-        Instruction::JType(JTypeInstruction {
+        Instruction::J(JTypeInstruction {
             imm,
             rd,
             opcode: JTypeOpcode::JAL,
@@ -73,7 +73,7 @@ pub(super) fn generate_basic_block_end(
             block.ret();
         }
 
-        Instruction::IType(ITypeInstruction {
+        Instruction::I(ITypeInstruction {
             imm,
             rd,
             opcode: ITypeOpcode::JALR,
@@ -95,16 +95,15 @@ pub(super) fn generate_basic_block_end(
                 );
             }
 
-            block.btr_Register32Bit_Immediate8Bit(Register32Bit::EAX, 0u8.into());
+            block.btr_Register32Bit_Immediate8Bit(Register32Bit::EAX, 0_u8.into());
 
             block.ret();
         }
 
-        Instruction::IType(_)
-        | Instruction::RType(_)
-        | Instruction::SType(_)
-        | Instruction::UType(_) => unreachable!("blocks can only end on a branch?"),
-        Instruction::BType(instr) => generate_branch(block, instr, reg_manager, next_start_address),
+        Instruction::I(_) | Instruction::R(_) | Instruction::S(_) | Instruction::U(_) => {
+            unreachable!("blocks can only end on a branch?")
+        }
+        Instruction::B(instr) => generate_branch(block, instr, reg_manager, next_start_address),
     }
 }
 
@@ -191,14 +190,14 @@ fn generate_instruction(
     } = instruction;
 
     match instruction {
-        Instruction::JType(_)
-        | Instruction::BType(_)
-        | Instruction::IType(ITypeInstruction {
+        Instruction::J(_)
+        | Instruction::B(_)
+        | Instruction::I(ITypeInstruction {
             opcode: ITypeOpcode::JALR,
             ..
         }) => unreachable!("blocks cannot contain a branch"),
 
-        Instruction::SType(instruction) => {
+        Instruction::S(instruction) => {
             generate_stype_instruction(block, instruction, reg_manager, next_start_address)
         }
 
@@ -244,7 +243,9 @@ pub(super) fn generate_basic_block(
         .start_address;
     let end_pc = branch.end_address();
 
-    let mut block = ctx.buffer.instruction_stream(&Default::default());
+    let mut block = ctx
+        .buffer
+        .instruction_stream(&assembler::InstructionStreamHints::default());
     let mut reg_manager = RegisterManager::new();
 
     for instruction in block_instrs {
