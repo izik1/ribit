@@ -1,5 +1,3 @@
-use crate::instruction;
-
 mod alloc;
 mod generator;
 

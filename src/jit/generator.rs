@@ -51,6 +51,30 @@ impl<'a> BlockBuilder<'a> {
 
         funct
     }
+
+    fn write_register_imm(&mut self, register: register::RiscV, value: u32, read_allocated: bool) {
+        // optimal writes are as follows:
+        // match (used_again, in_register) {
+        //     (false, false) => generate_register_write_imm(...),
+        //     (false, true) => generate_register_write_imm(...), // and mark it as free without writing it out if it's dirty.
+        //     (true, false) => generate_register_write_imm2(...), // make sure to read it in first, mark as dirty.
+        //     (true, true) => generate_register_write_imm2(...) // just overwrite it, mark as dirty.
+        // }
+
+        if let Some(native_reg) = self.register_manager.find_native_register(register) {
+            // todo: add an option to free the register with this write (see table at start of function)
+            if read_allocated || !self.register_manager.needs_load(register) {
+                self.register_manager
+                    .load(register, &mut self.stream)
+                    .unwrap();
+                self.register_manager.set_dirty(register).unwrap();
+                generate_register_write_imm2(&mut self.stream, native_reg, value);
+                return;
+            }
+        }
+
+        generate_register_write_imm(&mut self.stream, register, value);
+    }
 }
 
 pub(super) fn generate_register_writeback(
@@ -87,6 +111,22 @@ pub(super) fn generate_register_write_imm(
     );
 }
 
+/// writes a immediate value to a register.
+fn generate_register_write_imm2(
+    stream: &mut InstructionStream,
+    native_reg: register::Native,
+    value: u32,
+) {
+    if value != 0 {
+        stream.mov_Register32Bit_Immediate32Bit(native_reg.as_assembly_reg32(), value.into());
+    } else {
+        stream.xor_Register32Bit_Register32Bit(
+            native_reg.as_assembly_reg32(),
+            native_reg.as_assembly_reg32(),
+        );
+    }
+}
+
 fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
     let next_start_address = branch.end_address();
 
@@ -100,18 +140,16 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
         }) => {
             let res_pc = next_start_address.wrapping_add(imm);
 
-            // before we return, and before we `generate_register_write_imm` we need to make sure that all the registers are done.
-            builder.register_manager.free_all(&mut builder.stream);
-
             if let Some(rd) = rd {
-                generate_register_write_imm(&mut builder.stream, rd, next_start_address);
+                builder.write_register_imm(rd, next_start_address, false);
+
+                // before we return we need to make sure that all the registers are done.
+                builder.register_manager.free_all(&mut builder.stream);
             }
 
             builder
                 .stream
                 .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, res_pc.into());
-
-            builder.stream.ret();
         }
 
         Instruction::I(instruction::I {
@@ -120,12 +158,11 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
             opcode: opcode::I::JALR,
             rs1,
         }) => {
-            // before we return, and before we `generate_register_write_imm` we need to make sure that all the registers are done.
-            builder.register_manager.free_all(&mut builder.stream);
-
             if let Some(rd) = rd {
-                // todo: have this interact better with `builder.register_manager`
-                generate_register_write_imm(&mut builder.stream, rd, next_start_address);
+                builder.write_register_imm(rd, next_start_address, false);
+
+                // before we return we need to make sure that all the registers are done.
+                builder.register_manager.free_all(&mut builder.stream);
             }
 
             builder
@@ -142,8 +179,6 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
             builder
                 .stream
                 .btr_Register32Bit_Immediate8Bit(Register32Bit::EAX, 0_u8.into());
-
-            builder.stream.ret();
         }
 
         Instruction::I(_) | Instruction::R(_) | Instruction::S(_) | Instruction::U(_) => {
@@ -151,6 +186,8 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
         }
         Instruction::B(instr) => generate_branch(builder, instr, next_start_address),
     }
+
+    builder.stream.ret();
 }
 
 fn generate_branch(builder: &mut BlockBuilder, instruction: instruction::B, continue_pc: u32) {
@@ -169,32 +206,65 @@ fn generate_branch(builder: &mut BlockBuilder, instruction: instruction::B, cont
     // Rewrite is good for when non-canonical unconditional branches are common for some reason.
 
     // The operation looks something like this on a high level
+    // ; both registers:
     // mov eax, <continue_pc>
     // cmp <native_reg1>, <native_reg2>
-    // mov edx, <jump_addr> ; this is hacky: CMOV doesn't support immediates
+    // mov edx, <jump_addr>
     // CMOV<cond> eax, edx
     // ret
+    // ; one register:
+    // mov eax, <one branch path>
+    // test <native_reg1>, <native_reg1>
+    // mov edx, <the other branch path>
+    // cmod<cond> eax, edx
 
-    // fixme: need to handle x0
-    let rs1 = rs1.expect("todo");
-    let rs2 = rs2.expect("todo");
-    let native_rs1 = builder
-        .register_manager
-        .alloc(rs1, &[rs1, rs2], &mut builder.stream);
-    let native_rs2 = builder
-        .register_manager
-        .alloc(rs2, &[rs1, rs2], &mut builder.stream);
+    let early_return = match (rs1, rs2) {
+        (None, None) => generate_branch_same_reg(builder, continue_pc, jump_addr, opcode),
+
+        (Some(rs1), Some(rs2)) if rs1 == rs2 => {
+            generate_branch_same_reg(builder, continue_pc, jump_addr, opcode)
+        }
+
+        (Some(rs1), None) => generate_branch_cmp_0(builder, continue_pc, jump_addr, opcode, rs1),
+
+        (None, Some(rs2)) => generate_branch_cmp_0(builder, jump_addr, continue_pc, opcode, rs2),
+
+        (Some(rs1), Some(rs2)) => {
+            let native_rs1 = builder
+                .register_manager
+                .alloc(rs1, &[rs1, rs2], &mut builder.stream);
+
+            let native_rs2 = builder
+                .register_manager
+                .alloc(rs2, &[rs1, rs2], &mut builder.stream);
+
+            builder
+                .register_manager
+                .load(rs1, &mut builder.stream)
+                .unwrap();
+            builder
+                .register_manager
+                .load(rs2, &mut builder.stream)
+                .unwrap();
+
+            builder.stream.cmp_Register32Bit_Register32Bit(
+                native_rs1.as_assembly_reg32(),
+                native_rs2.as_assembly_reg32(),
+            );
+
+            false
+        }
+    };
+
+    // the branch has been made unconditional and so we should return early to avoid mucking it up.
+    if early_return {
+        return;
+    }
 
     builder
         .stream
         .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, (continue_pc).into());
 
-    builder.stream.cmp_Register32Bit_Register32Bit(
-        native_rs1.as_assembly_reg32(),
-        native_rs2.as_assembly_reg32(),
-    );
-
-    // hack: we don't know what registers were allocated for `native_rs1` and `native_rs2`, but we need to clobber ECX.
     builder.register_manager.free_all(&mut builder.stream);
 
     builder
@@ -221,8 +291,75 @@ fn generate_branch(builder: &mut BlockBuilder, instruction: instruction::B, cont
             .stream
             .cmovae_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
     }
+}
 
-    builder.stream.ret()
+// returns true if the branch becomes unconditional (always)
+fn generate_branch_same_reg(
+    builder: &mut BlockBuilder,
+    false_addr: u32,
+    true_addr: u32,
+    opcode: opcode::B,
+) -> bool {
+    match opcode {
+        // always true
+        opcode::B::BEQ | opcode::B::BGE | opcode::B::BGEU => builder
+            .stream
+            .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, true_addr.into()),
+
+        // always false
+        opcode::B::BNE | opcode::B::BLT | opcode::B::BLTU => builder
+            .stream
+            .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, false_addr.into()),
+    }
+
+    true
+}
+
+/// generates a branch based off of `cmp rs, 0`, if you want to use rs2 instead of rs1, make sure to swap
+///  `[false_addr]` and `[true_addr]` as well.
+/// returns true if the branch becomes unconditional.
+fn generate_branch_cmp_0(
+    builder: &mut BlockBuilder,
+    false_addr: u32,
+    true_addr: u32,
+    opcode: opcode::B,
+    rs: register::RiscV,
+) -> bool {
+    // there's some low hanging register contention fruit, cmp can optionally take a mem argument.
+    match opcode {
+        // always true
+        opcode::B::BGEU => {
+            builder
+                .stream
+                .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, true_addr.into());
+
+            return true;
+        }
+
+        // always false
+        opcode::B::BLTU => {
+            builder
+                .stream
+                .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, false_addr.into());
+            return true;
+        }
+        _ => {}
+    }
+
+    let native_rs = builder
+        .register_manager
+        .alloc(rs, &[rs], &mut builder.stream);
+
+    builder
+        .register_manager
+        .load(rs, &mut builder.stream)
+        .unwrap();
+
+    builder.stream.test_Register32Bit_Register32Bit(
+        native_rs.as_assembly_reg32(),
+        native_rs.as_assembly_reg32(),
+    );
+    false
 }
 
 fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::Info) {

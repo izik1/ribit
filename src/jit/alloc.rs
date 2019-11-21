@@ -8,6 +8,8 @@ use crate::register;
 pub(super) struct RegisterManager {
     free_registers: Vec<register::Native>,
     used_registers: VecDeque<(register::Native, register::RiscV)>,
+    load_map: u32,
+    store_map: u32,
 }
 
 impl RegisterManager {
@@ -22,12 +24,52 @@ impl RegisterManager {
                 // register::Native::RAX,
             ],
             used_registers: VecDeque::new(),
+            load_map: 0,
+            store_map: 0,
         }
     }
 
     pub fn is_cleared(&self) -> bool {
-        self.used_registers.is_empty()
+        self.store_map == 0
     }
+
+    pub fn is_allocated(&self, register: register::RiscV) -> bool {
+        self.find_native_register(register).is_some()
+    }
+
+    pub fn needs_store(&self, register: register::RiscV) -> bool {
+        (self.store_map >> register.get()) & 1 == 1
+    }
+
+    pub fn needs_load(&self, register: register::RiscV) -> bool {
+        (self.load_map >> register.get()) & 1 == 1
+    }
+
+    pub fn load(
+        &mut self,
+        rv32_reg: register::RiscV,
+        stream: &mut InstructionStream,
+    ) -> Result<(), ()> {
+        let native_reg = self.find_native_register(rv32_reg).ok_or(())?;
+
+        if self.needs_load(rv32_reg) {
+            generate_register_read(stream, native_reg, rv32_reg);
+            self.load_map &= !(1 << rv32_reg.get())
+        }
+
+        Ok(())
+    }
+
+    // hack:
+    pub fn set_dirty(&mut self, rv32_reg: register::RiscV) -> Result<(), ()> {
+        self.find_native_register(rv32_reg).ok_or(())?;
+
+        self.store_map |= 1 << rv32_reg.get();
+
+        Ok(())
+    }
+
+    // todo: add a `move register` function to avoid having to write->read a register that's already in a Native register.
 
     pub fn try_alloc_specific(
         &mut self,
@@ -48,14 +90,19 @@ impl RegisterManager {
         &mut self,
         native_reg: register::Native,
         rv_reg: register::RiscV,
-        basic_block: &mut InstructionStream,
+        stream: &mut InstructionStream,
     ) {
         // todo: proper error handling?
         self.free_registers
             .remove_item(&native_reg)
             .expect("Can't reserve a register that's in use!");
 
-        generate_register_read(basic_block, native_reg, rv_reg);
+        // todo: current setup can't handle the same register being in multiple places at once.
+        if self.find_native_register(rv_reg).is_some() {
+            self.free(rv_reg, stream);
+        }
+
+        self.load_map |= 1 << rv_reg.get();
         self.used_registers.push_back((native_reg, rv_reg));
     }
 
@@ -75,7 +122,7 @@ impl RegisterManager {
             })
     }
 
-    fn find_native_register(&self, reg: register::RiscV) -> Option<register::Native> {
+    pub fn find_native_register(&self, reg: register::RiscV) -> Option<register::Native> {
         self.used_registers
             .iter()
             .find_map(|(native_reg, alloced_reg)| {
@@ -89,13 +136,13 @@ impl RegisterManager {
 
     fn try_alloc(
         &mut self,
-        reg: register::RiscV,
+        rv_reg: register::RiscV,
         basic_block: &mut InstructionStream,
     ) -> Option<register::Native> {
-        self.find_native_register(reg).or_else(|| {
+        self.find_native_register(rv_reg).or_else(|| {
             let native_reg = self.free_registers.pop()?;
-            generate_register_read(basic_block, native_reg, reg);
-            self.used_registers.push_back((native_reg, reg));
+            self.load_map |= 1 << rv_reg.get();
+            self.used_registers.push_back((native_reg, rv_reg));
             Some(native_reg)
         })
     }
@@ -131,7 +178,13 @@ impl RegisterManager {
 
         let native_reg = self.used_registers.remove(idx).map(|it| it.0)?;
 
-        generate_register_writeback(basic_block, native_reg, rv32_reg);
+        if self.needs_store(rv32_reg) {
+            generate_register_writeback(basic_block, native_reg, rv32_reg);
+            self.store_map &= !(1 << rv32_reg.get())
+        }
+
+        self.free_registers.push(native_reg);
+
         Some(native_reg)
     }
 
@@ -151,13 +204,25 @@ impl RegisterManager {
             .remove(idx)
             .unwrap_or_else(|| unsafe { std::hint::unreachable_unchecked() });
 
-        generate_register_writeback(basic_block, native_reg, rv_reg);
+        if self.needs_store(rv_reg) {
+            generate_register_writeback(basic_block, native_reg, rv_reg);
+            self.store_map &= !(1 << rv_reg.get())
+        }
+
+        self.free_registers.push(native_reg);
+
         Some(native_reg)
     }
 
     pub fn free_all(&mut self, basic_block: &mut InstructionStream) {
         for (native_reg, rv_reg) in self.used_registers.drain(..) {
-            generate_register_writeback(basic_block, native_reg, rv_reg);
+            // hack: inline `Self::needs_store` to play nice with lifetimes
+            if (self.store_map >> rv_reg.get()) & 1 == 1 {
+                generate_register_writeback(basic_block, native_reg, rv_reg);
+                self.store_map &= !(1 << rv_reg.get())
+            }
+
+            self.free_registers.push(native_reg);
         }
     }
 }
