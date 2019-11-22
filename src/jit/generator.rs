@@ -15,8 +15,7 @@ use assembler::InstructionStream;
 
 use crate::{
     instruction::{self, Instruction},
-    opcode::{self, Width},
-    register,
+    opcode, register,
 };
 
 pub struct BlockBuilder<'a> {
@@ -138,10 +137,10 @@ fn generate_register_write_imm2(
     value: u32,
 ) {
     let register = register.as_asm_reg32();
-    if value != 0 {
-        stream.mov_Register32Bit_Immediate32Bit(register, value.into());
-    } else {
+    if value == 0 {
         stream.xor_Register32Bit_Register32Bit(register, register);
+    } else {
+        stream.mov_Register32Bit_Immediate32Bit(register, value.into());
     }
 }
 

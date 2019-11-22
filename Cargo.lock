@@ -3,10 +3,10 @@
 [[package]]
 name = "assembler"
 version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/izik1/assembler?branch=clippy-fix#b4d70d32fb5b7d51e89a920ce4bf68ffb43e31a4"
 dependencies = [
  "libc 0.2.65 (registry+https://github.com/rust-lang/crates.io-index)",
- "likely 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "likely 0.1.0 (git+https://github.com/izik1/likely?branch=clippy-fix)",
 ]
 
 [[package]]
@@ -17,13 +17,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "likely"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/izik1/likely?branch=clippy-fix#054ee9243eab20d7b54e96dfad5b342a759737fa"
 
 [[package]]
 name = "rv32i-mc-interpreter"
 version = "0.1.0"
 dependencies = [
- "assembler 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "assembler 0.10.1 (git+https://github.com/izik1/assembler?branch=clippy-fix)",
  "static_assertions 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -33,7 +33,7 @@ version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [metadata]
-"checksum assembler 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)" = "87394e5e13802ed108ab335cdb9626251a2ea8b54902a026619bc851fe032a87"
+"checksum assembler 0.10.1 (git+https://github.com/izik1/assembler?branch=clippy-fix)" = "<none>"
 "checksum libc 0.2.65 (registry+https://github.com/rust-lang/crates.io-index)" = "1a31a0627fdf1f6a39ec0dd577e101440b7db22672c0901fe00a9a6fbb5c24e8"
-"checksum likely 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a376724c7528c066bb67f2e958a9ce95f1dee26a57e614f64a9e7b15ea0bb9f5"
+"checksum likely 0.1.0 (git+https://github.com/izik1/likely?branch=clippy-fix)" = "<none>"
 "checksum static_assertions 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"

@@ -9,3 +9,7 @@ edition = "2018"
 [dependencies]
 assembler = "0.10.1"
 static_assertions = "1.1.0"
+
+[patch.crates-io]
+likely = { git = "https://github.com/izik1/likely", branch = "clippy-fix" }
+assembler = { git = "https://github.com/izik1/assembler", branch = "clippy-fix" }

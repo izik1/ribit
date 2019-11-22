@@ -5,10 +5,9 @@ use crate::register;
 use assembler::mnemonic_parameter_types::memory::{
     Any16BitMemory, Any32BitMemory, Any8BitMemory, Memory as AssemblerMemory,
 };
-use assembler::mnemonic_parameter_types::registers::{
-    Register16Bit, Register32Bit, Register64Bit, Register8Bit,
-};
+use assembler::mnemonic_parameter_types::registers::{Register32Bit, Register64Bit};
 
+#[derive(Copy, Clone)]
 pub enum Memory {
     Byte(Any8BitMemory),
     Word(Any16BitMemory),
@@ -19,15 +18,15 @@ impl Memory {
     pub fn new(width: Width, imm: u16) -> Self {
         let addr = imm_16_to_addr(imm);
         match width {
-            Width::Byte => Memory::Byte(AssemblerMemory::base_64_displacement(
+            Width::Byte => Self::Byte(AssemblerMemory::base_64_displacement(
                 Register64Bit::RDX,
                 addr.into(),
             )),
-            Width::Word => Memory::Word(AssemblerMemory::base_64_displacement(
+            Width::Word => Self::Word(AssemblerMemory::base_64_displacement(
                 Register64Bit::RDX,
                 addr.into(),
             )),
-            Width::DWord => Memory::DWord(AssemblerMemory::base_64_displacement(
+            Width::DWord => Self::DWord(AssemblerMemory::base_64_displacement(
                 Register64Bit::RDX,
                 addr.into(),
             )),
@@ -36,15 +35,15 @@ impl Memory {
 
     pub fn mem_eax(width: Width) -> Self {
         match width {
-            Width::Byte => Memory::Byte(AssemblerMemory::base_64_index_64(
+            Width::Byte => Self::Byte(AssemblerMemory::base_64_index_64(
                 Register64Bit::RDX,
                 Register64Bit::RAX,
             )),
-            Width::Word => Memory::Word(AssemblerMemory::base_64_index_64(
+            Width::Word => Self::Word(AssemblerMemory::base_64_index_64(
                 Register64Bit::RDX,
                 Register64Bit::RAX,
             )),
-            Width::DWord => Memory::DWord(AssemblerMemory::base_64_index_64(
+            Width::DWord => Self::DWord(AssemblerMemory::base_64_index_64(
                 Register64Bit::RDX,
                 Register64Bit::RAX,
             )),

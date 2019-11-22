@@ -82,6 +82,7 @@ pub enum Native {
 }
 
 impl Native {
+    #[must_use]
     pub fn as_asm_reg64(self) -> Register64Bit {
         match self {
             Self::RDX => Register64Bit::RDX,
@@ -91,6 +92,7 @@ impl Native {
         }
     }
 
+    #[must_use]
     pub fn as_asm_reg32(self) -> Register32Bit {
         match self {
             Self::RDX => Register32Bit::EDX,
@@ -100,6 +102,7 @@ impl Native {
         }
     }
 
+    #[must_use]
     pub fn as_asm_reg16(self) -> Register16Bit {
         match self {
             Self::RDX => Register16Bit::DX,
@@ -109,6 +112,7 @@ impl Native {
         }
     }
 
+    #[must_use]
     pub fn as_asm_reg8(self) -> Register8Bit {
         match self {
             Self::RDX => Register8Bit::DL,
