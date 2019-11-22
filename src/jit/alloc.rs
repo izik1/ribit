@@ -5,6 +5,14 @@ use assembler::InstructionStream;
 use crate::jit::generator::{generate_register_read, generate_register_writeback};
 use crate::register;
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum LoadProfile {
+    Eager,
+    // It's fine for now that nothing ever makes one of these.
+    #[allow(dead_code)]
+    Lazy,
+}
+
 #[derive(Default, Copy, Clone)]
 struct UsageMask(u32);
 
@@ -174,13 +182,36 @@ impl RegisterManager {
             })
     }
 
-    fn try_alloc(&mut self, rv_reg: register::RiscV) -> Option<register::Native> {
+    fn try_alloc(
+        &mut self,
+        rv_reg: register::RiscV,
+        basic_block: &mut InstructionStream,
+        load_profile: LoadProfile,
+    ) -> Option<register::Native> {
         self.find_native_register(rv_reg).or_else(|| {
             let native_reg = self.free_registers.pop()?;
-            self.to_load_map.set(rv_reg);
+
+            match load_profile {
+                LoadProfile::Lazy => self.to_load_map.set(rv_reg),
+                LoadProfile::Eager => generate_register_read(basic_block, native_reg, rv_reg),
+            }
+
             self.used_registers.push_back((native_reg, rv_reg));
             Some(native_reg)
         })
+    }
+
+    pub fn alloc_2(
+        &mut self,
+        reg1: register::RiscV,
+        reg2: register::RiscV,
+        keep_regs: &[register::RiscV],
+        basic_block: &mut InstructionStream,
+        load_profile: LoadProfile,
+    ) -> (register::Native, register::Native) {
+        // split lines to avoid indeterminant ordering.
+        let reg1 = self.alloc(reg1, keep_regs, basic_block, load_profile);
+        (reg1, self.alloc(reg2, keep_regs, basic_block, load_profile))
     }
 
     pub fn alloc(
@@ -188,8 +219,9 @@ impl RegisterManager {
         reg: register::RiscV,
         keep_regs: &[register::RiscV],
         basic_block: &mut InstructionStream,
+        load_profile: LoadProfile,
     ) -> register::Native {
-        if let Some(native_reg) = self.try_alloc(reg) {
+        if let Some(native_reg) = self.try_alloc(reg, basic_block, load_profile) {
             return native_reg;
         }
 
@@ -197,7 +229,7 @@ impl RegisterManager {
         let _ = self.free_first(keep_regs, basic_block)
             .expect("Tried to allocate a register without a free register, and all others needed to be kept.");
 
-        self.try_alloc(reg).unwrap()
+        self.try_alloc(reg, basic_block, load_profile).unwrap()
     }
 
     pub fn free(

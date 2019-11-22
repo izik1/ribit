@@ -1,4 +1,7 @@
-use super::{alloc::RegisterManager, BasicBlock, CheckRanges};
+use super::{
+    alloc::{LoadProfile, RegisterManager},
+    BasicBlock, CheckRanges,
+};
 
 mod branch;
 mod memory;
@@ -75,15 +78,8 @@ impl<'a> BlockBuilder<'a> {
     }
 
     fn ez_alloc(&mut self, register: register::RiscV) -> register::Native {
-        let native_register = self
-            .register_manager
-            .alloc(register, &[register], &mut self.stream);
-
         self.register_manager
-            .load(register, &mut self.stream)
-            .unwrap();
-
-        native_register
+            .alloc(register, &[register], &mut self.stream, LoadProfile::Eager)
     }
 
     fn ez_alloc2(
@@ -91,23 +87,13 @@ impl<'a> BlockBuilder<'a> {
         register1: register::RiscV,
         register2: register::RiscV,
     ) -> (register::Native, register::Native) {
-        let native1 =
-            self.register_manager
-                .alloc(register1, &[register1, register2], &mut self.stream);
-
-        self.register_manager
-            .load(register1, &mut self.stream)
-            .unwrap();
-
-        let native2 =
-            self.register_manager
-                .alloc(register2, &[register1, register2], &mut self.stream);
-
-        self.register_manager
-            .load(register2, &mut self.stream)
-            .unwrap();
-
-        (native1, native2)
+        self.register_manager.alloc_2(
+            register1,
+            register2,
+            &[register1, register2],
+            &mut self.stream,
+            LoadProfile::Eager,
+        )
     }
 }
 
