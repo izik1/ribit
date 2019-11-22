@@ -19,7 +19,7 @@ mod test {
     fn init() -> ([u32; 32], Vec<u8>) {
         let mut regs = [0xaaaaaaaa; 32];
         regs[0] = 0;
-        let memory = vec![0xbb; 1024 * 1024 * 16];
+        let memory = vec![0xbb; crate::MEMORY_SIZE as usize];
 
         (regs, memory)
     }

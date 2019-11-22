@@ -6,14 +6,21 @@
     clippy::cast_lossless
 )]
 
-pub mod decode;
-pub mod jit;
+#[macro_use]
+extern crate static_assertions;
 
+pub mod decode;
 pub mod instruction;
+pub mod jit;
 pub mod opcode;
 pub mod register;
 
 const XLEN: usize = 32;
+
+const MEMORY_SIZE: u32 = (1024 * 1024 * 16);
+
+// ensure that memory size is a power of two.
+const_assert_eq!(MEMORY_SIZE.count_ones(), 1);
 
 // todo: enum DecodeError { InvalidInstruction, Reserved, UnimplementedExtension(extension) }
 #[derive(Debug)]

@@ -16,7 +16,8 @@ pub enum Memory {
 }
 
 impl Memory {
-    pub fn new(width: Width, addr: u32) -> Self {
+    pub fn new(width: Width, imm: u16) -> Self {
+        let addr = imm_16_to_addr(imm);
         match width {
             Width::Byte => Memory::Byte(AssemblerMemory::base_64_displacement(
                 Register64Bit::RDX,
@@ -51,22 +52,12 @@ impl Memory {
     }
 }
 
-pub enum Register {
-    Byte(Register8Bit),
-    Word(Register16Bit),
-    DWord(Register32Bit),
-}
-
 // fixme: handle memory size changing in the future.
 pub const fn imm_16_to_addr(imm: u16) -> u32 {
     let imm = imm as i16 as u32;
 
     // ensure that imm gets "wrapped" around memory overflows.
-    imm & (1024 * 1024 * 16 - 1)
-}
-
-pub const fn u32_to_addr(val: u32) -> u32 {
-    val & (1024 * 1024 * 16 - 1)
+    imm & (crate::MEMORY_SIZE - 1)
 }
 
 pub fn store_src_0(builder: &mut BlockBuilder, displacement: Memory) {
@@ -99,4 +90,15 @@ pub fn store(builder: &mut BlockBuilder, base: Memory, src: register::Native) {
             .stream
             .mov_Any32BitMemory_Register32Bit(displacement, src.as_asm_reg32()),
     };
+}
+
+pub fn dyn_address(builder: &mut BlockBuilder, base: register::Native, imm: u16) {
+    builder.stream.lea_Register32Bit_Any32BitMemory(
+        Register32Bit::EAX,
+        AssemblerMemory::base_64_displacement(base.as_asm_reg64(), (imm as i16 as u32).into()),
+    );
+
+    builder
+        .stream
+        .and_EAX_Immediate32Bit((crate::MEMORY_SIZE - 1).into());
 }

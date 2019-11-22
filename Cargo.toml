@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 assembler = "0.10.1"
+static_assertions = "1.1.0"

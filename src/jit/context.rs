@@ -19,8 +19,8 @@ impl Runtime {
         regs: &mut [u32; crate::XLEN],
         memory: &mut [u8],
     ) {
-        // assert 16 MiB of memory for now
-        assert_eq!(memory.len(), 1024 * 1024 * 16);
+        // assert memory size for now
+        assert_eq!(memory.len(), crate::MEMORY_SIZE as usize);
 
         if let Some(block_num) = self.ranges.iter().position(|range| range.start == *pc) {
             let block = &self.blocks[block_num];
