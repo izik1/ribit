@@ -5,11 +5,40 @@ use assembler::InstructionStream;
 use crate::jit::generator::{generate_register_read, generate_register_writeback};
 use crate::register;
 
+#[derive(Default, Copy, Clone)]
+struct UsageMask(u32);
+
+impl UsageMask {
+    fn _new() -> Self {
+        Self::default()
+    }
+
+    fn _with_mask(mask: u32) -> Self {
+        Self(mask)
+    }
+
+    fn is_set(self, register: register::RiscV) -> bool {
+        (self.0 >> register.get()) & 1 == 1
+    }
+
+    fn set(&mut self, register: register::RiscV) {
+        self.0 |= 1 << register.get();
+    }
+
+    fn res(&mut self, register: register::RiscV) {
+        self.0 &= !(1 << register.get());
+    }
+
+    fn is_clear(self) -> bool {
+        self.0 == 0
+    }
+}
+
 pub(super) struct RegisterManager {
     free_registers: Vec<register::Native>,
     used_registers: VecDeque<(register::Native, register::RiscV)>,
-    load_map: u32,
-    store_map: u32,
+    to_load_map: UsageMask,
+    to_store_map: UsageMask,
 }
 
 impl RegisterManager {
@@ -24,13 +53,13 @@ impl RegisterManager {
                 // register::Native::RAX,
             ],
             used_registers: VecDeque::new(),
-            load_map: 0,
-            store_map: 0,
+            to_load_map: UsageMask::default(),
+            to_store_map: UsageMask::default(),
         }
     }
 
     pub fn is_cleared(&self) -> bool {
-        self.store_map == 0
+        self.to_store_map.is_clear()
     }
 
     pub fn is_allocated(&self, register: register::RiscV) -> bool {
@@ -38,11 +67,22 @@ impl RegisterManager {
     }
 
     pub fn needs_store(&self, register: register::RiscV) -> bool {
-        (self.store_map >> register.get()) & 1 == 1
+        self.to_store_map.is_set(register)
     }
 
     pub fn needs_load(&self, register: register::RiscV) -> bool {
-        (self.load_map >> register.get()) & 1 == 1
+        self.to_load_map.is_set(register)
+    }
+
+    pub fn clobber(&mut self, register: register::Native, stream: &mut InstructionStream) {
+        if let Some(rv32_reg) = self.find_rv32_register(register) {
+            if self.to_store_map.is_set(rv32_reg) {
+                generate_register_writeback(stream, register, rv32_reg);
+                self.to_store_map.res(rv32_reg);
+            }
+
+            self.to_load_map.set(rv32_reg);
+        }
     }
 
     pub fn load(
@@ -52,9 +92,9 @@ impl RegisterManager {
     ) -> Result<(), ()> {
         let native_reg = self.find_native_register(rv32_reg).ok_or(())?;
 
-        if self.needs_load(rv32_reg) {
+        if self.to_load_map.is_set(rv32_reg) {
             generate_register_read(stream, native_reg, rv32_reg);
-            self.load_map &= !(1 << rv32_reg.get())
+            self.to_load_map.res(rv32_reg);
         }
 
         Ok(())
@@ -64,7 +104,7 @@ impl RegisterManager {
     pub fn set_dirty(&mut self, rv32_reg: register::RiscV) -> Result<(), ()> {
         self.find_native_register(rv32_reg).ok_or(())?;
 
-        self.store_map |= 1 << rv32_reg.get();
+        self.to_store_map.set(rv32_reg);
 
         Ok(())
     }
@@ -102,7 +142,7 @@ impl RegisterManager {
             self.free(rv_reg, stream);
         }
 
-        self.load_map |= 1 << rv_reg.get();
+        self.to_load_map.set(rv_reg);
         self.used_registers.push_back((native_reg, rv_reg));
     }
 
@@ -134,14 +174,10 @@ impl RegisterManager {
             })
     }
 
-    fn try_alloc(
-        &mut self,
-        rv_reg: register::RiscV,
-        basic_block: &mut InstructionStream,
-    ) -> Option<register::Native> {
+    fn try_alloc(&mut self, rv_reg: register::RiscV) -> Option<register::Native> {
         self.find_native_register(rv_reg).or_else(|| {
             let native_reg = self.free_registers.pop()?;
-            self.load_map |= 1 << rv_reg.get();
+            self.to_load_map.set(rv_reg);
             self.used_registers.push_back((native_reg, rv_reg));
             Some(native_reg)
         })
@@ -153,17 +189,15 @@ impl RegisterManager {
         keep_regs: &[register::RiscV],
         basic_block: &mut InstructionStream,
     ) -> register::Native {
-        if let Some(native_reg) = self.try_alloc(reg, basic_block) {
+        if let Some(native_reg) = self.try_alloc(reg) {
             return native_reg;
         }
 
         // this should only be `None` if keep regs tries to keep as many virtual registers as there are native registers.
-        let native_reg = self.free_first(keep_regs, basic_block)
+        let _ = self.free_first(keep_regs, basic_block)
             .expect("Tried to allocate a register without a free register, and all others needed to be kept.");
 
-        generate_register_read(basic_block, native_reg, reg);
-        self.used_registers.push_back((native_reg, reg));
-        native_reg
+        self.try_alloc(reg).unwrap()
     }
 
     pub fn free(
@@ -178,9 +212,9 @@ impl RegisterManager {
 
         let native_reg = self.used_registers.remove(idx).map(|it| it.0)?;
 
-        if self.needs_store(rv32_reg) {
+        if self.to_store_map.is_set(rv32_reg) {
             generate_register_writeback(basic_block, native_reg, rv32_reg);
-            self.store_map &= !(1 << rv32_reg.get())
+            self.to_store_map.res(rv32_reg);
         }
 
         self.free_registers.push(native_reg);
@@ -204,9 +238,9 @@ impl RegisterManager {
             .remove(idx)
             .unwrap_or_else(|| unsafe { std::hint::unreachable_unchecked() });
 
-        if self.needs_store(rv_reg) {
+        if self.to_store_map.is_set(rv_reg) {
             generate_register_writeback(basic_block, native_reg, rv_reg);
-            self.store_map &= !(1 << rv_reg.get())
+            self.to_store_map.res(rv_reg);
         }
 
         self.free_registers.push(native_reg);
@@ -216,10 +250,9 @@ impl RegisterManager {
 
     pub fn free_all(&mut self, basic_block: &mut InstructionStream) {
         for (native_reg, rv_reg) in self.used_registers.drain(..) {
-            // hack: inline `Self::needs_store` to play nice with lifetimes
-            if (self.store_map >> rv_reg.get()) & 1 == 1 {
+            if self.to_store_map.is_set(rv_reg) {
                 generate_register_writeback(basic_block, native_reg, rv_reg);
-                self.store_map &= !(1 << rv_reg.get())
+                self.to_store_map.res(rv_reg);
             }
 
             self.free_registers.push(native_reg);

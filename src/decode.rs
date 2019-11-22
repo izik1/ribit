@@ -8,7 +8,7 @@ use crate::instruction::{self, Instruction};
 
 use crate::register;
 
-use crate::opcode;
+use crate::opcode::{self, Width};
 
 #[inline]
 fn decode_register(instruction: u32) -> Option<register::RiscV> {
@@ -76,13 +76,13 @@ pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> 
             opcode::I::LHU,
         )),
         (0b010_0011, 0b000, _) => {
-            Instruction::S(instruction::S::from_instruction(instruction, opcode::S::SB))
+            Instruction::S(instruction::S::from_instruction(instruction, Width::Byte))
         }
         (0b010_0011, 0b001, _) => {
-            Instruction::S(instruction::S::from_instruction(instruction, opcode::S::SH))
+            Instruction::S(instruction::S::from_instruction(instruction, Width::Word))
         }
         (0b010_0011, 0b010, _) => {
-            Instruction::S(instruction::S::from_instruction(instruction, opcode::S::SW))
+            Instruction::S(instruction::S::from_instruction(instruction, Width::DWord))
         }
         (0b001_0011, 0b000, _) => Instruction::I(instruction::I::from_instruction(
             instruction,

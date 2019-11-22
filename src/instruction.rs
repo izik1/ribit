@@ -109,7 +109,7 @@ pub struct S {
     pub(crate) imm: u16,
     pub(crate) rs1: Option<RiscVRegister>,
     pub(crate) rs2: Option<RiscVRegister>,
-    pub(crate) opcode: opcode::S,
+    pub(crate) width: opcode::Width,
 }
 
 impl S {
@@ -117,17 +117,17 @@ impl S {
         imm: u16,
         rs1: Option<RiscVRegister>,
         rs2: Option<RiscVRegister>,
-        opcode: opcode::S,
+        width: opcode::Width,
     ) -> Self {
         Self {
             imm,
             rs1,
             rs2,
-            opcode,
+            width,
         }
     }
 
-    pub(crate) fn from_instruction(instruction: u32, opcode: opcode::S) -> Self {
+    pub(crate) fn from_instruction(instruction: u32, width: opcode::Width) -> Self {
         let (rs1, rs2) = decode_rs(instruction);
 
         let imm = (((instruction >> 19) & 0b0000_1111_1110_0000)
@@ -139,7 +139,7 @@ impl S {
             rs1,
             rs2,
             imm,
-            opcode,
+            width,
         }
     }
 }

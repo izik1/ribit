@@ -72,7 +72,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
             if funct3 == 0b010 {
                 Instruction::I(instruction::I::new(imm, rs1, r, opcode::I::LW))
             } else {
-                Instruction::S(instruction::S::new(imm, rs1, r, opcode::S::SW))
+                Instruction::S(instruction::S::new(imm, rs1, r, opcode::Width::DWord))
             }
         }
 
@@ -275,7 +275,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
                 imm,
                 Some(RiscVRegister::X2),
                 rs2,
-                opcode::S::SW,
+                opcode::Width::DWord,
             ))
         }
 

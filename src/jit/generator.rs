@@ -1,5 +1,7 @@
 use super::{alloc::RegisterManager, BasicBlock, CheckRanges};
 
+mod memory;
+
 use assembler::mnemonic_parameter_types::{
     memory::Memory,
     registers::{Register32Bit, Register64Bit},
@@ -9,7 +11,8 @@ use assembler::InstructionStream;
 
 use crate::{
     instruction::{self, Instruction},
-    opcode, register,
+    opcode::{self, Width},
+    register,
 };
 
 pub struct BlockBuilder<'a> {
@@ -75,6 +78,42 @@ impl<'a> BlockBuilder<'a> {
 
         generate_register_write_imm(&mut self.stream, register, value);
     }
+
+    fn ez_alloc(&mut self, register: register::RiscV) -> register::Native {
+        let native_register = self
+            .register_manager
+            .alloc(register, &[register], &mut self.stream);
+
+        self.register_manager
+            .load(register, &mut self.stream)
+            .unwrap();
+
+        native_register
+    }
+
+    fn ez_alloc2(
+        &mut self,
+        register1: register::RiscV,
+        register2: register::RiscV,
+    ) -> (register::Native, register::Native) {
+        let native1 =
+            self.register_manager
+                .alloc(register1, &[register1, register2], &mut self.stream);
+
+        self.register_manager
+            .load(register1, &mut self.stream)
+            .unwrap();
+
+        let native2 =
+            self.register_manager
+                .alloc(register2, &[register1, register2], &mut self.stream);
+
+        self.register_manager
+            .load(register2, &mut self.stream)
+            .unwrap();
+
+        (native1, native2)
+    }
 }
 
 pub(super) fn generate_register_writeback(
@@ -84,7 +123,7 @@ pub(super) fn generate_register_writeback(
 ) {
     basic_block.mov_Any32BitMemory_Register32Bit(
         Memory::base_64_displacement(Register64Bit::RDI, rv_reg.as_offset().into()),
-        native_reg.as_assembly_reg32(),
+        native_reg.as_asm_reg32(),
     );
 }
 
@@ -94,7 +133,7 @@ pub(super) fn generate_register_read(
     rv_reg: register::RiscV,
 ) {
     basic_block.mov_Register32Bit_Any32BitMemory(
-        native_reg.as_assembly_reg32(),
+        native_reg.as_asm_reg32(),
         Memory::base_64_displacement(Register64Bit::RDI, rv_reg.as_offset().into()),
     );
 }
@@ -118,12 +157,10 @@ fn generate_register_write_imm2(
     value: u32,
 ) {
     if value != 0 {
-        stream.mov_Register32Bit_Immediate32Bit(native_reg.as_assembly_reg32(), value.into());
+        stream.mov_Register32Bit_Immediate32Bit(native_reg.as_asm_reg32(), value.into());
     } else {
-        stream.xor_Register32Bit_Register32Bit(
-            native_reg.as_assembly_reg32(),
-            native_reg.as_assembly_reg32(),
-        );
+        stream
+            .xor_Register32Bit_Register32Bit(native_reg.as_asm_reg32(), native_reg.as_asm_reg32());
     }
 }
 
@@ -248,8 +285,8 @@ fn generate_branch(builder: &mut BlockBuilder, instruction: instruction::B, cont
                 .unwrap();
 
             builder.stream.cmp_Register32Bit_Register32Bit(
-                native_rs1.as_assembly_reg32(),
-                native_rs2.as_assembly_reg32(),
+                native_rs1.as_asm_reg32(),
+                native_rs2.as_asm_reg32(),
             );
 
             false
@@ -355,10 +392,9 @@ fn generate_branch_cmp_0(
         .load(rs, &mut builder.stream)
         .unwrap();
 
-    builder.stream.test_Register32Bit_Register32Bit(
-        native_rs.as_assembly_reg32(),
-        native_rs.as_assembly_reg32(),
-    );
+    builder
+        .stream
+        .test_Register32Bit_Register32Bit(native_rs.as_asm_reg32(), native_rs.as_asm_reg32());
     false
 }
 
@@ -378,28 +414,70 @@ fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::In
             ..
         }) => unreachable!("blocks cannot contain a branch"),
 
-        Instruction::S(instruction) => {
-            generate_stype_instruction(builder, instruction, next_start_address)
-        }
+        Instruction::S(instruction) => generate_stype_instruction(builder, instruction),
 
-        _ => todo!("implement remaining instructions"),
+        Instruction::I(_) => todo!("I type instructions are not yet implemented"),
+        Instruction::U(_) => todo!("U type instructions are not yet implemented"),
+
+        Instruction::R(instruction::R {
+            rs1,
+            rs2,
+            rd,
+            opcode,
+        }) => todo!("R type instructions need to be implemented"),
     }
 }
 
 // todo: broken
-fn generate_stype_instruction(
-    builder: &mut BlockBuilder,
-    instruction: instruction::S,
-    next_start_address: u32,
-) {
+fn generate_stype_instruction(builder: &mut BlockBuilder, instruction: instruction::S) {
     let instruction::S {
-        imm: _imm,
+        imm,
         rs1,
         rs2,
-        opcode: _opcode,
+        width,
     } = instruction;
 
     // todo: handle rs1 == 0 || rs2 == 0
+
+    match (rs1, rs2) {
+        (None, None) => memory::store_src_0(
+            builder,
+            memory::Memory::new(width, memory::imm_16_to_addr(imm)),
+        ),
+        (Some(base), None) => {
+            let base = builder.ez_alloc(base);
+            builder.stream.lea_Register32Bit_Any32BitMemory(
+                Register32Bit::EAX,
+                Memory::base_64_displacement(base.as_asm_reg64(), (imm as i32).into()),
+            );
+
+            builder
+                .stream
+                .and_EAX_Immediate32Bit((1024 * 1024 * 16 - 1).into());
+
+            memory::store_src_0(builder, memory::Memory::mem_eax(width));
+        }
+
+        (None, Some(src)) => {
+            let src = builder.ez_alloc(src);
+            generate_store_base_0(builder, imm, src, width);
+        }
+
+        (Some(base), Some(src)) => {
+            let (base, src) = builder.ez_alloc2(base, src);
+
+            builder.stream.lea_Register32Bit_Any32BitMemory(
+                Register32Bit::EAX,
+                Memory::base_64_displacement(base.as_asm_reg64(), (imm as i32).into()),
+            );
+
+            builder
+                .stream
+                .and_EAX_Immediate32Bit((1024 * 1024 * 16 - 1).into());
+
+            memory::store(builder, memory::Memory::mem_eax(width), src);
+        }
+    }
 
     if let (Some(rs1), Some(rs2)) = (rs1, rs2) {
         let _native_rs1 = builder
@@ -412,5 +490,32 @@ fn generate_stype_instruction(
 
     todo!("store instruction");
 
-    // todo: handle blocks getting tainted
+    // todo: handle blocks getting tainted -- not required due to a lack of `FENCE.I`.
+}
+
+fn generate_store_base_0(
+    builder: &mut BlockBuilder,
+    imm: u16,
+    src: register::Native,
+    width: Width,
+) {
+    // ensure that imm gets "wrapped" around memory overflows.
+    let imm = memory::imm_16_to_addr(imm);
+
+    match width {
+        Width::Byte => builder.stream.mov_Any8BitMemory_Register8Bit(
+            Memory::base_64_displacement(Register64Bit::RDX, imm.into()),
+            src.as_asm_reg8(),
+        ),
+
+        Width::Word => builder.stream.mov_Any16BitMemory_Register16Bit(
+            Memory::base_64_displacement(Register64Bit::RDX, imm.into()),
+            src.as_asm_reg16(),
+        ),
+
+        Width::DWord => builder.stream.mov_Any32BitMemory_Register32Bit(
+            Memory::base_64_displacement(Register64Bit::RDX, imm.into()),
+            src.as_asm_reg32(),
+        ),
+    };
 }

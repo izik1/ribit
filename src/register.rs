@@ -1,4 +1,6 @@
-pub(crate) use assembler::mnemonic_parameter_types::registers::Register32Bit as AssemblerReg32;
+use assembler::mnemonic_parameter_types::registers::{
+    Register16Bit, Register32Bit, Register64Bit, Register8Bit,
+};
 
 use std::num::NonZeroU8;
 
@@ -71,7 +73,7 @@ impl RiscV {
 }
 
 #[derive(Hash, Eq, PartialEq, Copy, Clone)]
-pub(crate) enum Native {
+pub enum Native {
     RDX,
     RCX,
     R8,
@@ -80,12 +82,39 @@ pub(crate) enum Native {
 }
 
 impl Native {
-    pub fn as_assembly_reg32(self) -> AssemblerReg32 {
+    pub fn as_asm_reg64(self) -> Register64Bit {
         match self {
-            Self::RDX => AssemblerReg32::EDX,
-            Self::RCX => AssemblerReg32::ECX,
-            Self::R8 => AssemblerReg32::R8D,
-            Self::R9 => AssemblerReg32::R9D,
+            Self::RDX => Register64Bit::RDX,
+            Self::RCX => Register64Bit::RCX,
+            Self::R8 => Register64Bit::R8,
+            Self::R9 => Register64Bit::R9,
+        }
+    }
+
+    pub fn as_asm_reg32(self) -> Register32Bit {
+        match self {
+            Self::RDX => Register32Bit::EDX,
+            Self::RCX => Register32Bit::ECX,
+            Self::R8 => Register32Bit::R8D,
+            Self::R9 => Register32Bit::R9D,
+        }
+    }
+
+    pub fn as_asm_reg16(self) -> Register16Bit {
+        match self {
+            Self::RDX => Register16Bit::DX,
+            Self::RCX => Register16Bit::CX,
+            Self::R8 => Register16Bit::R8W,
+            Self::R9 => Register16Bit::R9W,
+        }
+    }
+
+    pub fn as_asm_reg8(self) -> Register8Bit {
+        match self {
+            Self::RDX => Register8Bit::DL,
+            Self::RCX => Register8Bit::CL,
+            Self::R8 => Register8Bit::R8B,
+            Self::R9 => Register8Bit::R9B,
         }
     }
 }
