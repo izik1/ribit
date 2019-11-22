@@ -1,9 +1,32 @@
 use std::collections::VecDeque;
 
+use assembler::mnemonic_parameter_types::{memory::Memory, registers::Register64Bit};
+
 use assembler::InstructionStream;
 
-use crate::jit::generator::{generate_register_read, generate_register_writeback};
 use crate::register;
+
+fn writeback_register(
+    basic_block: &mut InstructionStream,
+    native_reg: register::Native,
+    rv_reg: register::RiscV,
+) {
+    basic_block.mov_Any32BitMemory_Register32Bit(
+        Memory::base_64_displacement(Register64Bit::RDI, rv_reg.as_offset().into()),
+        native_reg.as_asm_reg32(),
+    );
+}
+
+fn read_register(
+    basic_block: &mut InstructionStream,
+    native_reg: register::Native,
+    rv_reg: register::RiscV,
+) {
+    basic_block.mov_Register32Bit_Any32BitMemory(
+        native_reg.as_asm_reg32(),
+        Memory::base_64_displacement(Register64Bit::RDI, rv_reg.as_offset().into()),
+    );
+}
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum LoadProfile {
@@ -85,7 +108,7 @@ impl RegisterManager {
     pub fn clobber(&mut self, register: register::Native, stream: &mut InstructionStream) {
         if let Some(rv32_reg) = self.find_rv32_register(register) {
             if self.to_store_map.is_set(rv32_reg) {
-                generate_register_writeback(stream, register, rv32_reg);
+                writeback_register(stream, register, rv32_reg);
                 self.to_store_map.res(rv32_reg);
             }
 
@@ -101,7 +124,7 @@ impl RegisterManager {
         let native_reg = self.find_native_register(rv32_reg).ok_or(())?;
 
         if self.to_load_map.is_set(rv32_reg) {
-            generate_register_read(stream, native_reg, rv32_reg);
+            read_register(stream, native_reg, rv32_reg);
             self.to_load_map.res(rv32_reg);
         }
 
@@ -193,7 +216,7 @@ impl RegisterManager {
 
             match load_profile {
                 LoadProfile::Lazy => self.to_load_map.set(rv_reg),
-                LoadProfile::Eager => generate_register_read(basic_block, native_reg, rv_reg),
+                LoadProfile::Eager => read_register(basic_block, native_reg, rv_reg),
             }
 
             self.used_registers.push_back((native_reg, rv_reg));
@@ -245,7 +268,7 @@ impl RegisterManager {
         let native_reg = self.used_registers.remove(idx).map(|it| it.0)?;
 
         if self.to_store_map.is_set(rv32_reg) {
-            generate_register_writeback(basic_block, native_reg, rv32_reg);
+            writeback_register(basic_block, native_reg, rv32_reg);
             self.to_store_map.res(rv32_reg);
         }
 
@@ -271,7 +294,7 @@ impl RegisterManager {
             .unwrap_or_else(|| unsafe { std::hint::unreachable_unchecked() });
 
         if self.to_store_map.is_set(rv_reg) {
-            generate_register_writeback(basic_block, native_reg, rv_reg);
+            writeback_register(basic_block, native_reg, rv_reg);
             self.to_store_map.res(rv_reg);
         }
 
@@ -283,7 +306,7 @@ impl RegisterManager {
     pub fn free_all(&mut self, basic_block: &mut InstructionStream) {
         for (native_reg, rv_reg) in self.used_registers.drain(..) {
             if self.to_store_map.is_set(rv_reg) {
-                generate_register_writeback(basic_block, native_reg, rv_reg);
+                writeback_register(basic_block, native_reg, rv_reg);
                 self.to_store_map.res(rv_reg);
             }
 

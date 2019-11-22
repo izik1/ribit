@@ -94,28 +94,16 @@ impl<'a> BlockBuilder<'a> {
             LoadProfile::Eager,
         )
     }
-}
 
-pub(super) fn generate_register_writeback(
-    basic_block: &mut InstructionStream,
-    native_reg: register::Native,
-    rv_reg: register::RiscV,
-) {
-    basic_block.mov_Any32BitMemory_Register32Bit(
-        Memory::base_64_displacement(Register64Bit::RDI, rv_reg.as_offset().into()),
-        native_reg.as_asm_reg32(),
-    );
-}
-
-pub(super) fn generate_register_read(
-    basic_block: &mut InstructionStream,
-    native_reg: register::Native,
-    rv_reg: register::RiscV,
-) {
-    basic_block.mov_Register32Bit_Any32BitMemory(
-        native_reg.as_asm_reg32(),
-        Memory::base_64_displacement(Register64Bit::RDI, rv_reg.as_offset().into()),
-    );
+    fn mov_eax_imm(&mut self, imm: u32) {
+        if imm == 0 {
+            self.stream
+                .xor_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::EAX);
+        } else {
+            self.stream
+                .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, imm.into());
+        }
+    }
 }
 
 // todo: support native_register arguments
@@ -161,9 +149,7 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
                 builder.write_register_imm(rd, next_start_address, false);
             }
 
-            builder
-                .stream
-                .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, res_pc.into());
+            builder.mov_eax_imm(res_pc);
         }
 
         Instruction::I(instruction::I {
@@ -176,25 +162,27 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
                 builder.write_register_imm(rd, next_start_address, false);
             }
 
-            builder
-                .stream
-                .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, (imm as i16).into());
-
             if let Some(rs1) = rs1 {
+                builder.mov_eax_imm(imm as i16 as u32);
                 builder.stream.add_Register32Bit_Any32BitMemory(
                     Register32Bit::EAX,
                     Memory::base_64_displacement(Register64Bit::RDI, rs1.as_offset().into()),
                 );
-            }
 
-            builder
-                .stream
-                .btr_Register32Bit_Immediate8Bit(Register32Bit::EAX, 0_u8.into());
+                builder
+                    .stream
+                    .btr_Register32Bit_Immediate8Bit(Register32Bit::EAX, 0_u8.into());
+            } else {
+                let imm = imm as i16 as u32;
+                // avoid generating a btr for a constant by clearing the bit here.
+                builder.mov_eax_imm(imm & !1);
+            }
         }
 
         Instruction::I(_) | Instruction::R(_) | Instruction::S(_) | Instruction::U(_) => {
             unreachable!("blocks can only end on a branch?")
         }
+
         Instruction::B(instr) => branch::conditional(builder, instr, next_start_address),
     }
 
