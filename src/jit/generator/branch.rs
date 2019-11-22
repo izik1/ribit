@@ -4,6 +4,9 @@ use crate::{instruction, opcode, register};
 use assembler::mnemonic_parameter_types::registers::Register32Bit;
 
 pub fn conditional(builder: &mut BlockBuilder, instruction: instruction::B, continue_pc: u32) {
+    const EAX: Register32Bit = Register32Bit::EAX;
+    const ECX: Register32Bit = Register32Bit::ECX;
+
     let instruction::B {
         rs1,
         rs2,
@@ -22,19 +25,18 @@ pub fn conditional(builder: &mut BlockBuilder, instruction: instruction::B, cont
     // ; both registers:
     // mov eax, <continue_pc>
     // cmp <native_reg1>, <native_reg2>
-    // mov edx, <jump_addr>
-    // CMOV<cond> eax, edx
+    // mov ecx, <jump_addr>
+    // CMOV<cond> eax, ecx
     // ret
     // ; one register:
     // mov eax, <one branch path>
     // test <native_reg1>, <native_reg1>
-    // mov edx, <the other branch path>
-    // cmod<cond> eax, edx
+    // mov ecx, <the other branch path>
+    // cmod<cond> eax, ecx
 
     match (rs1, rs2) {
         (rs1, rs2) if rs1 == rs2 => {
             conditional_same_reg(builder, continue_pc, jump_addr, opcode);
-            builder.register_manager.free_all(&mut builder.stream);
             return;
         }
 
@@ -47,7 +49,6 @@ pub fn conditional(builder: &mut BlockBuilder, instruction: instruction::B, cont
                 rs1.map_or((continue_pc, jump_addr), |_| (jump_addr, continue_pc));
 
             if conditional_cmp_0(builder, false_addr, true_addr, opcode, rs) {
-                builder.register_manager.free_all(&mut builder.stream);
                 return; // the branch is now unconditional, return
             }
         }
@@ -63,33 +64,24 @@ pub fn conditional(builder: &mut BlockBuilder, instruction: instruction::B, cont
 
     builder
         .stream
-        .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, continue_pc.into());
+        .mov_Register32Bit_Immediate32Bit(EAX, continue_pc.into());
 
-    builder.register_manager.free_all(&mut builder.stream);
+    // we're about to write over ECX, so make sure nothing is using it.
+    builder
+        .register_manager
+        .clobber(register::Native::RCX, &mut builder.stream);
 
     builder
         .stream
-        .mov_Register32Bit_Immediate32Bit(Register32Bit::ECX, jump_addr.into());
+        .mov_Register32Bit_Immediate32Bit(ECX, jump_addr.into());
 
     match opcode {
-        opcode::B::BEQ => builder
-            .stream
-            .cmove_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
-        opcode::B::BNE => builder
-            .stream
-            .cmovne_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
-        opcode::B::BLT => builder
-            .stream
-            .cmovl_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
-        opcode::B::BGE => builder
-            .stream
-            .cmovge_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
-        opcode::B::BLTU => builder
-            .stream
-            .cmovb_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
-        opcode::B::BGEU => builder
-            .stream
-            .cmovae_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
+        opcode::B::BEQ => builder.stream.cmove_Register32Bit_Register32Bit(EAX, ECX),
+        opcode::B::BNE => builder.stream.cmovne_Register32Bit_Register32Bit(EAX, ECX),
+        opcode::B::BLT => builder.stream.cmovl_Register32Bit_Register32Bit(EAX, ECX),
+        opcode::B::BGE => builder.stream.cmovge_Register32Bit_Register32Bit(EAX, ECX),
+        opcode::B::BLTU => builder.stream.cmovb_Register32Bit_Register32Bit(EAX, ECX),
+        opcode::B::BGEU => builder.stream.cmovae_Register32Bit_Register32Bit(EAX, ECX),
     }
 }
 

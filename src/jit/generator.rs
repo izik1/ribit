@@ -41,17 +41,11 @@ impl<'a> BlockBuilder<'a> {
     pub fn complete(mut self, branch_instruction: instruction::Info) -> BasicBlock {
         end_basic_block(&mut self, branch_instruction);
 
-        // deconstruct self to avoid drop panic.
-        let BlockBuilder {
-            stream,
-            register_manager,
-            ..
-        } = self;
+        assert!(self.register_manager.is_cleared());
 
-        assert!(register_manager.is_cleared());
-
-        let funct: BasicBlock = unsafe { std::mem::transmute(stream.start_instruction_pointer()) };
-        stream.finish();
+        let funct: BasicBlock =
+            unsafe { std::mem::transmute(self.stream.start_instruction_pointer()) };
+        self.stream.finish();
 
         funct
     }
@@ -154,14 +148,14 @@ pub(super) fn generate_register_write_imm(
 /// writes a immediate value to a register.
 fn generate_register_write_imm2(
     stream: &mut InstructionStream,
-    native_reg: register::Native,
+    register: register::Native,
     value: u32,
 ) {
+    let register = register.as_asm_reg32();
     if value != 0 {
-        stream.mov_Register32Bit_Immediate32Bit(native_reg.as_asm_reg32(), value.into());
+        stream.mov_Register32Bit_Immediate32Bit(register, value.into());
     } else {
-        stream
-            .xor_Register32Bit_Register32Bit(native_reg.as_asm_reg32(), native_reg.as_asm_reg32());
+        stream.xor_Register32Bit_Register32Bit(register, register);
     }
 }
 
@@ -182,8 +176,6 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
                 builder.write_register_imm(rd, next_start_address, false);
             }
 
-            // before we return we need to make sure that all the registers are done.
-            builder.register_manager.free_all(&mut builder.stream);
             builder
                 .stream
                 .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, res_pc.into());
@@ -198,9 +190,6 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
             if let Some(rd) = rd {
                 builder.write_register_imm(rd, next_start_address, false);
             }
-
-            // before we return we need to make sure that all the registers are done.
-            builder.register_manager.free_all(&mut builder.stream);
 
             builder
                 .stream
@@ -224,8 +213,10 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
         Instruction::B(instr) => branch::conditional(builder, instr, next_start_address),
     }
 
+    builder.register_manager.free_all(&mut builder.stream);
     builder.stream.ret();
 }
+
 fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::Info) {
     let next_start_address = instruction.end_address();
     let instruction::Info {
