@@ -1,5 +1,6 @@
 use super::{alloc::RegisterManager, BasicBlock, CheckRanges};
 
+mod branch;
 mod memory;
 
 use assembler::mnemonic_parameter_types::{
@@ -179,11 +180,10 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
 
             if let Some(rd) = rd {
                 builder.write_register_imm(rd, next_start_address, false);
-
-                // before we return we need to make sure that all the registers are done.
-                builder.register_manager.free_all(&mut builder.stream);
             }
 
+            // before we return we need to make sure that all the registers are done.
+            builder.register_manager.free_all(&mut builder.stream);
             builder
                 .stream
                 .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, res_pc.into());
@@ -197,10 +197,10 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
         }) => {
             if let Some(rd) = rd {
                 builder.write_register_imm(rd, next_start_address, false);
-
-                // before we return we need to make sure that all the registers are done.
-                builder.register_manager.free_all(&mut builder.stream);
             }
+
+            // before we return we need to make sure that all the registers are done.
+            builder.register_manager.free_all(&mut builder.stream);
 
             builder
                 .stream
@@ -221,183 +221,11 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
         Instruction::I(_) | Instruction::R(_) | Instruction::S(_) | Instruction::U(_) => {
             unreachable!("blocks can only end on a branch?")
         }
-        Instruction::B(instr) => generate_branch(builder, instr, next_start_address),
+        Instruction::B(instr) => branch::conditional(builder, instr, next_start_address),
     }
 
     builder.stream.ret();
 }
-
-fn generate_branch(builder: &mut BlockBuilder, instruction: instruction::B, continue_pc: u32) {
-    let instruction::B {
-        rs1,
-        rs2,
-        imm,
-        opcode,
-    } = instruction;
-
-    let jump_addr = continue_pc.wrapping_add(imm as i16 as u32);
-
-    // todo: try to optimize obviously false/true branches with a [rewrite + warn, rewrite, warn, <neither>] feature set
-    // None would allow for less time spent in code-gen (because you don't have to find the optimizable branches)
-    // Warn is good for actually testing RISC-V code generation (_not_ this JIT)
-    // Rewrite is good for when non-canonical unconditional branches are common for some reason.
-
-    // The operation looks something like this on a high level
-    // ; both registers:
-    // mov eax, <continue_pc>
-    // cmp <native_reg1>, <native_reg2>
-    // mov edx, <jump_addr>
-    // CMOV<cond> eax, edx
-    // ret
-    // ; one register:
-    // mov eax, <one branch path>
-    // test <native_reg1>, <native_reg1>
-    // mov edx, <the other branch path>
-    // cmod<cond> eax, edx
-
-    let early_return = match (rs1, rs2) {
-        (None, None) => generate_branch_same_reg(builder, continue_pc, jump_addr, opcode),
-
-        (Some(rs1), Some(rs2)) if rs1 == rs2 => {
-            generate_branch_same_reg(builder, continue_pc, jump_addr, opcode)
-        }
-
-        (Some(rs1), None) => generate_branch_cmp_0(builder, continue_pc, jump_addr, opcode, rs1),
-
-        (None, Some(rs2)) => generate_branch_cmp_0(builder, jump_addr, continue_pc, opcode, rs2),
-
-        (Some(rs1), Some(rs2)) => {
-            let native_rs1 = builder
-                .register_manager
-                .alloc(rs1, &[rs1, rs2], &mut builder.stream);
-
-            let native_rs2 = builder
-                .register_manager
-                .alloc(rs2, &[rs1, rs2], &mut builder.stream);
-
-            builder
-                .register_manager
-                .load(rs1, &mut builder.stream)
-                .unwrap();
-            builder
-                .register_manager
-                .load(rs2, &mut builder.stream)
-                .unwrap();
-
-            builder.stream.cmp_Register32Bit_Register32Bit(
-                native_rs1.as_asm_reg32(),
-                native_rs2.as_asm_reg32(),
-            );
-
-            false
-        }
-    };
-
-    // the branch has been made unconditional and so we should return early to avoid mucking it up.
-    if early_return {
-        return;
-    }
-
-    builder
-        .stream
-        .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, (continue_pc).into());
-
-    builder.register_manager.free_all(&mut builder.stream);
-
-    builder
-        .stream
-        .mov_Register32Bit_Immediate32Bit(Register32Bit::ECX, jump_addr.into());
-
-    match opcode {
-        opcode::B::BEQ => builder
-            .stream
-            .cmove_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
-        opcode::B::BNE => builder
-            .stream
-            .cmovne_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
-        opcode::B::BLT => builder
-            .stream
-            .cmovl_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
-        opcode::B::BGE => builder
-            .stream
-            .cmovge_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
-        opcode::B::BLTU => builder
-            .stream
-            .cmovb_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
-        opcode::B::BGEU => builder
-            .stream
-            .cmovae_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::ECX),
-    }
-}
-
-// returns true if the branch becomes unconditional (always)
-fn generate_branch_same_reg(
-    builder: &mut BlockBuilder,
-    false_addr: u32,
-    true_addr: u32,
-    opcode: opcode::B,
-) -> bool {
-    match opcode {
-        // always true
-        opcode::B::BEQ | opcode::B::BGE | opcode::B::BGEU => builder
-            .stream
-            .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, true_addr.into()),
-
-        // always false
-        opcode::B::BNE | opcode::B::BLT | opcode::B::BLTU => builder
-            .stream
-            .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, false_addr.into()),
-    }
-
-    true
-}
-
-/// generates a branch based off of `cmp rs, 0`, if you want to use rs2 instead of rs1, make sure to swap
-///  `[false_addr]` and `[true_addr]` as well.
-/// returns true if the branch becomes unconditional.
-fn generate_branch_cmp_0(
-    builder: &mut BlockBuilder,
-    false_addr: u32,
-    true_addr: u32,
-    opcode: opcode::B,
-    rs: register::RiscV,
-) -> bool {
-    // there's some low hanging register contention fruit, cmp can optionally take a mem argument.
-    match opcode {
-        // always true
-        opcode::B::BGEU => {
-            builder
-                .stream
-                .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, true_addr.into());
-
-            return true;
-        }
-
-        // always false
-        opcode::B::BLTU => {
-            builder
-                .stream
-                .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, false_addr.into());
-            return true;
-        }
-        _ => {}
-    }
-
-    let native_rs = builder
-        .register_manager
-        .alloc(rs, &[rs], &mut builder.stream);
-
-    builder
-        .register_manager
-        .load(rs, &mut builder.stream)
-        .unwrap();
-
-    builder
-        .stream
-        .test_Register32Bit_Register32Bit(native_rs.as_asm_reg32(), native_rs.as_asm_reg32());
-    false
-}
-
 fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::Info) {
     let next_start_address = instruction.end_address();
     let instruction::Info {
