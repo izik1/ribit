@@ -166,18 +166,44 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
             let imm5 = imm >> 5;
 
             match (instruction >> 10) & 0b11 {
-                0b00 if imm5 == 0 => {
-                    Instruction::R(instruction::R::new(r, rs2, r, opcode::R::SRLI))
-                }
-                0b01 if imm5 == 0 => {
-                    Instruction::R(instruction::R::new(r, rs2, r, opcode::R::SRAI))
-                }
+                0b00 if imm5 == 0 => Instruction::R(instruction::R::new(
+                    r,
+                    rs2,
+                    r,
+                    opcode::R::Shift(opcode::RShift::SRLI),
+                )),
+                0b01 if imm5 == 0 => Instruction::R(instruction::R::new(
+                    r,
+                    rs2,
+                    r,
+                    opcode::R::Shift(opcode::RShift::SRAI),
+                )),
                 0b10 => Instruction::I(instruction::I::new(imm, r, r, opcode::I::ANDI)),
                 0b11 if imm5 == 0 => match (instruction >> 5) & 0b11 {
-                    0b00 => Instruction::R(instruction::R::new(r, rs2, r, opcode::R::SUB)),
-                    0b01 => Instruction::R(instruction::R::new(r, rs2, r, opcode::R::XOR)),
-                    0b10 => Instruction::R(instruction::R::new(r, rs2, r, opcode::R::OR)),
-                    0b11 => Instruction::R(instruction::R::new(r, rs2, r, opcode::R::AND)),
+                    0b00 => Instruction::R(instruction::R::new(
+                        r,
+                        rs2,
+                        r,
+                        opcode::R::Math(opcode::RMath::SUB),
+                    )),
+                    0b01 => Instruction::R(instruction::R::new(
+                        r,
+                        rs2,
+                        r,
+                        opcode::R::Math(opcode::RMath::XOR),
+                    )),
+                    0b10 => Instruction::R(instruction::R::new(
+                        r,
+                        rs2,
+                        r,
+                        opcode::R::Math(opcode::RMath::OR),
+                    )),
+                    0b11 => Instruction::R(instruction::R::new(
+                        r,
+                        rs2,
+                        r,
+                        opcode::R::Math(opcode::RMath::AND),
+                    )),
                     _ => unreachable!(),
                 },
                 _ => return Err(DecodeError),
@@ -195,13 +221,13 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
 
             let imm = sign_extend(imm, 9);
 
-            let opcode = if funct3 == 0b110 {
-                opcode::B::BEQ
+            let cmp_mode = if funct3 == 0b110 {
+                opcode::Cmp::Eq
             } else {
-                opcode::B::BNE
+                opcode::Cmp::Ne
             };
 
-            Instruction::B(instruction::B::new(imm, Some(rs1), None, opcode))
+            Instruction::B(instruction::B::new(imm, Some(rs1), None, cmp_mode))
         }
 
         (0b10, 0b000) => {
@@ -214,7 +240,12 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
 
             let r = decode_full_register(instruction >> 7);
 
-            Instruction::R(instruction::R::new(r, rs2, r, opcode::R::SLLI))
+            Instruction::R(instruction::R::new(
+                r,
+                rs2,
+                r,
+                opcode::R::Shift(opcode::RShift::SLLI),
+            ))
         }
 
         // C.FLDSP requires D extension
@@ -246,19 +277,30 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
                 (false, None, rs1) => {
                     Instruction::I(instruction::I::new(0, rs1, None, opcode::I::JALR))
                 }
-                (false, rs2, rd) => {
-                    Instruction::R(instruction::R::new(None, rs2, rd, opcode::R::ADD))
-                }
-                (true, None, None) => {
-                    Instruction::R(instruction::R::new(None, None, None, opcode::R::EBREAK))
-                }
+                (false, rs2, rd) => Instruction::R(instruction::R::new(
+                    None,
+                    rs2,
+                    rd,
+                    opcode::R::Math(opcode::RMath::ADD),
+                )),
+                (true, None, None) => Instruction::R(instruction::R::new(
+                    None,
+                    None,
+                    None,
+                    opcode::R::Sys(opcode::RSys::EBREAK),
+                )),
                 (true, None, rs1) => Instruction::I(instruction::I::new(
                     0,
                     rs1,
                     Some(RiscVRegister::X1),
                     opcode::I::JALR,
                 )),
-                (true, rs2, r) => Instruction::R(instruction::R::new(r, rs2, r, opcode::R::ADD)),
+                (true, rs2, r) => Instruction::R(instruction::R::new(
+                    r,
+                    rs2,
+                    r,
+                    opcode::R::Math(opcode::RMath::ADD),
+                )),
             }
         }
 

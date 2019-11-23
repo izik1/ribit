@@ -3,10 +3,42 @@ mod generator;
 
 pub mod context;
 
-type BasicBlock =
-    unsafe extern "sysv64" fn(regs: *mut u32, ctx: &mut context::Runtime, memory: *mut u8) -> u32;
+type BasicBlock = unsafe extern "sysv64" fn(
+    regs: *mut u32,
+    ctx: &mut context::Runtime,
+    memory: *mut u8,
+) -> BlockReturn;
 
 type CheckRanges = extern "sysv64" fn(pc: u32, ctx: &mut context::Runtime, address: u32) -> bool;
+
+#[repr(transparent)]
+#[derive(Copy, Clone)]
+pub struct BlockReturn(u64);
+
+impl BlockReturn {
+    fn into_parts(self) -> (u32, ReturnCode) {
+        let address = self.0 as u32;
+        let return_code: ReturnCode = unsafe { std::mem::transmute((self.0 >> 32) as u32) };
+        (address, return_code)
+    }
+
+    fn from_parts(addr: u32, return_code: ReturnCode) -> Self {
+        Self((addr as u64) | ((return_code as u64) << 32))
+    }
+
+    fn as_u64(self) -> u64 {
+        self.0
+    }
+}
+
+#[repr(u32)]
+enum ReturnCode {
+    #[allow(dead_code)]
+    Normal = 0,
+    EBreak,
+    ECall,
+    Div0,
+}
 
 #[cfg(test)]
 mod test {

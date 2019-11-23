@@ -67,8 +67,8 @@ impl<'a> BlockBuilder<'a> {
                 self.register_manager
                     .load(register, &mut self.stream)
                     .unwrap();
-                self.register_manager.set_dirty(register).unwrap();
-                generate_register_write_imm2(&mut self.stream, native_reg, value);
+                self.register_manager.set_dirty(register);
+                self.mov_r32_imm32(native_reg, value);
                 return;
             }
         }
@@ -104,6 +104,35 @@ impl<'a> BlockBuilder<'a> {
                 .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, imm.into());
         }
     }
+
+    fn mov_r32_imm32(&mut self, register: register::Native, imm: u32) {
+        let register = register.as_asm_reg32();
+        if imm == 0 {
+            self.stream
+                .xor_Register32Bit_Register32Bit(register, register);
+        } else {
+            self.stream
+                .mov_Register32Bit_Immediate32Bit(register, imm.into());
+        }
+    }
+
+    fn register_mov(&mut self, dest: register::RiscV, src: register::RiscV) {
+        if dest != src {
+            let native_src = self.ez_alloc(src);
+            let native_dest = self.register_manager.alloc(
+                dest,
+                &[dest, src],
+                &mut self.stream,
+                LoadProfile::Lazy,
+            );
+
+            self.stream.mov_Register32Bit_Register32Bit(
+                native_dest.as_asm_reg32(),
+                native_src.as_asm_reg32(),
+            );
+            self.register_manager.set_dirty(dest);
+        }
+    }
 }
 
 // todo: support native_register arguments
@@ -116,20 +145,6 @@ pub(super) fn generate_register_write_imm(
         Memory::base_64_displacement(Register64Bit::RDI, rv_reg.as_offset().into()),
         value.into(),
     );
-}
-
-/// writes a immediate value to a register.
-fn generate_register_write_imm2(
-    stream: &mut InstructionStream,
-    register: register::Native,
-    value: u32,
-) {
-    let register = register.as_asm_reg32();
-    if value == 0 {
-        stream.xor_Register32Bit_Register32Bit(register, register);
-    } else {
-        stream.mov_Register32Bit_Immediate32Bit(register, value.into());
-    }
 }
 
 fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
@@ -179,6 +194,23 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
             }
         }
 
+        Instruction::R(instruction::R {
+            opcode: opcode::R::Sys(opcode),
+            ..
+        }) => {
+            use crate::jit::BlockReturn;
+            use crate::jit::ReturnCode;
+            let return_code = match opcode {
+                opcode::RSys::EBREAK => ReturnCode::EBreak,
+                opcode::RSys::ECALL => ReturnCode::ECall,
+            };
+
+            let return_value = BlockReturn::from_parts(next_start_address, return_code).as_u64();
+            builder
+                .stream
+                .mov_Register64Bit_Immediate64Bit(Register64Bit::RAX, return_value.into());
+        }
+
         Instruction::I(_) | Instruction::R(_) | Instruction::S(_) | Instruction::U(_) => {
             unreachable!("blocks can only end on a branch?")
         }
@@ -204,6 +236,10 @@ fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::In
         | Instruction::I(instruction::I {
             opcode: opcode::I::JALR,
             ..
+        })
+        | Instruction::R(instruction::R {
+            opcode: opcode::R::Sys(_),
+            ..
         }) => unreachable!("blocks cannot contain a branch"),
 
         Instruction::S(instruction) => generate_store_instruction(builder, instruction),
@@ -211,12 +247,95 @@ fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::In
         Instruction::I(_) => todo!("I type instructions are not yet implemented"),
         Instruction::U(_) => todo!("U type instructions are not yet implemented"),
 
-        Instruction::R(instruction::R {
-            rs1,
-            rs2,
-            rd,
-            opcode,
-        }) => todo!("R type instructions need to be implemented"),
+        Instruction::R(instruction) => generate_register_instruction(builder, instruction),
+    }
+}
+
+macro_rules! unwrap_or_return {
+    ($exp:expr) => {
+        if let Some(inner) = $exp {
+            inner
+        } else {
+            return;
+        }
+    };
+}
+
+fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instruction::R) {
+    let instruction::R {
+        rs1,
+        rs2,
+        rd,
+        opcode,
+    } = instruction;
+
+    // None of these instructions do anything if RD is 0
+    let rd = unwrap_or_return!(rd);
+
+    match opcode {
+        opcode::R::Sys(_) => unreachable!(),
+        opcode::R::Shift(opcode) => generate_rshift_instruction(builder, rd, rs2, rs1, opcode),
+        opcode::R::Math(opcode) => generate_rmath_instruction(builder, rd, rs2, rs1, opcode),
+    }
+}
+
+fn generate_rmath_instruction(
+    builder: &mut BlockBuilder,
+    rd: register::RiscV,
+    rs2: Option<register::RiscV>,
+    rs1: Option<register::RiscV>,
+    opcode: opcode::RMath,
+) {
+    match opcode {
+        // rd = if (u)rs1 < (u)rs2 {1} else {0}
+        opcode::RMath::SLTU => {
+            let rs2 = if let Some(rs) = rs2 {
+                rs
+            } else {
+                // no rs2 -> always 0
+                builder.write_register_imm(rd, 0, true);
+                return;
+            };
+
+            todo!("RMath::SLTU")
+        }
+
+        _ => todo!("Rmath::_"),
+    }
+}
+
+fn generate_rshift_instruction(
+    builder: &mut BlockBuilder,
+    rd: register::RiscV,
+    rs2: Option<register::RiscV>,
+    rs1: Option<register::RiscV>,
+    opcode: opcode::RShift,
+) {
+    let rs = if let Some(rs) = rs1 {
+        rs
+    } else {
+        // no rs -> always 0
+        builder.write_register_imm(rd, 0, true);
+        return;
+    };
+
+    // high level:
+    // mov dest, src ; ommited if not needed
+    // <shift> dest, shamt
+
+    // before shifting we need to move src -> dest
+    builder.register_mov(rd, rs);
+
+    let shamt = unwrap_or_return!(rs2).get().into();
+
+    let dest = builder.ez_alloc(rd).as_asm_reg32();
+
+    match opcode {
+        // todo: figure out if lea would be better for 1 < shamt < 4.
+        // todo: use lea for shamt == 1 IFF rd != rs
+        opcode::RShift::SLLI => builder.stream.shl_Register32Bit_Immediate8Bit(dest, shamt),
+        opcode::RShift::SRLI => builder.stream.shr_Register32Bit_Immediate8Bit(dest, shamt),
+        opcode::RShift::SRAI => builder.stream.sar_Register32Bit_Immediate8Bit(dest, shamt),
     }
 }
 

@@ -131,13 +131,13 @@ impl RegisterManager {
         Ok(())
     }
 
-    // hack:
-    pub fn set_dirty(&mut self, rv32_reg: register::RiscV) -> Result<(), ()> {
-        self.find_native_register(rv32_reg).ok_or(())?;
+    pub fn set_dirty(&mut self, rv32_reg: register::RiscV) {
+        if self.find_native_register(rv32_reg).is_none() {
+            return;
+        }
 
+        self.to_load_map.res(rv32_reg);
         self.to_store_map.set(rv32_reg);
-
-        Ok(())
     }
 
     // todo: add a `move register` function to avoid having to write->read a register that's already in a Native register.

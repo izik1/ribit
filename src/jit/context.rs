@@ -24,7 +24,11 @@ impl Runtime {
 
         if let Some(block_num) = self.ranges.iter().position(|range| range.start == *pc) {
             let block = &self.blocks[block_num];
-            *pc = unsafe { block(regs.as_mut_ptr(), self, memory.as_mut_ptr()) }
+
+            let (address, _return_code) =
+                unsafe { block(regs.as_mut_ptr(), self, memory.as_mut_ptr()) }.into_parts();
+
+            *pc = address;
         } else {
             todo!("put an error here")
         }

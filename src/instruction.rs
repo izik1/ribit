@@ -148,7 +148,7 @@ pub struct B {
     pub(crate) rs1: Option<RiscVRegister>,
     pub(crate) rs2: Option<RiscVRegister>,
     pub(crate) imm: u16,
-    pub(crate) opcode: opcode::B,
+    pub(crate) cmp_mode: opcode::Cmp,
 }
 
 impl B {
@@ -156,13 +156,13 @@ impl B {
         imm: u16,
         rs1: Option<RiscVRegister>,
         rs2: Option<RiscVRegister>,
-        opcode: opcode::B,
+        cmp_mode: opcode::Cmp,
     ) -> Self {
         Self {
             imm,
             rs1,
             rs2,
-            opcode,
+            cmp_mode,
         }
     }
 }

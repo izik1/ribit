@@ -11,7 +11,7 @@ pub fn conditional(builder: &mut BlockBuilder, instruction: instruction::B, cont
         rs1,
         rs2,
         imm,
-        opcode,
+        cmp_mode,
     } = instruction;
 
     let jump_addr = continue_pc.wrapping_add(imm as i16 as u32);
@@ -36,7 +36,8 @@ pub fn conditional(builder: &mut BlockBuilder, instruction: instruction::B, cont
 
     match (rs1, rs2) {
         (rs1, rs2) if rs1 == rs2 => {
-            conditional_same_reg(builder, continue_pc, jump_addr, opcode);
+            let addr = cmp_same_reg(continue_pc, jump_addr, cmp_mode);
+            builder.mov_eax_imm(addr.into());
             return;
         }
 
@@ -48,7 +49,8 @@ pub fn conditional(builder: &mut BlockBuilder, instruction: instruction::B, cont
             let (true_addr, false_addr) =
                 rs1.map_or((continue_pc, jump_addr), |_| (jump_addr, continue_pc));
 
-            if conditional_cmp_0(builder, false_addr, true_addr, opcode, rs) {
+            if let Some(addr) = cmp_0(builder, false_addr, true_addr, cmp_mode, rs) {
+                builder.mov_eax_imm(addr.into());
                 return; // the branch is now unconditional, return
             }
         }
@@ -62,74 +64,52 @@ pub fn conditional(builder: &mut BlockBuilder, instruction: instruction::B, cont
         }
     };
 
-    builder
-        .stream
-        .mov_Register32Bit_Immediate32Bit(EAX, continue_pc.into());
+    builder.mov_eax_imm(continue_pc);
 
     // we're about to write over ECX, so make sure nothing is using it.
     builder
         .register_manager
         .clobber(register::Native::RCX, &mut builder.stream);
 
-    builder
-        .stream
-        .mov_Register32Bit_Immediate32Bit(ECX, jump_addr.into());
+    builder.mov_r32_imm32(register::Native::RCX, jump_addr);
 
-    match opcode {
-        opcode::B::BEQ => builder.stream.cmove_Register32Bit_Register32Bit(EAX, ECX),
-        opcode::B::BNE => builder.stream.cmovne_Register32Bit_Register32Bit(EAX, ECX),
-        opcode::B::BLT => builder.stream.cmovl_Register32Bit_Register32Bit(EAX, ECX),
-        opcode::B::BGE => builder.stream.cmovge_Register32Bit_Register32Bit(EAX, ECX),
-        opcode::B::BLTU => builder.stream.cmovb_Register32Bit_Register32Bit(EAX, ECX),
-        opcode::B::BGEU => builder.stream.cmovae_Register32Bit_Register32Bit(EAX, ECX),
+    match cmp_mode {
+        opcode::Cmp::Eq => builder.stream.cmove_Register32Bit_Register32Bit(EAX, ECX),
+        opcode::Cmp::Ne => builder.stream.cmovne_Register32Bit_Register32Bit(EAX, ECX),
+        opcode::Cmp::Lt => builder.stream.cmovl_Register32Bit_Register32Bit(EAX, ECX),
+        opcode::Cmp::Ge => builder.stream.cmovge_Register32Bit_Register32Bit(EAX, ECX),
+        opcode::Cmp::Ltu => builder.stream.cmovb_Register32Bit_Register32Bit(EAX, ECX),
+        opcode::Cmp::Geu => builder.stream.cmovae_Register32Bit_Register32Bit(EAX, ECX),
     }
 }
 
-// returns true if the branch becomes unconditional (always)
-fn conditional_same_reg(
-    builder: &mut BlockBuilder,
-    false_addr: u32,
-    true_addr: u32,
-    opcode: opcode::B,
-) {
-    let addr = match opcode {
-        opcode::B::BEQ | opcode::B::BGE | opcode::B::BGEU => true_addr,
-        opcode::B::BNE | opcode::B::BLT | opcode::B::BLTU => false_addr,
-    };
-
-    builder
-        .stream
-        .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, addr.into())
+pub fn cmp_same_reg<T>(false_val: T, true_val: T, cmp_mode: opcode::Cmp) -> T {
+    match cmp_mode {
+        opcode::Cmp::Eq | opcode::Cmp::Ge | opcode::Cmp::Geu => true_val,
+        opcode::Cmp::Ne | opcode::Cmp::Lt | opcode::Cmp::Ltu => false_val,
+    }
 }
 
-/// generates a branch based off of `cmp rs, 0`, if you want to use rs2 instead of rs1, make sure to swap
-///  `[false_addr]` and `[true_addr]` as well.
-/// returns true if the branch becomes unconditional.
-fn conditional_cmp_0(
+// returns one of the input Ts if the branch becomes unconditional
+pub fn cmp_0<T>(
     builder: &mut BlockBuilder,
-    false_addr: u32,
-    true_addr: u32,
-    opcode: opcode::B,
+    false_val: T,
+    true_val: T,
+    cmp_mode: opcode::Cmp,
     rs: register::RiscV,
-) -> bool {
+) -> Option<T> {
     // there's some low hanging register contention fruit, cmp can optionally take a mem argument.
-    let unconditonal_addr = match opcode {
-        opcode::B::BGEU => Some(true_addr),
-        opcode::B::BLTU => Some(false_addr),
-        _ => None,
+    match cmp_mode {
+        opcode::Cmp::Geu => return Some(true_val),
+        opcode::Cmp::Ltu => return Some(false_val),
+        _ => {}
     };
-
-    if let Some(addr) = unconditonal_addr {
-        builder
-            .stream
-            .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, addr.into());
-        return true;
-    }
 
     let rs = builder.ez_alloc(rs);
 
     builder
         .stream
         .test_Register32Bit_Register32Bit(rs.as_asm_reg32(), rs.as_asm_reg32());
-    false
+
+    None
 }
