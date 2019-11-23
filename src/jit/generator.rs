@@ -69,12 +69,9 @@ impl<'a> BlockBuilder<'a> {
             },
 
             Some(StoreProfile::Allocate) => {
-                let native_reg = self.register_manager.alloc(
-                    register,
-                    &[register],
-                    &mut self.stream,
-                    LoadProfile::Lazy,
-                );
+                let native_reg =
+                    self.register_manager
+                        .alloc(register, &[], &mut self.stream, LoadProfile::Lazy);
                 self.register_manager.set_dirty(register);
                 self.mov_r32_imm32(native_reg, value);
             }
@@ -95,7 +92,7 @@ impl<'a> BlockBuilder<'a> {
 
     fn ez_alloc(&mut self, register: register::RiscV) -> register::Native {
         self.register_manager
-            .alloc(register, &[register], &mut self.stream, LoadProfile::Eager)
+            .alloc(register, &[], &mut self.stream, LoadProfile::Eager)
     }
 
     fn ez_alloc2(
@@ -136,12 +133,13 @@ impl<'a> BlockBuilder<'a> {
 
     fn register_mov(&mut self, dest: register::RiscV, src: register::RiscV) {
         if dest != src {
-            let native_src = self.ez_alloc(src);
-            let native_dest = self.register_manager.alloc(
+            let (native_dest, native_src) = self.register_manager.alloc_2(
                 dest,
+                src,
                 &[dest, src],
                 &mut self.stream,
                 LoadProfile::Lazy,
+                LoadProfile::Eager,
             );
 
             self.stream.mov_Register32Bit_Register32Bit(

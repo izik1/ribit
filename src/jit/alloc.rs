@@ -234,6 +234,18 @@ impl RegisterManager {
         Some(native_reg)
     }
 
+    pub fn alloc_3(
+        &mut self,
+        regs: (register::RiscV, register::RiscV, register::RiscV),
+        stream: &mut InstructionStream,
+        load_profiles: (LoadProfile, LoadProfile, LoadProfile),
+    ) -> (register::Native, register::Native, register::Native) {
+        let reg1 = self.alloc(regs.0, &[regs.1, regs.2], stream, load_profiles.0);
+        let reg2 = self.alloc(regs.1, &[regs.0, regs.2], stream, load_profiles.1);
+        let reg3 = self.alloc(regs.2, &[regs.0, regs.1], stream, load_profiles.2);
+        (reg1, reg2, reg3)
+    }
+
     pub fn alloc_2(
         &mut self,
         reg1: register::RiscV,

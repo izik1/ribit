@@ -160,19 +160,11 @@ pub fn bool_cmp(
             ret
         }
         (Some(rs1), Some(rs2)) => {
-            let regs = [rs1, rs2, rd];
-            let rd =
-                builder
-                    .register_manager
-                    .alloc(rd, &regs, &mut builder.stream, LoadProfile::Lazy);
-            let rs1 =
-                builder
-                    .register_manager
-                    .alloc(rs1, &regs, &mut builder.stream, LoadProfile::Eager);
-            let rs2 =
-                builder
-                    .register_manager
-                    .alloc(rs2, &regs, &mut builder.stream, LoadProfile::Eager);
+            let (rd, rs1, rs2) = builder.register_manager.alloc_3(
+                (rd, rs1, rs2),
+                &mut builder.stream,
+                (LoadProfile::Lazy, LoadProfile::Eager, LoadProfile::Eager),
+            );
 
             // this has to be before the cmp, because it trashes flags
             let ret = if rd == rs1 || rd == rs2 {
@@ -202,7 +194,10 @@ pub fn bool_cmp(
         let native_rd =
             builder
                 .register_manager
-                .alloc(rd, &[rd], &mut builder.stream, LoadProfile::Lazy);
+                .alloc(rd, &[], &mut builder.stream, LoadProfile::Lazy);
+
+        builder.register_manager.set_dirty(rd);
+
         builder
             .stream
             .mov_Register32Bit_Register32Bit(native_rd.as_asm_reg32(), Register32Bit::EAX);
