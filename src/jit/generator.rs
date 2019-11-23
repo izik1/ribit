@@ -1,5 +1,5 @@
 use super::{
-    alloc::{LoadProfile, RegisterManager},
+    alloc::{LoadProfile, RegisterManager, StoreProfile},
     BasicBlock, CheckRanges,
 };
 
@@ -8,7 +8,7 @@ mod memory;
 
 use assembler::mnemonic_parameter_types::{
     memory::Memory,
-    registers::{Register32Bit, Register64Bit, Register8Bit},
+    registers::{Register32Bit, Register64Bit},
 };
 
 use assembler::InstructionStream;
@@ -52,28 +52,45 @@ impl<'a> BlockBuilder<'a> {
         funct
     }
 
-    fn write_register_imm(&mut self, register: register::RiscV, value: u32, read_allocated: bool) {
-        // optimal writes are as follows:
-        // match (used_again, in_register) {
-        //     (false, false) => generate_register_write_imm(...),
-        //     (false, true) => generate_register_write_imm(...), // and mark it as free without writing it out if it's dirty.
-        //     (true, false) => generate_register_write_imm2(...), // make sure to read it in first, mark as dirty.
-        //     (true, true) => generate_register_write_imm2(...) // just overwrite it, mark as dirty.
-        // }
+    fn write_register_imm(
+        &mut self,
+        register: register::RiscV,
+        value: u32,
+        store_profile: Option<StoreProfile>,
+    ) {
+        match store_profile {
+            None => match self.register_manager.find_native_register(register) {
+                Some(native_reg) => {
+                    self.register_manager.set_dirty(register);
+                    self.mov_r32_imm32(native_reg, value);
+                }
 
-        if let Some(native_reg) = self.register_manager.find_native_register(register) {
-            // todo: add an option to free the register with this write (see table at start of function)
-            if read_allocated || !self.register_manager.needs_load(register) {
-                self.register_manager
-                    .load(register, &mut self.stream)
-                    .unwrap();
+                None => generate_register_write_imm(&mut self.stream, register, value),
+            },
+
+            Some(StoreProfile::Allocate) => {
+                let native_reg = self.register_manager.alloc(
+                    register,
+                    &[register],
+                    &mut self.stream,
+                    LoadProfile::Lazy,
+                );
                 self.register_manager.set_dirty(register);
                 self.mov_r32_imm32(native_reg, value);
-                return;
+            }
+
+            Some(StoreProfile::Free) => {
+                match self.register_manager.find_native_register(register) {
+                    Some(native_reg) => {
+                        self.register_manager.set_dirty(register);
+                        self.mov_r32_imm32(native_reg, value);
+                        let _ = self.register_manager.free(register, &mut self.stream);
+                    }
+
+                    None => generate_register_write_imm(&mut self.stream, register, value),
+                }
             }
         }
-
-        generate_register_write_imm(&mut self.stream, register, value);
     }
 
     fn ez_alloc(&mut self, register: register::RiscV) -> register::Native {
@@ -168,7 +185,7 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
             let res_pc = next_start_address.wrapping_add(imm);
 
             if let Some(rd) = rd {
-                builder.write_register_imm(rd, next_start_address, false);
+                builder.write_register_imm(rd, next_start_address, Some(StoreProfile::Free));
             }
 
             builder.mov_eax_imm(res_pc);
@@ -181,7 +198,7 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
             rs1,
         }) => {
             if let Some(rd) = rd {
-                builder.write_register_imm(rd, next_start_address, false);
+                builder.write_register_imm(rd, next_start_address, Some(StoreProfile::Free));
             }
 
             if let Some(rs1) = rs1 {
@@ -304,7 +321,7 @@ fn generate_rshift_instruction(
         rs
     } else {
         // no rs -> always 0
-        builder.write_register_imm(rd, 0, true);
+        builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate));
         return;
     };
 

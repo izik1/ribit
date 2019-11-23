@@ -1,5 +1,9 @@
 use super::BlockBuilder;
-use crate::{instruction, jit::alloc::LoadProfile, opcode, register};
+use crate::{
+    instruction,
+    jit::alloc::{LoadProfile, StoreProfile},
+    opcode, register,
+};
 
 use assembler::mnemonic_parameter_types::registers::{Register32Bit, Register8Bit};
 
@@ -118,11 +122,7 @@ pub fn bool_cmp(
         (rs1, rs2) if rs1 == rs2 => {
             let value = cmp_same_reg(0, 1, cmp_mode);
 
-            let _ =
-                builder
-                    .register_manager
-                    .alloc(rd, &[rd], &mut builder.stream, LoadProfile::Lazy);
-            builder.write_register_imm(rd, value, true);
+            builder.write_register_imm(rd, value, Some(StoreProfile::Allocate));
             return;
         }
 
@@ -134,13 +134,7 @@ pub fn bool_cmp(
             let (true_val, false_val) = rs1.map_or((0, 1), |_| (1, 0));
 
             if let Some(value) = cmp_0(false_val, true_val, cmp_mode) {
-                let _ = builder.register_manager.alloc(
-                    rd,
-                    &[rd],
-                    &mut builder.stream,
-                    LoadProfile::Lazy,
-                );
-                builder.write_register_imm(rd, value, true);
+                builder.write_register_imm(rd, value, Some(StoreProfile::Allocate));
                 return; // the branch is now unconditional, return
             }
 
