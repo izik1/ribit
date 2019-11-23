@@ -3,12 +3,12 @@ use super::{
     BasicBlock, CheckRanges,
 };
 
-mod branch;
+mod cmp;
 mod memory;
 
 use assembler::mnemonic_parameter_types::{
     memory::Memory,
-    registers::{Register32Bit, Register64Bit},
+    registers::{Register32Bit, Register64Bit, Register8Bit},
 };
 
 use assembler::InstructionStream;
@@ -92,6 +92,7 @@ impl<'a> BlockBuilder<'a> {
             &[register1, register2],
             &mut self.stream,
             LoadProfile::Eager,
+            LoadProfile::Eager,
         )
     }
 
@@ -132,6 +133,12 @@ impl<'a> BlockBuilder<'a> {
             );
             self.register_manager.set_dirty(dest);
         }
+    }
+
+    fn test_r32(&mut self, register: register::Native) {
+        let register = register.as_asm_reg32();
+        self.stream
+            .test_Register32Bit_Register32Bit(register, register);
     }
 }
 
@@ -212,7 +219,7 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
             unreachable!("blocks can only end on a branch?")
         }
 
-        Instruction::B(instr) => branch::conditional(builder, instr, next_start_address),
+        Instruction::B(instr) => cmp::branch_conditional(builder, instr, next_start_address),
     }
 
     builder.register_manager.free_all(&mut builder.stream);
@@ -280,19 +287,8 @@ fn generate_rmath_instruction(
     opcode: opcode::RMath,
 ) {
     match opcode {
-        // rd = if (u)rs1 < (u)rs2 {1} else {0}
-        opcode::RMath::SCond(_cmp) => {
-            let rs2 = if let Some(rs) = rs2 {
-                rs
-            } else {
-                // no rs2 -> always 0
-                builder.write_register_imm(rd, 0, true);
-                return;
-            };
-
-            todo!("RMath::SCond")
-        }
-
+        // rd = if cmp(rs1, rs2) {1} else {0}
+        opcode::RMath::SCond(cmp_mode) => cmp::bool_cmp(builder, rd, rs1, rs2, cmp_mode),
         _ => todo!("Rmath::_"),
     }
 }

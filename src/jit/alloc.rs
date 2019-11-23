@@ -211,17 +211,19 @@ impl RegisterManager {
         basic_block: &mut InstructionStream,
         load_profile: LoadProfile,
     ) -> Option<register::Native> {
-        self.find_native_register(rv_reg).or_else(|| {
+        let native_reg = self.find_native_register(rv_reg).or_else(|| {
             let native_reg = self.free_registers.pop()?;
 
-            match load_profile {
-                LoadProfile::Lazy => self.to_load_map.set(rv_reg),
-                LoadProfile::Eager => read_register(basic_block, native_reg, rv_reg),
-            }
-
+            self.to_load_map.set(rv_reg);
             self.used_registers.push_back((native_reg, rv_reg));
             Some(native_reg)
-        })
+        })?;
+
+        if self.to_load_map.is_set(rv_reg) && load_profile == LoadProfile::Eager {
+            read_register(basic_block, native_reg, rv_reg);
+        }
+
+        Some(native_reg)
     }
 
     pub fn alloc_2(
@@ -230,11 +232,15 @@ impl RegisterManager {
         reg2: register::RiscV,
         keep_regs: &[register::RiscV],
         basic_block: &mut InstructionStream,
-        load_profile: LoadProfile,
+        load_profile1: LoadProfile,
+        load_profile2: LoadProfile,
     ) -> (register::Native, register::Native) {
         // split lines to avoid indeterminant ordering.
-        let reg1 = self.alloc(reg1, keep_regs, basic_block, load_profile);
-        (reg1, self.alloc(reg2, keep_regs, basic_block, load_profile))
+        let reg1 = self.alloc(reg1, keep_regs, basic_block, load_profile1);
+        (
+            reg1,
+            self.alloc(reg2, keep_regs, basic_block, load_profile2),
+        )
     }
 
     pub fn alloc(
