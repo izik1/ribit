@@ -7,6 +7,38 @@ use crate::{
 
 use assembler::mnemonic_parameter_types::registers::{Register32Bit, Register8Bit};
 
+fn bool_cmp<T>(
+    rs1: Option<register::RiscV>,
+    rs2: Option<register::RiscV>,
+    false_value: T,
+    true_value: T,
+    cmp_mode: opcode::Cmp,
+) -> CmpValue<T> {
+    match (rs1, rs2) {
+        (rs1, rs2) if rs1 == rs2 => {
+            CmpValue::Const(cmp_same_reg(false_value, true_value, cmp_mode))
+        }
+
+        // None == None
+        (None, None) => unreachable!(),
+
+        (Some(rs), None) | (None, Some(rs)) => {
+            // if we have rs2 we need to invert the conditions.
+            let (true_value, false_value) = match rs1.is_some() {
+                true => (true_value, false_value),
+                false => (false_value, true_value),
+            };
+
+            match cmp_0(false_value, true_value, cmp_mode) {
+                Some(const_value) => CmpValue::Const(const_value),
+                None => CmpValue::Test(rs),
+            }
+        }
+
+        (Some(rs1), Some(rs2)) => CmpValue::Cmp(rs1, rs2),
+    }
+}
+
 pub fn branch_conditional(
     builder: &mut BlockBuilder,
     instruction: instruction::B,
@@ -42,40 +74,26 @@ pub fn branch_conditional(
     // mov ecx, <the other branch path>
     // cmod<cond> eax, ecx
 
-    match (rs1, rs2) {
-        (rs1, rs2) if rs1 == rs2 => {
-            let addr = cmp_same_reg(continue_pc, jump_addr, cmp_mode);
+    match bool_cmp(rs1, rs2, continue_pc, jump_addr, cmp_mode) {
+        CmpValue::Const(addr) => {
             builder.mov_eax_imm(addr.into());
             return;
         }
 
-        // None == None
-        (None, None) => unreachable!(),
-
-        (Some(rs), None) | (None, Some(rs)) => {
-            // if we have rs2 we need to invert the addresses for jumping.
-            let (true_addr, false_addr) =
-                rs1.map_or((continue_pc, jump_addr), |_| (jump_addr, continue_pc));
-
-            if let Some(addr) = cmp_0(false_addr, true_addr, cmp_mode) {
-                builder.mov_eax_imm(addr.into());
-                return; // the branch is now unconditional, return
-            }
-
+        CmpValue::Test(rs) => {
             builder.mov_eax_imm(continue_pc);
+
             let rs = builder.ez_alloc(rs);
             builder.test_r32(rs);
         }
 
-        (Some(rs1), Some(rs2)) => {
+        CmpValue::Cmp(rs1, rs2) => {
             let (rs1, rs2) = builder.ez_alloc2(rs1, rs2);
 
             builder.mov_eax_imm(continue_pc);
-            builder
-                .stream
-                .cmp_Register32Bit_Register32Bit(rs1.as_asm_reg32(), rs2.as_asm_reg32());
+            builder.cmp_r32_r32(rs1, rs2);
         }
-    };
+    }
 
     // we're about to write over ECX, so make sure nothing is using it.
     builder
@@ -111,78 +129,70 @@ pub fn cmp_0<T>(false_val: T, true_val: T, cmp_mode: opcode::Cmp) -> Option<T> {
     }
 }
 
-pub fn bool_cmp(
+enum CmpValue<T> {
+    Const(T),
+    Test(register::RiscV),
+    Cmp(register::RiscV, register::RiscV),
+}
+
+pub fn set_bool_conditional(
     builder: &mut BlockBuilder,
     rd: register::RiscV,
     rs1: Option<register::RiscV>,
     rs2: Option<register::RiscV>,
     cmp_mode: opcode::Cmp,
 ) {
-    let native_rd = match (rs1, rs2) {
-        (rs1, rs2) if rs1 == rs2 => {
-            let value = cmp_same_reg(0, 1, cmp_mode);
-
-            builder.write_register_imm(rd, value, Some(StoreProfile::Allocate));
+    let cmp_reg = match bool_cmp(rs1, rs2, 0, 1, cmp_mode) {
+        CmpValue::Const(v) => {
+            builder.write_register_imm(rd, v, Some(StoreProfile::Allocate));
             return;
         }
 
-        // None == None
-        (None, None) => unreachable!(),
-
-        (Some(rs), None) | (None, Some(rs)) => {
-            // if we have rs2 we need to invert the conditions.
-            let (true_val, false_val) = rs1.map_or((0, 1), |_| (1, 0));
-
-            if let Some(value) = cmp_0(false_val, true_val, cmp_mode) {
-                builder.write_register_imm(rd, value, Some(StoreProfile::Allocate));
-                return; // the branch is now unconditional, return
-            }
-
-            let (rs, rd) = builder.register_manager.alloc_2(
-                rs,
-                rd,
-                &[rs, rd],
+        CmpValue::Test(rs) => {
+            let (native_rd, rs) = builder.register_manager.alloc_2(
+                (rd, rs),
+                &[rd, rs],
                 &mut builder.stream,
-                LoadProfile::Eager,
-                LoadProfile::Lazy,
+                (LoadProfile::Lazy, LoadProfile::Eager),
             );
 
-            // this has to be before the cmp, because it trashes flags
-            let ret = if rs == rd {
+            if rs == native_rd {
+                // this has to be before the cmp, because it trashes flags
                 builder.mov_eax_imm(0);
-                None
+
+                builder.test_r32(rs);
+                Register8Bit::AL
             } else {
-                Some(rd)
-            };
+                builder.register_manager.set_dirty(rd);
+                builder.mov_r32_imm32(native_rd, 0);
 
-            builder.test_r32(rs);
-
-            ret
+                builder.test_r32(rs);
+                native_rd.as_asm_reg8()
+            }
         }
-        (Some(rs1), Some(rs2)) => {
-            let (rd, rs1, rs2) = builder.register_manager.alloc_3(
+
+        CmpValue::Cmp(rs1, rs2) => {
+            let (native_rd, rs1, rs2) = builder.register_manager.alloc_3(
                 (rd, rs1, rs2),
                 &mut builder.stream,
                 (LoadProfile::Lazy, LoadProfile::Eager, LoadProfile::Eager),
             );
 
-            // this has to be before the cmp, because it trashes flags
-            let ret = if rd == rs1 || rd == rs2 {
+            if native_rd == rs1 || native_rd == rs2 {
+                // this has to be before the cmp, because it trashes flags
                 builder.mov_eax_imm(0);
-                None
+
+                builder.cmp_r32_r32(rs1, rs2);
+                Register8Bit::AL
             } else {
-                Some(rd)
-            };
+                builder.register_manager.set_dirty(rd);
+                builder.mov_r32_imm32(native_rd, 0);
 
-            builder
-                .stream
-                .cmp_Register32Bit_Register32Bit(rs1.as_asm_reg32(), rs2.as_asm_reg32());
-
-            ret
+                builder.cmp_r32_r32(rs1, rs2);
+                native_rd.as_asm_reg8()
+            }
         }
     };
-
-    let cmp_reg = native_rd.map_or(Register8Bit::AL, register::Native::as_asm_reg8);
 
     match cmp_mode {
         opcode::Cmp::Lt => builder.stream.setb_Register8Bit(cmp_reg),
@@ -190,7 +200,7 @@ pub fn bool_cmp(
         _ => todo!("extended S_ instruction (non-standard, low priority)"),
     }
 
-    if let None = native_rd {
+    if cmp_reg == Register8Bit::AL {
         let native_rd =
             builder
                 .register_manager

@@ -101,12 +101,10 @@ impl<'a> BlockBuilder<'a> {
         register2: register::RiscV,
     ) -> (register::Native, register::Native) {
         self.register_manager.alloc_2(
-            register1,
-            register2,
+            (register1, register2),
             &[register1, register2],
             &mut self.stream,
-            LoadProfile::Eager,
-            LoadProfile::Eager,
+            (LoadProfile::Eager, LoadProfile::Eager),
         )
     }
 
@@ -134,12 +132,10 @@ impl<'a> BlockBuilder<'a> {
     fn register_mov(&mut self, dest: register::RiscV, src: register::RiscV) {
         if dest != src {
             let (native_dest, native_src) = self.register_manager.alloc_2(
-                dest,
-                src,
+                (dest, src),
                 &[dest, src],
                 &mut self.stream,
-                LoadProfile::Lazy,
-                LoadProfile::Eager,
+                (LoadProfile::Lazy, LoadProfile::Eager),
             );
 
             self.stream.mov_Register32Bit_Register32Bit(
@@ -154,6 +150,11 @@ impl<'a> BlockBuilder<'a> {
         let register = register.as_asm_reg32();
         self.stream
             .test_Register32Bit_Register32Bit(register, register);
+    }
+
+    fn cmp_r32_r32(&mut self, register1: register::Native, register2: register::Native) {
+        self.stream
+            .cmp_Register32Bit_Register32Bit(register1.as_asm_reg32(), register2.as_asm_reg32());
     }
 }
 
@@ -303,7 +304,9 @@ fn generate_rmath_instruction(
 ) {
     match opcode {
         // rd = if cmp(rs1, rs2) {1} else {0}
-        opcode::RMath::SCond(cmp_mode) => cmp::bool_cmp(builder, rd, rs1, rs2, cmp_mode),
+        opcode::RMath::SCond(cmp_mode) => {
+            cmp::set_bool_conditional(builder, rd, rs1, rs2, cmp_mode)
+        }
         _ => todo!("Rmath::_"),
     }
 }
