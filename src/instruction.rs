@@ -33,6 +33,18 @@ pub enum Instruction {
     B(B),
     U(U),
     J(J),
+    Sys(Sys),
+}
+
+#[derive(Debug)]
+pub struct Sys {
+    pub(crate) opcode: opcode::RSys,
+}
+
+impl Sys {
+    pub(crate) fn new(opcode: opcode::RSys) -> Self {
+        Self { opcode }
+    }
 }
 
 #[derive(Debug)]

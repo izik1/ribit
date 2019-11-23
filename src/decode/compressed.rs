@@ -283,12 +283,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
                     rd,
                     opcode::R::Math(opcode::RMath::ADD),
                 )),
-                (true, None, None) => Instruction::R(instruction::R::new(
-                    None,
-                    None,
-                    None,
-                    opcode::R::Sys(opcode::RSys::EBREAK),
-                )),
+                (true, None, None) => Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
                 (true, None, rs1) => Instruction::I(instruction::I::new(
                     0,
                     rs1,

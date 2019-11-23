@@ -134,11 +134,13 @@ pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> 
         )),
         (0b011_0011, 0b010, 0b000_0000) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::SLT),
+            // SLT
+            opcode::R::Math(opcode::RMath::SCond(opcode::Cmp::Lt)),
         )),
         (0b011_0011, 0b011, 0b000_0000) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::SLTU),
+            // SLTU
+            opcode::R::Math(opcode::RMath::SCond(opcode::Cmp::Ltu)),
         )),
         (0b011_0011, 0b100, 0b000_0000) => Instruction::R(instruction::R::from_instruction(
             instruction,
@@ -164,12 +166,12 @@ pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> 
             instruction,
             opcode::I::FENCE,
         )),
-        (0b111_0011, _, _) if instruction & !0b111_0011 == 0 => Instruction::R(
-            instruction::R::from_instruction(instruction, opcode::R::Sys(opcode::RSys::ECALL)),
-        ),
-        (0b111_0011, _, _) if instruction & !0b111_0011 == (1 << 20) => Instruction::R(
-            instruction::R::from_instruction(instruction, opcode::R::Sys(opcode::RSys::EBREAK)),
-        ),
+        (0b111_0011, _, _) if instruction & !0b111_0011 == 0 => {
+            Instruction::Sys(instruction::Sys::new(opcode::RSys::ECALL))
+        }
+        (0b111_0011, _, _) if instruction & !0b111_0011 == (1 << 20) => {
+            Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK))
+        }
         (0b011_0011, 0b000, _) => Instruction::R(instruction::R::from_instruction(
             instruction,
             opcode::R::Math(opcode::RMath::MUL),
@@ -236,8 +238,8 @@ mod test {
     fn decode_ebreak() {
         let instruction =
             super::decode_instruction(0b0000_0000_0001_0000_0000_0000_0111_0011).unwrap();
-        if let Instruction::R(instruction) = instruction {
-            assert_eq!(instruction.opcode, opcode::R::Sys(opcode::RSys::EBREAK))
+        if let Instruction::Sys(instruction) = instruction {
+            assert_eq!(instruction.opcode, opcode::RSys::EBREAK)
         } else {
             panic!("Instruction type wasn't RType!")
         }

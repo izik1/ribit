@@ -194,10 +194,7 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
             }
         }
 
-        Instruction::R(instruction::R {
-            opcode: opcode::R::Sys(opcode),
-            ..
-        }) => {
+        Instruction::Sys(instruction::Sys { opcode }) => {
             use crate::jit::BlockReturn;
             use crate::jit::ReturnCode;
             let return_code = match opcode {
@@ -233,12 +230,9 @@ fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::In
     match instruction {
         Instruction::J(_)
         | Instruction::B(_)
+        | Instruction::Sys(_)
         | Instruction::I(instruction::I {
             opcode: opcode::I::JALR,
-            ..
-        })
-        | Instruction::R(instruction::R {
-            opcode: opcode::R::Sys(_),
             ..
         }) => unreachable!("blocks cannot contain a branch"),
 
@@ -273,7 +267,6 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
     let rd = unwrap_or_return!(rd);
 
     match opcode {
-        opcode::R::Sys(_) => unreachable!(),
         opcode::R::Shift(opcode) => generate_rshift_instruction(builder, rd, rs2, rs1, opcode),
         opcode::R::Math(opcode) => generate_rmath_instruction(builder, rd, rs2, rs1, opcode),
     }
@@ -288,7 +281,7 @@ fn generate_rmath_instruction(
 ) {
     match opcode {
         // rd = if (u)rs1 < (u)rs2 {1} else {0}
-        opcode::RMath::SLTU => {
+        opcode::RMath::SCond(_cmp) => {
             let rs2 = if let Some(rs) = rs2 {
                 rs
             } else {
@@ -297,7 +290,7 @@ fn generate_rmath_instruction(
                 return;
             };
 
-            todo!("RMath::SLTU")
+            todo!("RMath::SCond")
         }
 
         _ => todo!("Rmath::_"),

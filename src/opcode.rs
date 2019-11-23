@@ -14,7 +14,6 @@ pub enum Width {
 pub enum R {
     Shift(RShift),
     Math(RMath),
-    Sys(RSys),
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -29,8 +28,7 @@ pub enum RMath {
     ADD,
     SUB,
     SLL,
-    SLT,
-    SLTU,
+    SCond(Cmp),
     XOR,
     SRL,
     SRA,
