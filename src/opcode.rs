@@ -64,8 +64,7 @@ pub enum Cmp {
 pub enum I {
     FENCE,
     ADDI,
-    SLTI,
-    SLTIU,
+    SICond(Cmp),
     XORI,
     ORI,
     ANDI,
@@ -73,11 +72,6 @@ pub enum I {
     LD(Width),
     // note that LDU(DWord) doesn't exist, but would be the same as LD(DWord) anyway.
     LDU(Width),
-    LB,
-    LH,
-    LW,
-    LBU,
-    LHU,
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]

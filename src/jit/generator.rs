@@ -280,7 +280,7 @@ fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::In
 
         Instruction::S(instruction) => generate_store_instruction(builder, instruction),
 
-        Instruction::I(_) => todo!("I type instructions are not yet implemented"),
+        Instruction::I(instruction) => generate_immediate_instruction(builder, instruction),
         Instruction::U(instruction::U { opcode, imm, rd }) => {
             if let Some(rd) = rd {
                 let value = match opcode {
@@ -304,6 +304,57 @@ macro_rules! unwrap_or_return {
             return;
         }
     };
+}
+
+fn generate_immediate_instruction(builder: &mut BlockBuilder, instruction: instruction::I) {
+    let instruction::I {
+        opcode,
+        imm,
+        rs1,
+        rd,
+    } = instruction;
+
+    match opcode {
+        opcode::I::FENCE => todo!("FENCE (nop on single hart system? MFENCE?)"),
+        opcode::I::ADDI => {
+            let rd = unwrap_or_return!(rd);
+            let imm = imm as i16 as u32;
+            match (rs1, imm) {
+                (None, _) => builder.write_register_imm(rd, imm, Some(StoreProfile::Allocate)),
+                (Some(rs), 0) => builder.register_mov(rd, rs),
+                (Some(rs), _) if rd != rs => {
+                    let (native_rd, rs) = builder.register_manager.alloc_2(
+                        (rd, rs),
+                        &[rd, rs],
+                        &mut builder.stream,
+                        (LoadProfile::Lazy, LoadProfile::Eager),
+                    );
+
+                    builder.register_manager.set_dirty(rd);
+
+                    builder.stream.lea_Register32Bit_Any32BitMemory(
+                        native_rd.as_asm_reg32(),
+                        Memory::base_64_displacement(rs.as_asm_reg64(), imm.into()),
+                    );
+                }
+
+                (Some(rs), _) => {
+                    let rs = builder.ez_alloc(rs);
+                    builder.register_manager.set_dirty(rd);
+                    builder
+                        .stream
+                        .add_Register32Bit_Immediate32Bit(rs.as_asm_reg32(), imm.into());
+                }
+            }
+        }
+        opcode::I::SICond(_) => todo!("SLTI(U)"),
+        opcode::I::XORI => todo!("XORI"),
+        opcode::I::ORI => todo!("ORI"),
+        opcode::I::ANDI => todo!("ANDI"),
+        opcode::I::JALR => unreachable!("blocks cannot contain a branch"),
+        opcode::I::LD(_) => todo!("LD"),
+        opcode::I::LDU(_) => todo!("LDU"),
+    }
 }
 
 fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instruction::R) {
@@ -528,7 +579,7 @@ fn generate_rmath_instruction(
         | opcode::RMath::DIV
         | opcode::RMath::DIVU
         | opcode::RMath::REM
-        | opcode::RMath::REMU => todo!("M Extension (required)"),
+        | opcode::RMath::REMU => todo!("M Extension (impl required)"),
     }
 }
 

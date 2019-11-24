@@ -70,7 +70,12 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
                 | ((instruction >> 4) & 0b0100);
 
             if funct3 == 0b010 {
-                Instruction::I(instruction::I::new(imm, rs1, r, opcode::I::LW))
+                Instruction::I(instruction::I::new(
+                    imm,
+                    rs1,
+                    r,
+                    opcode::I::LD(opcode::Width::DWord),
+                ))
             } else {
                 Instruction::S(instruction::S::new(imm, rs1, r, opcode::Width::DWord))
             }
@@ -264,7 +269,12 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, DecodeError> 
                 return Err(DecodeError);
             }
 
-            Instruction::I(instruction::I::new(imm, Some(r), Some(r), opcode::I::LW))
+            Instruction::I(instruction::I::new(
+                imm,
+                Some(r),
+                Some(r),
+                opcode::I::LD(opcode::Width::DWord),
+            ))
         }
 
         (0b10, 0b100) => {

@@ -58,22 +58,25 @@ pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> 
         )),
 
         (0b110_0011, _, _) => Instruction::B(decode_branch(instruction)?),
-        (0b000_0011, 0b000, _) => {
-            Instruction::I(instruction::I::from_instruction(instruction, opcode::I::LB))
-        }
-        (0b000_0011, 0b001, _) => {
-            Instruction::I(instruction::I::from_instruction(instruction, opcode::I::LH))
-        }
-        (0b000_0011, 0b010, _) => {
-            Instruction::I(instruction::I::from_instruction(instruction, opcode::I::LW))
-        }
+        (0b000_0011, 0b000, _) => Instruction::I(instruction::I::from_instruction(
+            instruction,
+            opcode::I::LD(Width::Byte),
+        )),
+        (0b000_0011, 0b001, _) => Instruction::I(instruction::I::from_instruction(
+            instruction,
+            opcode::I::LD(Width::Word),
+        )),
+        (0b000_0011, 0b010, _) => Instruction::I(instruction::I::from_instruction(
+            instruction,
+            opcode::I::LD(Width::DWord),
+        )),
         (0b000_0011, 0b100, _) => Instruction::I(instruction::I::from_instruction(
             instruction,
-            opcode::I::LBU,
+            opcode::I::LDU(Width::Byte),
         )),
         (0b000_0011, 0b101, _) => Instruction::I(instruction::I::from_instruction(
             instruction,
-            opcode::I::LHU,
+            opcode::I::LDU(Width::Word),
         )),
         (0b010_0011, 0b000, _) => {
             Instruction::S(instruction::S::from_instruction(instruction, Width::Byte))
@@ -90,11 +93,11 @@ pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> 
         )),
         (0b001_0011, 0b010, _) => Instruction::I(instruction::I::from_instruction(
             instruction,
-            opcode::I::SLTI,
+            opcode::I::SICond(opcode::Cmp::Lt),
         )),
         (0b001_0011, 0b011, _) => Instruction::I(instruction::I::from_instruction(
             instruction,
-            opcode::I::SLTIU,
+            opcode::I::SICond(opcode::Cmp::Ltu),
         )),
         (0b001_0011, 0b100, _) => Instruction::I(instruction::I::from_instruction(
             instruction,
