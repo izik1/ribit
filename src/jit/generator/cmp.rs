@@ -172,11 +172,7 @@ pub fn set_bool_conditional(
         }
 
         CmpValue::Cmp(rs1, rs2) => {
-            let (native_rd, rs1, rs2) = builder.register_manager.alloc_3(
-                (rd, rs1, rs2),
-                &mut builder.stream,
-                (LoadProfile::Lazy, LoadProfile::Eager, LoadProfile::Eager),
-            );
+            let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
 
             if native_rd == rs1 || native_rd == rs2 {
                 // this has to be before the cmp, because it trashes flags

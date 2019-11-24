@@ -108,6 +108,18 @@ impl<'a> BlockBuilder<'a> {
         )
     }
 
+    pub fn ez_alloc_3op(
+        &mut self,
+        rd: register::RiscV,
+        srcs: (register::RiscV, register::RiscV),
+    ) -> (register::Native, register::Native, register::Native) {
+        self.register_manager.alloc_3(
+            (rd, srcs.0, srcs.1),
+            &mut self.stream,
+            (LoadProfile::Lazy, LoadProfile::Eager, LoadProfile::Eager),
+        )
+    }
+
     fn mov_eax_imm(&mut self, imm: u32) {
         if imm == 0 {
             self.stream
@@ -307,6 +319,20 @@ fn generate_rmath_instruction(
         opcode::RMath::SCond(cmp_mode) => {
             cmp::set_bool_conditional(builder, rd, rs1, rs2, cmp_mode)
         }
+
+        opcode::RMath::ADD => match (rs1, rs2) {
+            (None, None) => {}
+            (Some(rs), None) | (None, Some(rs)) => builder.register_mov(rd, rs),
+            (Some(rs1), Some(rs2)) => {
+                let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
+                builder.register_manager.set_dirty(rd);
+                builder.stream.lea_Register32Bit_Any32BitMemory(
+                    native_rd.as_asm_reg32(),
+                    Memory::base_64_index_64(rs1.as_asm_reg64(), rs2.as_asm_reg64()),
+                );
+            }
+        },
+
         _ => todo!("Rmath::_"),
     }
 }
