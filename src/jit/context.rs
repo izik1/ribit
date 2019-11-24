@@ -30,7 +30,7 @@ impl Runtime {
 
             *pc = address;
         } else {
-            todo!("put an error here")
+            todo!("failed to find block -- put an error here")
         }
     }
 

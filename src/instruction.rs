@@ -180,9 +180,9 @@ impl B {
 }
 
 pub struct U {
-    imm: u32,
-    rd: Option<RiscVRegister>,
-    opcode: opcode::U,
+    pub(crate) imm: u32,
+    pub(crate) rd: Option<RiscVRegister>,
+    pub(crate) opcode: opcode::U,
 }
 
 impl U {

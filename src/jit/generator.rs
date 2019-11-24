@@ -281,7 +281,16 @@ fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::In
         Instruction::S(instruction) => generate_store_instruction(builder, instruction),
 
         Instruction::I(_) => todo!("I type instructions are not yet implemented"),
-        Instruction::U(_) => todo!("U type instructions are not yet implemented"),
+        Instruction::U(instruction::U { opcode, imm, rd }) => {
+            if let Some(rd) = rd {
+                let value = match opcode {
+                    opcode::U::AUIPC => start_address.wrapping_add(imm),
+                    opcode::U::LUI => imm,
+                };
+
+                builder.write_register_imm(rd, value, Some(StoreProfile::Allocate));
+            }
+        }
 
         Instruction::R(instruction) => generate_register_instruction(builder, instruction),
     }

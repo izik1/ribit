@@ -37,7 +37,6 @@ enum ReturnCode {
     Normal = 0,
     EBreak,
     ECall,
-    Div0,
 }
 
 #[cfg(test)]
