@@ -29,6 +29,13 @@ impl<'a> BlockBuilder<'a> {
         stream: assembler::InstructionStream<'a>,
         check_ranges: CheckRanges,
     ) -> Self {
+        if !raw_cpuid::CpuId::new()
+            .get_extended_feature_info()
+            .map_or(false, |feats| feats.has_bmi2())
+        {
+            panic!("Make the crate author support code gen on x86 without bmi2");
+        }
+
         Self {
             stream,
             register_manager: RegisterManager::new(),
@@ -314,6 +321,17 @@ fn generate_rmath_instruction(
     rs1: Option<register::RiscV>,
     opcode: opcode::RMath,
 ) {
+    // a list of identities (a op 0 == ?)
+    // S<cc>: depends on CC
+    // ADD: additive
+    // AND: multiplicive
+    // OR: additive
+    // XOR: additive
+    // SLL: additive
+    // SRL: additive
+    // SUB: additive
+    // SRA: additive
+
     match opcode {
         // rd = if cmp(rs1, rs2) {1} else {0}
         opcode::RMath::SCond(cmp_mode) => {
@@ -321,7 +339,7 @@ fn generate_rmath_instruction(
         }
 
         opcode::RMath::ADD => match (rs1, rs2) {
-            (None, None) => {}
+            (None, None) => builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate)),
             (Some(rs), None) | (None, Some(rs)) => builder.register_mov(rd, rs),
             (Some(rs1), Some(rs2)) => {
                 let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
@@ -333,7 +351,175 @@ fn generate_rmath_instruction(
             }
         },
 
-        _ => todo!("Rmath::_"),
+        opcode::RMath::AND => match (rs1, rs2) {
+            // todo: opt: avoid:
+            // mov eax, rs2
+            // and eax, rs1
+            // mov rd, eax
+            // if [rs2, rs1].contains(rd)
+            // or if rs1 == rs2
+            (Some(rs1), Some(rs2)) => {
+                let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
+                builder
+                    .stream
+                    .mov_Register32Bit_Register32Bit(Register32Bit::EAX, rs2.as_asm_reg32());
+                builder
+                    .stream
+                    .add_Register32Bit_Register32Bit(Register32Bit::EAX, rs1.as_asm_reg32());
+                builder.register_manager.set_dirty(rd);
+                builder
+                    .stream
+                    .mov_Register32Bit_Register32Bit(native_rd.as_asm_reg32(), Register32Bit::EAX);
+            }
+            _ => builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate)),
+        },
+
+        opcode::RMath::OR => match (rs1, rs2) {
+            // todo: opt: avoid:
+            // mov eax, rs2
+            // or eax, rs1
+            // mov rd, eax
+            // if [rs2, rs1].contains(rd)
+            // or if rs1 == rs2
+            (None, None) => builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate)),
+            (Some(rs), None) | (None, Some(rs)) => builder.register_mov(rd, rs),
+            (Some(rs1), Some(rs2)) => {
+                let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
+                builder
+                    .stream
+                    .mov_Register32Bit_Register32Bit(Register32Bit::EAX, rs2.as_asm_reg32());
+                builder
+                    .stream
+                    .or_Register32Bit_Register32Bit(Register32Bit::EAX, rs1.as_asm_reg32());
+                builder.register_manager.set_dirty(rd);
+                builder
+                    .stream
+                    .mov_Register32Bit_Register32Bit(native_rd.as_asm_reg32(), Register32Bit::EAX);
+            }
+        },
+
+        opcode::RMath::XOR => match (rs1, rs2) {
+            // todo: opt: avoid:
+            // mov eax, rs2
+            // xor eax, rs1
+            // mov rd, eax
+            // if [rs2, rs1].contains(rd)
+            // or if rs1 == rs2
+            (None, None) => builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate)),
+            (Some(rs), None) | (None, Some(rs)) => builder.register_mov(rd, rs),
+            (Some(rs1), Some(rs2)) => {
+                let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
+                builder
+                    .stream
+                    .mov_Register32Bit_Register32Bit(Register32Bit::EAX, rs2.as_asm_reg32());
+                builder
+                    .stream
+                    .xor_Register32Bit_Register32Bit(Register32Bit::EAX, rs1.as_asm_reg32());
+                builder.register_manager.set_dirty(rd);
+                builder
+                    .stream
+                    .mov_Register32Bit_Register32Bit(native_rd.as_asm_reg32(), Register32Bit::EAX);
+            }
+        },
+
+        opcode::RMath::SLL => match (rs1, rs2) {
+            // todo: opt: avoid:
+            // mov eax, rs2
+            // shl eax, rs1
+            // mov rd, eax
+            // if [rs2, rs1].contains(rd)
+            // or if rs1 == rs2
+            (None, None) => builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate)),
+            (Some(rs), None) | (None, Some(rs)) => builder.register_mov(rd, rs),
+            (Some(rs1), Some(rs2)) => {
+                let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
+                builder.register_manager.set_dirty(rd);
+                builder
+                    .stream
+                    .shlx_Register32Bit_Register32Bit_Register32Bit(
+                        native_rd.as_asm_reg32(),
+                        rs1.as_asm_reg32(),
+                        rs2.as_asm_reg32(),
+                    );
+            }
+        },
+
+        opcode::RMath::SRL => match (rs1, rs2) {
+            // todo: opt: avoid:
+            // mov eax, rs2
+            // shr eax, rs1
+            // mov rd, eax
+            // if [rs2, rs1].contains(rd)
+            // or if rs1 == rs2
+            (None, None) => builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate)),
+            (Some(rs), None) | (None, Some(rs)) => builder.register_mov(rd, rs),
+            (Some(rs1), Some(rs2)) => {
+                let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
+                builder.register_manager.set_dirty(rd);
+                builder
+                    .stream
+                    .shrx_Register32Bit_Register32Bit_Register32Bit(
+                        native_rd.as_asm_reg32(),
+                        rs1.as_asm_reg32(),
+                        rs2.as_asm_reg32(),
+                    );
+            }
+        },
+
+        opcode::RMath::SUB => match (rs1, rs2) {
+            // todo: opt: avoid:
+            // mov eax, rs2
+            // sub eax, rs1
+            // mov rd, eax
+            // if [rs2, rs1].contains(rd)
+            // or if rs1 == rs2
+            (None, None) => builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate)),
+            (Some(rs), None) | (None, Some(rs)) => builder.register_mov(rd, rs),
+            (Some(rs1), Some(rs2)) => {
+                let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
+                builder
+                    .stream
+                    .mov_Register32Bit_Register32Bit(Register32Bit::EAX, rs2.as_asm_reg32());
+                builder
+                    .stream
+                    .sub_Register32Bit_Register32Bit(Register32Bit::EAX, rs1.as_asm_reg32());
+                builder.register_manager.set_dirty(rd);
+                builder
+                    .stream
+                    .mov_Register32Bit_Register32Bit(native_rd.as_asm_reg32(), Register32Bit::EAX);
+            }
+        },
+
+        opcode::RMath::SRA => match (rs1, rs2) {
+            // todo: opt: avoid:
+            // mov eax, rs2
+            // sar eax, rs1
+            // mov rd, eax
+            // if [rs2, rs1].contains(rd)
+            // or if rs1 == rs2
+            (None, None) => builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate)),
+            (Some(rs), None) | (None, Some(rs)) => builder.register_mov(rd, rs),
+            (Some(rs1), Some(rs2)) => {
+                let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
+                builder.register_manager.set_dirty(rd);
+                builder
+                    .stream
+                    .sarx_Register32Bit_Register32Bit_Register32Bit(
+                        native_rd.as_asm_reg32(),
+                        rs1.as_asm_reg32(),
+                        rs2.as_asm_reg32(),
+                    );
+            }
+        },
+
+        opcode::RMath::MUL
+        | opcode::RMath::MULH
+        | opcode::RMath::MULHSU
+        | opcode::RMath::MULHU
+        | opcode::RMath::DIV
+        | opcode::RMath::DIVU
+        | opcode::RMath::REM
+        | opcode::RMath::REMU => todo!("M Extension (required)"),
     }
 }
 
