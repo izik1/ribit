@@ -330,8 +330,12 @@ fn generate_immediate_instruction(builder: &mut BlockBuilder, instruction: instr
         opcode::I::ORI => math::ori(builder, imm as i16 as u32, unwrap_or_return!(rd), rs1),
         opcode::I::ANDI => math::andi(builder, imm as i16 as u32, unwrap_or_return!(rd), rs1),
         opcode::I::JALR => unreachable!("blocks cannot contain a branch"),
-        opcode::I::LD(_) => todo!("LD"),
-        opcode::I::LDU(_) => todo!("LDU"),
+        opcode::I::LD(width) => {
+            memory::load_rs_imm(builder, unwrap_or_return!(rd), rs1, imm, width, true)
+        }
+        opcode::I::LDU(width) => {
+            memory::load_rs_imm(builder, unwrap_or_return!(rd), rs1, imm, width, false)
+        }
     }
 }
 

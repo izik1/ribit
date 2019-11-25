@@ -91,6 +91,71 @@ pub fn store(builder: &mut BlockBuilder, base: Memory, src: register::Native) {
     };
 }
 
+pub fn load_rs_imm(
+    builder: &mut BlockBuilder,
+    rd: register::RiscV,
+    base: Option<register::RiscV>,
+    imm: u16,
+    width: Width,
+    sign_extend: bool,
+) {
+    use super::LoadProfile;
+
+    let displacement = match base {
+        None => Memory::new(width, imm),
+
+        Some(base) => {
+            let (_, base) = builder.register_manager.alloc_2(
+                (rd, base),
+                &[rd, base],
+                &mut builder.stream,
+                (LoadProfile::Lazy, LoadProfile::Eager),
+            );
+
+            dyn_address(builder, base, imm);
+
+            Memory::mem_eax(width)
+        }
+    };
+
+    let rd = builder
+        .register_manager
+        .alloc(rd, &[], &mut builder.stream, LoadProfile::Lazy);
+
+    match sign_extend {
+        true => load(builder, displacement, rd),
+        false => loadu(builder, displacement, rd),
+    };
+}
+
+fn load(builder: &mut BlockBuilder, base: Memory, dest: register::Native) {
+    match base {
+        Memory::Byte(displacement) => builder
+            .stream
+            .movsx_Register32Bit_Any8BitMemory(dest.as_asm_reg32(), displacement),
+        Memory::Word(displacement) => builder
+            .stream
+            .movsx_Register32Bit_Any16BitMemory(dest.as_asm_reg32(), displacement),
+        Memory::DWord(displacement) => builder
+            .stream
+            .mov_Register32Bit_Any32BitMemory(dest.as_asm_reg32(), displacement),
+    }
+}
+
+fn loadu(builder: &mut BlockBuilder, base: Memory, dest: register::Native) {
+    match base {
+        Memory::Byte(displacement) => builder
+            .stream
+            .movzx_Register32Bit_Any8BitMemory(dest.as_asm_reg32(), displacement),
+        Memory::Word(displacement) => builder
+            .stream
+            .movzx_Register32Bit_Any16BitMemory(dest.as_asm_reg32(), displacement),
+        Memory::DWord(displacement) => builder
+            .stream
+            .mov_Register32Bit_Any32BitMemory(dest.as_asm_reg32(), displacement),
+    }
+}
+
 pub fn dyn_address(builder: &mut BlockBuilder, base: register::Native, imm: u16) {
     builder.stream.lea_Register32Bit_Any32BitMemory(
         Register32Bit::EAX,
