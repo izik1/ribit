@@ -2,9 +2,101 @@ use std::ops::Range;
 
 use assembler::ExecutableAnonymousMemoryMap;
 
-use super::generator::BlockBuilder;
+use super::{generator::BlockBuilder, ReturnCode};
 use crate::instruction;
 
+mod sbi {
+    #[repr(u32)]
+    enum StatusCode {
+        Success = 0,
+        ErrFailure = -1i32 as u32,
+        ErrNotSupported = -2i32 as u32,
+        ErrInvalidParam = -3i32 as u32,
+        ErrDenied = -4i32 as u32,
+        ErrInvalidAddress = -51i32 as u32,
+    }
+
+    pub fn call(regs: &mut [u32; crate::XLEN]) {
+        let extension_id = regs[17]; // x17 -> a7
+        let extension_funct = regs[16]; // x16 -> a6
+        
+        let (code, value) = match (extension_id, extension_funct) {
+            (0x01, _) => console_putchar(regs[12]),
+            (0x02, _) => console_getchar(),
+            (0x10, 0) => get_sbi_spec_version(),
+            (0x10, 1) => get_sbi_impl_id(),
+            (0x10, 2) => get_sbi_impl_version(),
+            (0x10, 3) => probe_extension(regs[12]),
+            (0x10, 4) => get_mvendorid(),
+            (0x10, 5) => get_marchid(),
+            (0x10, 6) => get_mimpid(),
+            _ => unsupported(),
+        };
+
+        regs[10] = code as u32; // a0
+        regs[11] = value; // a1
+    }
+
+    const fn unsupported() -> (StatusCode, u32) {
+        (StatusCode::ErrNotSupported, 0)
+    }
+
+    const fn get_sbi_spec_version() -> (StatusCode, u32) {
+        // no error, minor version 2
+        (StatusCode::Success, 2)
+    }
+
+    const fn get_sbi_impl_id() -> (StatusCode, u32) {
+        // no error, id = 0xfabadaba
+        (StatusCode::Success, 0xfabadaba)
+    }
+
+    const fn get_sbi_impl_version() -> (StatusCode, u32) {
+        // no error, we're v0.1, encoding TBD
+        (StatusCode::Success, 1)
+    }
+
+    fn probe_extension(extension_id: u32) -> (StatusCode, u32) {
+        // no error
+        let id = match extension_id {
+            1 | 2 => extension_id,
+            _ => 0, // None
+        };
+
+        (StatusCode::Success, id)
+    }
+
+    fn get_mvendorid() -> (StatusCode, u32) {
+        (StatusCode::Success, 0)        
+    }
+
+    fn get_marchid() -> (StatusCode, u32) {
+        (StatusCode::Success, 0)        
+    }
+
+    fn get_mimpid() -> (StatusCode, u32) {
+        (StatusCode::Success, 0)        
+    }
+
+    fn console_getchar() -> (StatusCode, u32) {
+        use std::io::Read;
+
+        let stdin = std::io::stdin();
+        let mut stdin = stdin.lock();
+        let mut buf = [0];
+        let code = match stdin.read_exact(&mut buf) {
+            Ok(_) => StatusCode::Success,
+            Err(_) => StatusCode::ErrFailure,
+        };
+
+        (code, buf[0] as u32)
+    }
+
+    fn console_putchar(ch: u32) -> (StatusCode, u32) {
+        print!("{}", char::from(ch as u8));
+        (StatusCode::Success, 0)
+    }
+}
 pub struct Runtime {
     buffer: ExecutableAnonymousMemoryMap,
     blocks: Vec<super::BasicBlock>,
@@ -25,10 +117,16 @@ impl Runtime {
         if let Some(block_num) = self.ranges.iter().position(|range| range.start == *pc) {
             let block = &self.blocks[block_num];
 
-            let (address, _return_code) =
+            let (address, return_code) =
                 unsafe { block(regs.as_mut_ptr(), self, memory.as_mut_ptr()) }.into_parts();
 
             *pc = address;
+
+            match return_code {
+                ReturnCode::Normal => {},
+                ReturnCode::EBreak => todo!("EBREAK"),
+                ReturnCode::ECall => sbi::call(regs),
+            }
         } else {
             todo!("failed to find block -- put an error here")
         }
