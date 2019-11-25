@@ -41,6 +41,7 @@ pub const fn sign_extend_32(value: u32, data_bits: u8) -> u32 {
 
 #[allow(clippy::too_many_lines)]
 pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> {
+    log::debug!("instruction: {:032b}", instruction);
     let funct3 = ((instruction >> 12) & 0b0000_0111) as u8;
     let funct7 = ((instruction >> 25) & 0b0111_1111) as u8;
     let opcode = (instruction & 0b0111_1111) as u8;
@@ -207,7 +208,7 @@ pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> 
             instruction,
             opcode::R::Math(opcode::RMath::REMU),
         )),
-        _ => return Err(DecodeError),
+        _ => return Err(DecodeError::InvalidInstruction(instruction)),
     };
 
     Ok(instruction)
@@ -227,7 +228,7 @@ fn decode_branch(instruction: u32) -> Result<instruction::B, DecodeError> {
         0b101 => opcode::Cmp::Ge,
         0b110 => opcode::Cmp::Ltu,
         0b111 => opcode::Cmp::Geu,
-        0b010 | 0b011 => return Err(DecodeError),
+        0b010 | 0b011 => return Err(DecodeError::InvalidInstruction(instruction)),
         0x08..=0xff => unreachable!(),
     };
 

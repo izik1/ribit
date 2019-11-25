@@ -132,6 +132,12 @@ impl Runtime {
         }
     }
 
+    pub fn lookup_block(&self, start_address: u32) -> bool {
+         self
+            .ranges
+            .binary_search_by_key(&start_address, |range| range.start).is_ok()
+    }
+
     #[must_use]
     pub fn new() -> Self {
         Self {

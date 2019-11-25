@@ -36,6 +36,22 @@ pub enum Instruction {
     Sys(Sys),
 }
 
+impl Instruction {
+    pub fn is_terminator(&self) -> bool {
+        match self {
+            Self::J(_)
+            | Self::B(_)
+            | Self::Sys(_)
+            | Self::I(I {
+                opcode: opcode::I::JALR,
+                ..
+            }) => true,
+            
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Sys {
     pub(crate) opcode: opcode::RSys,
@@ -206,7 +222,7 @@ impl J {
         let rd = decode_rd(instruction);
         // abbb_bbbb_bbbc_dddd_dddd_xxxx_xxxx_xxxx -> 000a_dddd_dddd_cbbb_bbbb_bbb0
         let imm = ((instruction >> 11) & 0b0001_0000_0000_0000_0000_0000)
-            | ((instruction >> 19) & 0b0000_0000_0000_0111_1111_1110)
+            | ((instruction >> 20) & 0b0000_0000_0000_0111_1111_1110)
             | ((instruction >> 9) & 0b0000_0000_0000_1000_0000_0000)
             | (instruction & 0b0000_1111_1111_0000_0000_0000);
 

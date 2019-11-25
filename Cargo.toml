@@ -10,6 +10,8 @@ edition = "2018"
 assembler = "0.10.1"
 static_assertions = "1.1.0"
 raw-cpuid = "7.0.3"
+log = "0.4.8"
+itertools = "0.8.2"
 
 [patch.crates-io]
 likely = { git = "https://github.com/izik1/likely", branch = "clippy-fix" }

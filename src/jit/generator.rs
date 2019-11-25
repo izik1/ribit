@@ -55,7 +55,23 @@ impl<'a> BlockBuilder<'a> {
 
         let funct: BasicBlock =
             unsafe { std::mem::transmute(self.stream.start_instruction_pointer()) };
-        self.stream.finish();
+        let (instrs, _) = self.stream.finish();
+
+        let mut byte_str = String::new();
+        {
+            let mut bytes = instrs.iter();
+
+            if let Some(byte) = bytes.next() {
+                byte_str.push_str(&format!("{:02x}", byte));
+            }
+
+            for byte in bytes {
+                byte_str.push_str(", ");
+                byte_str.push_str(&format!("{:02x}", byte));
+            }
+        }
+
+        log::debug!("Native block: [{}]", byte_str);
 
         funct
     }
@@ -191,6 +207,7 @@ pub(super) fn generate_register_write_imm(
 }
 
 fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
+    let start_address = branch.start_address;
     let next_start_address = branch.end_address();
 
     let branch_instruction = branch.instruction;
@@ -201,7 +218,7 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
             rd,
             opcode: opcode::J::JAL,
         }) => {
-            let res_pc = next_start_address.wrapping_add(imm);
+            let res_pc = start_address.wrapping_add(imm);
 
             if let Some(rd) = rd {
                 builder.write_register_imm(rd, next_start_address, Some(StoreProfile::Free));
