@@ -326,9 +326,9 @@ fn generate_immediate_instruction(builder: &mut BlockBuilder, instruction: instr
             cmp_mode,
         ),
 
-        opcode::I::XORI => todo!("XORI"),
-        opcode::I::ORI => todo!("ORI"),
-        opcode::I::ANDI => todo!("ANDI"),
+        opcode::I::XORI => math::xori(builder, imm as i16 as u32, unwrap_or_return!(rd), rs1),
+        opcode::I::ORI => math::ori(builder, imm as i16 as u32, unwrap_or_return!(rd), rs1),
+        opcode::I::ANDI => math::andi(builder, imm as i16 as u32, unwrap_or_return!(rd), rs1),
         opcode::I::JALR => unreachable!("blocks cannot contain a branch"),
         opcode::I::LD(_) => todo!("LD"),
         opcode::I::LDU(_) => todo!("LDU"),
