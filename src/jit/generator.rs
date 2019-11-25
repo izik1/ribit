@@ -4,6 +4,7 @@ use super::{
 };
 
 mod cmp;
+mod math;
 mod memory;
 
 use assembler::mnemonic_parameter_types::{
@@ -316,38 +317,15 @@ fn generate_immediate_instruction(builder: &mut BlockBuilder, instruction: instr
 
     match opcode {
         opcode::I::FENCE => todo!("FENCE (nop on single hart system? MFENCE?)"),
-        opcode::I::ADDI => {
-            let rd = unwrap_or_return!(rd);
-            let imm = imm as i16 as u32;
-            match (rs1, imm) {
-                (None, _) => builder.write_register_imm(rd, imm, Some(StoreProfile::Allocate)),
-                (Some(rs), 0) => builder.register_mov(rd, rs),
-                (Some(rs), _) if rd != rs => {
-                    let (native_rd, rs) = builder.register_manager.alloc_2(
-                        (rd, rs),
-                        &[rd, rs],
-                        &mut builder.stream,
-                        (LoadProfile::Lazy, LoadProfile::Eager),
-                    );
+        opcode::I::ADDI => math::addi(builder, imm as i16 as u32, unwrap_or_return!(rd), rs1),
+        opcode::I::SICond(cmp_mode) => cmp::set_bool_conditional_imm(
+            builder,
+            unwrap_or_return!(rd),
+            rs1,
+            imm as i16 as u32,
+            cmp_mode,
+        ),
 
-                    builder.register_manager.set_dirty(rd);
-
-                    builder.stream.lea_Register32Bit_Any32BitMemory(
-                        native_rd.as_asm_reg32(),
-                        Memory::base_64_displacement(rs.as_asm_reg64(), imm.into()),
-                    );
-                }
-
-                (Some(rs), _) => {
-                    let rs = builder.ez_alloc(rs);
-                    builder.register_manager.set_dirty(rd);
-                    builder
-                        .stream
-                        .add_Register32Bit_Immediate32Bit(rs.as_asm_reg32(), imm.into());
-                }
-            }
-        }
-        opcode::I::SICond(_) => todo!("SLTI(U)"),
         opcode::I::XORI => todo!("XORI"),
         opcode::I::ORI => todo!("ORI"),
         opcode::I::ANDI => todo!("ANDI"),
