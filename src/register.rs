@@ -4,8 +4,6 @@ use assembler::mnemonic_parameter_types::registers::{
 
 use std::num::NonZeroU8;
 
-// todo: get rid of "Register" suffix
-
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct RiscV(NonZeroU8);
 

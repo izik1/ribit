@@ -46,7 +46,7 @@ impl Instruction {
                 opcode: opcode::I::JALR,
                 ..
             }) => true,
-            
+
             _ => false,
         }
     }

@@ -1,6 +1,6 @@
 use crate::{
     instruction::{self, Instruction},
-    opcode, CompressedDecodeError, Extension
+    opcode, CompressedDecodeError, Extension,
 };
 
 use crate::register::RiscV as RiscVRegister;
@@ -56,9 +56,19 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
         }
 
         // C.FLD requires D extension
-        (0b00, 0b001) => return Err(CompressedDecodeError::UnimplementedExtension(Extension::D, instruction)),
+        (0b00, 0b001) => {
+            return Err(CompressedDecodeError::UnimplementedExtension(
+                Extension::D,
+                instruction,
+            ))
+        }
         // C.FSD requires D extension
-        (0b00, 0b101) => return Err(CompressedDecodeError::UnimplementedExtension(Extension::D, instruction)),
+        (0b00, 0b101) => {
+            return Err(CompressedDecodeError::UnimplementedExtension(
+                Extension::D,
+                instruction,
+            ))
+        }
 
         (0b00, 0b010) | (0b00, 0b110) => {
             let rs1 = Some(decode_register(instruction >> 7));
@@ -84,7 +94,12 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
         (0b00, 0b011) => return Err(CompressedDecodeError::InvalidInstruction(instruction)),
 
         // C.FSW requires the F extension
-        (0b00, 0b111) => return Err(CompressedDecodeError::UnimplementedExtension(Extension::F, instruction)),
+        (0b00, 0b111) => {
+            return Err(CompressedDecodeError::UnimplementedExtension(
+                Extension::F,
+                instruction,
+            ))
+        }
 
         (0b00, 0b100) => return Err(CompressedDecodeError::InvalidInstruction(instruction)), // reserved
         (0b01, 0b000) | (0b01, 0b010) => {
@@ -254,7 +269,12 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
         }
 
         // C.FLDSP requires D extension
-        (0b10, 0b001) => return Err(CompressedDecodeError::UnimplementedExtension(Extension::D, instruction)),
+        (0b10, 0b001) => {
+            return Err(CompressedDecodeError::UnimplementedExtension(
+                Extension::D,
+                instruction,
+            ))
+        }
 
         (0b10, 0b010) | (0b10, 0b011) => {
             // 0bxxxa_0000_0bbb_ccxx -> ccab_bb00
@@ -262,11 +282,15 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
                 | ((instruction >> 2) & 0b0001_1100)
                 | ((instruction << 4) & 0b1100_0000);
 
-            let r = decode_full_register(instruction >> 7).ok_or(CompressedDecodeError::InvalidInstruction(instruction))?;
+            let r = decode_full_register(instruction >> 7)
+                .ok_or(CompressedDecodeError::InvalidInstruction(instruction))?;
 
             if funct3 == 0b011 {
                 // C.FLWSP requires F extension
-                return Err(CompressedDecodeError::UnimplementedExtension(Extension::D, instruction));
+                return Err(CompressedDecodeError::UnimplementedExtension(
+                    Extension::D,
+                    instruction,
+                ));
             }
 
             Instruction::I(instruction::I::new(
@@ -283,7 +307,9 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
             let imm5 = ((instruction >> 12) & 1) != 0;
 
             match (imm5, rs2, r) {
-                (false, None, None) => return Err(CompressedDecodeError::InvalidInstruction(instruction)),
+                (false, None, None) => {
+                    return Err(CompressedDecodeError::InvalidInstruction(instruction))
+                }
                 (false, None, rs1) => {
                     Instruction::I(instruction::I::new(0, rs1, None, opcode::I::JALR))
                 }
@@ -310,7 +336,12 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
         }
 
         // C.FSDSP requires D extension
-        (0b10, 0b101) => return Err(CompressedDecodeError::UnimplementedExtension(Extension::D, instruction)),
+        (0b10, 0b101) => {
+            return Err(CompressedDecodeError::UnimplementedExtension(
+                Extension::D,
+                instruction,
+            ))
+        }
 
         (0b10, 0b110) => {
             let rs2 = decode_full_register(instruction >> 2);
@@ -327,7 +358,12 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
         }
 
         // C.FSWSP requires RV32F extension.
-        (0b10, 0b111) => return Err(CompressedDecodeError::UnimplementedExtension(Extension::F, instruction)),
+        (0b10, 0b111) => {
+            return Err(CompressedDecodeError::UnimplementedExtension(
+                Extension::F,
+                instruction,
+            ))
+        }
 
         // this range is used for full length instructions
         (0b11, _) => return Err(CompressedDecodeError::InvalidInstruction(instruction)),

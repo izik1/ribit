@@ -14,6 +14,15 @@ pub mod instruction;
 pub mod jit;
 pub mod opcode;
 pub mod register;
+pub mod ssa;
+
+#[repr(u32)]
+enum ReturnCode {
+    #[allow(dead_code)]
+    Normal = 0,
+    EBreak,
+    ECall,
+}
 
 const XLEN: usize = 32;
 
@@ -72,7 +81,7 @@ impl Cpu {
         let mut memory = vec![0; MEMORY_SIZE as usize].into_boxed_slice();
         memory[..program.len()].copy_from_slice(program);
 
-        let xregs =  [0; XLEN];
+        let xregs = [0; XLEN];
         let pc = 0;
         let jit = jit::context::Runtime::new();
 
@@ -91,17 +100,20 @@ impl Cpu {
             return Err(DecodeError::Other);
         }
 
-        let instr = u16::from_le_bytes(self.memory[(self.pc as usize)..][..2].try_into().expect("bad slice size expected 2???"));
+        let instr = u16::from_le_bytes(
+            self.memory[(self.pc as usize)..][..2]
+                .try_into()
+                .expect("bad slice size expected 2???"),
+        );
         match instr & 0b11 {
             0b11 => Ok(None),
             _ => {
-            let instr = decode::compressed::decode_instruction(instr)?;
-            let info = instruction::Info::new(instr, self.pc, 2);
-            self.pc += 2;
-            Ok(Some(info))
+                let instr = decode::compressed::decode_instruction(instr)?;
+                let info = instruction::Info::new(instr, self.pc, 2);
+                self.pc += 2;
+                Ok(Some(info))
+            }
         }
-        }
-
     }
 
     fn parse_instruction(&mut self) -> Result<instruction::Info, DecodeError> {
@@ -116,7 +128,11 @@ impl Cpu {
             return Err(DecodeError::Other);
         }
 
-        let instr = u32::from_le_bytes(self.memory[(self.pc as usize)..][..4].try_into().expect("bad slice size expected 4???"));
+        let instr = u32::from_le_bytes(
+            self.memory[(self.pc as usize)..][..4]
+                .try_into()
+                .expect("bad slice size expected 4???"),
+        );
         let instr = decode::decode_instruction(instr)?;
         let info = instruction::Info::new(instr, self.pc, 4);
         self.pc += 4;
@@ -145,12 +161,13 @@ impl Cpu {
         Ok(())
     }
 
-    pub fn run(&mut self) -> Result<(), DecodeError>{
+    pub fn run(&mut self) -> Result<(), DecodeError> {
         if !self.jit.lookup_block(self.pc) {
             self.create_block()?;
         }
 
-        self.jit.execute_basic_block(&mut self.pc, &mut self.xregs, &mut self.memory);
+        self.jit
+            .execute_basic_block(&mut self.pc, &mut self.xregs, &mut self.memory);
 
         Ok(())
     }

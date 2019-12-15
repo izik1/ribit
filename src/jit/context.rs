@@ -19,7 +19,7 @@ mod sbi {
     pub fn call(regs: &mut [u32; crate::XLEN]) {
         let extension_id = regs[17]; // x17 -> a7
         let extension_funct = regs[16]; // x16 -> a6
-        
+
         let (code, value) = match (extension_id, extension_funct) {
             (0x01, _) => console_putchar(regs[12]),
             (0x02, _) => console_getchar(),
@@ -67,15 +67,15 @@ mod sbi {
     }
 
     fn get_mvendorid() -> (StatusCode, u32) {
-        (StatusCode::Success, 0)        
+        (StatusCode::Success, 0)
     }
 
     fn get_marchid() -> (StatusCode, u32) {
-        (StatusCode::Success, 0)        
+        (StatusCode::Success, 0)
     }
 
     fn get_mimpid() -> (StatusCode, u32) {
-        (StatusCode::Success, 0)        
+        (StatusCode::Success, 0)
     }
 
     fn console_getchar() -> (StatusCode, u32) {
@@ -123,7 +123,7 @@ impl Runtime {
             *pc = address;
 
             match return_code {
-                ReturnCode::Normal => {},
+                ReturnCode::Normal => {}
                 ReturnCode::EBreak => todo!("EBREAK"),
                 ReturnCode::ECall => sbi::call(regs),
             }
@@ -133,9 +133,9 @@ impl Runtime {
     }
 
     pub fn lookup_block(&self, start_address: u32) -> bool {
-         self
-            .ranges
-            .binary_search_by_key(&start_address, |range| range.start).is_ok()
+        self.ranges
+            .binary_search_by_key(&start_address, |range| range.start)
+            .is_ok()
     }
 
     #[must_use]
