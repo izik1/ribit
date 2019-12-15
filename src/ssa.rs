@@ -49,7 +49,7 @@ impl fmt::Display for Source {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Val(v) => v.fmt(f),
-            Self::Id(id) => id.fmt(f)
+            Self::Id(id) => id.fmt(f),
         }
     }
 }

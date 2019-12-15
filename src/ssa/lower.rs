@@ -32,15 +32,14 @@ impl Context {
 
     pub fn add_pc(&mut self, src: Source) -> Id {
         let id = self.new_id();
-        let pc = mem::replace(&mut self.pc, id);
 
         self.instructions.push(Instruction::Add {
             dest: id,
             src1: src,
-            src2: Source::Id(pc),
+            src2: Source::Id(mem::replace(&mut self.pc, id)),
         });
 
-        pc
+        id
     }
 
     fn new_id(&mut self) -> Id {
@@ -63,8 +62,15 @@ impl Context {
         id
     }
 
-    pub fn write_register(&mut self, reg: register::RiscV, val: Source) -> InstructionId {
+    pub fn load_register(&mut self, reg: Option<register::RiscV>) -> Id {
+        if let Some(reg) = reg {
+            self.read_register(reg)
+        } else {
+            self.load_const(0)
+        }
+    }
 
+    pub fn write_register(&mut self, reg: register::RiscV, val: Source) -> InstructionId {
         self.instructions.push(Instruction::WriteReg {
             dest: reg,
             src: val,
@@ -128,6 +134,55 @@ impl std::ops::Index<InstructionId> for Context {
 
     fn index(&self, idx: InstructionId) -> &Self::Output {
         &self.instructions[idx.0]
+    }
+}
+
+pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
+    let instruction::Info {
+        instruction,
+        start_address: _start_address,
+        len,
+    } = instr;
+
+    match instruction {
+        instruction::Instruction::J(_)
+        | instruction::Instruction::Sys(_)
+        | instruction::Instruction::B(_)
+        | instruction::Instruction::I(instruction::I {
+            opcode: opcode::I::JALR,
+            ..
+        }) => panic!("Instruction was a terminal"),
+
+        instruction::Instruction::I(instruction::I {
+            opcode,
+            imm,
+            rs1,
+            rd,
+        }) => match opcode {
+            opcode::I::JALR => panic!("Instruction was a terminal"),
+            opcode::I::FENCE => todo!(),
+            opcode::I::ADDI => {
+                let imm = imm as i16 as u32;
+                let src = ctx.load_register(rs1);
+
+                let add = ctx.add(Source::Id(src), Source::Val(imm));
+
+                if let Some(rd) = rd {
+                    ctx.write_register(rd, Source::Id(add));
+                }
+
+                ctx.add_pc(Source::Val(len));
+            }
+            opcode::I::SICond(_) => todo!(),
+            opcode::I::XORI => todo!(),
+            opcode::I::ORI => todo!(),
+            opcode::I::ANDI => todo!(),
+            opcode::I::LD(_) => todo!(),
+            opcode::I::LDU(_) => todo!(),
+        },
+        instruction::Instruction::R(_) => todo!(),
+        instruction::Instruction::S(_) => todo!(),
+        instruction::Instruction::U(_) => todo!(),
     }
 }
 
@@ -204,19 +259,8 @@ pub fn lower_terminal(mut ctx: Context, instr: instruction::Info) -> Vec<self::I
             rs2,
             cmp_mode,
         }) => {
-            let src1 = if let Some(src) = rs1 {
-                ctx.read_register(src)
-            } else {
-                ctx.load_const(0)
-            };
-
-            // todo: dedup this
-
-            let src2 = if let Some(src) = rs2 {
-                ctx.read_register(src)
-            } else {
-                ctx.load_const(0)
-            };
+            let src1 = ctx.load_register(rs1);
+            let src2 = ctx.load_register(rs2);
 
             let cmp = ctx.cmp(
                 Source::Id(src1),
@@ -237,9 +281,11 @@ pub fn lower_terminal(mut ctx: Context, instr: instruction::Info) -> Vec<self::I
 
             let jump_pc = ctx.add(current_pc, Source::Val(imm as i16 as u32));
 
-            let next_pc = ctx.select(Source::Id(cmp), Source::Id(jump_pc), Source::Id(continue_pc));
-
-            ctx.pc = next_pc;
+            ctx.pc = ctx.select(
+                Source::Id(cmp),
+                Source::Id(jump_pc),
+                Source::Id(continue_pc),
+            );
 
             ctx.ret()
         }
@@ -251,7 +297,16 @@ pub fn lower_terminal(mut ctx: Context, instr: instruction::Info) -> Vec<self::I
 #[cfg(test)]
 mod test {
     use super::Context;
+    use crate::ssa::lower::lower_non_terminal;
     use crate::{instruction, opcode, register};
+    use itertools::FoldWhile::Continue;
+
+    fn cmp_instrs(expected: &[&str], actual: &[super::Instruction]) {
+        for (idx, instr) in actual.iter().enumerate() {
+            assert_eq!(expected[idx], format!("{}", instr));
+            println!("{}", instr);
+        }
+    }
 
     #[test]
     fn jal_basic() {
@@ -270,10 +325,144 @@ mod test {
             ),
         );
 
-        for instr in instrs {
-            println!("{}", instr);
-        }
+        cmp_instrs(
+            &[
+                "%0 = 0",
+                "%1 = add %0, 4",
+                "x4 = %1",
+                "%2 = add 4096, %0",
+                "ret 0, %2",
+            ],
+            &instrs,
+        );
+    }
 
-        panic!()
+    #[test]
+    fn sys_break() {
+        let ctx = Context::new(0);
+
+        let instrs = super::lower_terminal(
+            ctx,
+            instruction::Info::new(
+                instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
+                0,
+                4,
+            ),
+        );
+
+        cmp_instrs(&["%0 = 0", "%1 = add 4, %0", "ret 1, %1"], &instrs);
+    }
+
+    #[test]
+    fn addi_nop() {
+        let mut ctx = Context::new(0);
+        lower_non_terminal(
+            &mut ctx,
+            instruction::Info::new(
+                instruction::Instruction::I(instruction::I::new(0, None, None, opcode::I::ADDI)),
+                0,
+                4,
+            ),
+        );
+
+        let instrs = super::lower_terminal(
+            ctx,
+            instruction::Info::new(
+                instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
+                4,
+                4,
+            ),
+        );
+
+        cmp_instrs(
+            &[
+                "%0 = 0",
+                "%1 = 0",
+                "%2 = add %1, 0",
+                "%3 = add 4, %0",
+                "%4 = add 4, %3",
+                "ret 1, %4",
+            ],
+            &instrs,
+        );
+    }
+
+    #[test]
+    fn addi_no_dest() {
+        let mut ctx = Context::new(0);
+        lower_non_terminal(
+            &mut ctx,
+            instruction::Info::new(
+                instruction::Instruction::I(instruction::I::new(
+                    50,
+                    Some(register::RiscV::X1),
+                    None,
+                    opcode::I::ADDI,
+                )),
+                0,
+                4,
+            ),
+        );
+
+        let instrs = super::lower_terminal(
+            ctx,
+            instruction::Info::new(
+                instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
+                4,
+                4,
+            ),
+        );
+
+        cmp_instrs(
+            &[
+                "%0 = 0",
+                "%1 = x1",
+                "%2 = add %1, 50",
+                "%3 = add 4, %0",
+                "%4 = add 4, %3",
+                "ret 1, %4",
+            ],
+            &instrs,
+        );
+    }
+
+    #[test]
+    fn addi_no_src() {
+        let mut ctx = Context::new(0);
+        lower_non_terminal(
+            &mut ctx,
+            instruction::Info::new(
+                instruction::Instruction::I(instruction::I::new(
+                    50,
+                    None,
+                    Some(register::RiscV::X2),
+                    opcode::I::ADDI,
+                )),
+                0,
+                4,
+            ),
+        );
+
+        let instrs = super::lower_terminal(
+            ctx,
+            instruction::Info::new(
+                instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
+                4,
+                4,
+            ),
+        );
+
+        cmp_instrs(
+            &[
+                "%0 = 0",
+                "%1 = 0",
+                "%2 = add %1, 50",
+                "x2 = %2",
+                "%3 = add 4, %0",
+                "%4 = add 4, %3",
+                "ret 1, %4",
+            ],
+            &instrs,
+        );
     }
 }
