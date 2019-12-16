@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::register;
+use crate::{register, opcode};
 
 pub mod lower;
 
@@ -8,7 +8,7 @@ pub mod lower;
 pub struct InstructionId(usize);
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub struct Id(usize);
+pub struct Id(u16);
 
 impl fmt::Display for Id {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -16,7 +16,7 @@ impl fmt::Display for Id {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum CmpKind {
     Eq,
     Ne,
@@ -24,6 +24,19 @@ pub enum CmpKind {
     Sl,
     Uge,
     Ul,
+}
+
+impl From<opcode::Cmp> for CmpKind {
+    fn from(cmp: opcode::Cmp) -> Self {
+        match cmp {
+            opcode::Cmp::Eq => Self::Eq,
+            opcode::Cmp::Ne => Self::Ne,
+            opcode::Cmp::Lt => Self::Sl,
+            opcode::Cmp::Ltu => Self::Ul,
+            opcode::Cmp::Ge => Self::Sge,
+            opcode::Cmp::Geu => Self::Uge,
+        }
+    }
 }
 
 impl fmt::Display for CmpKind {
@@ -78,22 +91,34 @@ pub enum Instruction {
         src1: Source,
         src2: Source,
     },
+    Or {
+        dest: Id,
+        src1: Source,
+        src2: Source,
+    },
+    Xor {
+        dest: Id,
+        src1: Source,
+        src2: Source,
+    },
     Cmp {
         dest: Id,
         src1: Source,
         src2: Source,
         kind: CmpKind,
     },
+    // todo: box this
     Select {
         dest: Id,
         cond: Source,
-        val1: Source,
-        val2: Source,
+        if_true: Source,
+        if_false: Source,
     },
     Ret {
         addr: Source,
         code: Source,
     },
+    Fence,
 }
 
 impl Instruction {
@@ -103,9 +128,11 @@ impl Instruction {
             | Self::ReadReg { dest, .. }
             | Self::LoadConst { dest, .. }
             | Self::Cmp { dest, .. }
+            | Self::Or { dest, .. }
+            | Self::Xor { dest, .. }
             | Self::And { dest, .. }
             | Self::Add { dest, .. } => Some(*dest),
-            Self::WriteReg { .. } | Self::Ret { .. } => None,
+            Self::WriteReg { .. } | Self::Ret { .. } | Self::Fence => None,
         }
     }
 }
@@ -116,6 +143,8 @@ impl fmt::Display for Instruction {
             Self::ReadReg { dest, src } => write!(f, "{} = x{}", dest, src.get()),
             Self::WriteReg { dest, src } => write!(f, "x{} = {}", dest.get(), src),
             Self::LoadConst { dest, src } => write!(f, "{} = {}", dest, src),
+            Self::Or { dest, src1, src2 } => write!(f, "{} = or {}, {}", dest, src1, src2),
+            Self::Xor { dest, src1, src2 } => write!(f, "{} = xor {}, {}", dest, src1, src2),
             Self::And { dest, src1, src2 } => write!(f, "{} = and {}, {}", dest, src1, src2),
             Self::Add { dest, src1, src2 } => write!(f, "{} = add {}, {}", dest, src1, src2),
             Self::Cmp {
@@ -128,10 +157,10 @@ impl fmt::Display for Instruction {
             Self::Select {
                 dest,
                 cond,
-                val1,
-                val2,
-            } => write!(f, "{} = select {}, {}, {}", dest, cond, val1, val2),
-
+                if_true,
+                if_false,
+            } => write!(f, "{} = select {}, {}, {}", dest, cond, if_true, if_false),
+            Self::Fence => write!(f, "fence"),
             Self::Ret { addr, code } => write!(f, "ret {}, {}", code, addr),
         }
     }
@@ -141,6 +170,7 @@ impl fmt::Display for Instruction {
 mod test {
     use super::{lower, Id, Instruction, Source};
     use crate::register;
+    use std::mem;
 
     #[test]
     fn empty() {

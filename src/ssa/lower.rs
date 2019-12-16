@@ -86,6 +86,14 @@ impl Context {
         })
     }
 
+    pub fn or(&mut self, src1: Source, src2: Source) -> Id {
+        self.instr_with_id(|dest| Instruction::Or { dest, src1, src2 })
+    }
+
+    pub fn xor(&mut self, src1: Source, src2: Source) -> Id {
+        self.instr_with_id(|dest| Instruction::Xor { dest, src1, src2 })
+    }
+
     pub fn and(&mut self, src1: Source, src2: Source) -> Id {
         self.instr_with_id(|dest| Instruction::And { dest, src1, src2 })
     }
@@ -103,13 +111,17 @@ impl Context {
         })
     }
 
-    pub fn select(&mut self, cond: Source, val1: Source, val2: Source) -> Id {
+    pub fn select(&mut self, cond: Source, if_true: Source, if_false: Source) -> Id {
         self.instr_with_id(|dest| Instruction::Select {
             dest,
-            val1,
-            val2,
+            if_true,
+            if_false,
             cond,
         })
+    }
+
+    pub fn fence(&mut self) {
+        self.instructions.push(Instruction::Fence)
     }
 
     pub fn ret_with_code(mut self, addr: Source, code: Source) -> Vec<Instruction> {
@@ -160,7 +172,11 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
             rd,
         }) => match opcode {
             opcode::I::JALR => panic!("Instruction was a terminal"),
-            opcode::I::FENCE => todo!(),
+            // todo: finer grained fences.
+            opcode::I::FENCE => {
+                ctx.fence();
+                ctx.add_pc(Source::Val(len));
+            },
             opcode::I::ADDI => {
                 let imm = imm as i16 as u32;
                 let src = ctx.load_register(rs1);
@@ -173,10 +189,50 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
 
                 ctx.add_pc(Source::Val(len));
             }
-            opcode::I::SICond(_) => todo!(),
-            opcode::I::XORI => todo!(),
-            opcode::I::ORI => todo!(),
-            opcode::I::ANDI => todo!(),
+            opcode::I::SICond(cmp_mode) => {
+                let imm = imm as i16 as u32;
+                let src = ctx.load_register(rs1);
+                let cmp = ctx.cmp(Source::Id(src), Source::Val(imm), cmp_mode.into());
+
+                if let Some(rd) = rd {
+                    ctx.write_register(rd, Source::Id(cmp));
+                }
+
+                ctx.add_pc(Source::Val(len));
+            },
+            opcode::I::XORI => {
+                let imm = imm as i16 as u32;
+                let src = ctx.load_register(rs1);
+                let and = ctx.xor(Source::Id(src), Source::Val(imm));
+
+                if let Some(rd) = rd {
+                    ctx.write_register(rd, Source::Id(and));
+                }
+
+                ctx.add_pc(Source::Val(len));
+            },
+            opcode::I::ORI => {
+                let imm = imm as i16 as u32;
+                let src = ctx.load_register(rs1);
+                let and = ctx.or(Source::Id(src), Source::Val(imm));
+
+                if let Some(rd) = rd {
+                    ctx.write_register(rd, Source::Id(and));
+                }
+
+                ctx.add_pc(Source::Val(len));
+            },
+            opcode::I::ANDI => {
+                let imm = imm as i16 as u32;
+                let src = ctx.load_register(rs1);
+                let and = ctx.and(Source::Id(src), Source::Val(imm));
+
+                if let Some(rd) = rd {
+                    ctx.write_register(rd, Source::Id(and));
+                }
+
+                ctx.add_pc(Source::Val(len));
+            },
             opcode::I::LD(_) => todo!(),
             opcode::I::LDU(_) => todo!(),
         },
@@ -265,14 +321,7 @@ pub fn lower_terminal(mut ctx: Context, instr: instruction::Info) -> Vec<self::I
             let cmp = ctx.cmp(
                 Source::Id(src1),
                 Source::Id(src2),
-                match cmp_mode {
-                    opcode::Cmp::Eq => CmpKind::Eq,
-                    opcode::Cmp::Ne => CmpKind::Ne,
-                    opcode::Cmp::Lt => CmpKind::Sl,
-                    opcode::Cmp::Ltu => CmpKind::Ul,
-                    opcode::Cmp::Ge => CmpKind::Sge,
-                    opcode::Cmp::Geu => CmpKind::Uge,
-                },
+                cmp_mode.into(),
             );
 
             let current_pc = Source::Id(ctx.pc);
