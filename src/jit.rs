@@ -95,11 +95,11 @@ mod test {
         ctx.generate_basic_block(
             vec![],
             instruction::Info::new(
-                Instruction::I(instruction::I {
+                Instruction::IJump(instruction::IJump {
                     imm: 4096,
                     rd: Some(register::RiscV::X4),
                     rs1: Some(register::RiscV::X1),
-                    opcode: opcode::I::JALR,
+                    opcode: opcode::IJump::JALR,
                 }),
                 4,
                 4,

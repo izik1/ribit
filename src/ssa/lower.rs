@@ -160,82 +160,50 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
         instruction::Instruction::J(_)
         | instruction::Instruction::Sys(_)
         | instruction::Instruction::B(_)
-        | instruction::Instruction::I(instruction::I {
-            opcode: opcode::I::JALR,
-            ..
-        }) => panic!("Instruction was a terminal"),
+        | instruction::Instruction::IJump(_) => panic!("Instruction was a terminal"),
+
+        instruction::Instruction::IMem(instruction::IMem {
+            opcode,
+            imm: _imm,
+            rs1: _rs1,
+            rd: _rd,
+        }) => {
+            match opcode {
+                // todo: finer grained fences.
+                opcode::IMem::FENCE => {
+                    ctx.fence();
+                    ctx.add_pc(Source::Val(len));
+                }
+                opcode::IMem::LD(_) => todo!(),
+                opcode::IMem::LDU(_) => todo!(),
+            }
+        }
 
         instruction::Instruction::I(instruction::I {
             opcode,
             imm,
             rs1,
             rd,
-        }) => match opcode {
-            opcode::I::JALR => panic!("Instruction was a terminal"),
-            // todo: finer grained fences.
-            opcode::I::FENCE => {
-                ctx.fence();
-                ctx.add_pc(Source::Val(len));
-            },
-            opcode::I::ADDI => {
-                let imm = imm as i16 as u32;
-                let src = ctx.load_register(rs1);
+        }) => {
+            let imm = imm as i16 as u32;
+            let src = ctx.load_register(rs1);
 
-                let add = ctx.add(Source::Id(src), Source::Val(imm));
-
-                if let Some(rd) = rd {
-                    ctx.write_register(rd, Source::Id(add));
+            let res = match opcode {
+                opcode::I::ADDI => ctx.add(Source::Id(src), Source::Val(imm)),
+                opcode::I::SICond(cmp_mode) => {
+                    ctx.cmp(Source::Id(src), Source::Val(imm), cmp_mode.into())
                 }
+                opcode::I::XORI => ctx.xor(Source::Id(src), Source::Val(imm)),
+                opcode::I::ORI => ctx.or(Source::Id(src), Source::Val(imm)),
+                opcode::I::ANDI => ctx.and(Source::Id(src), Source::Val(imm)),
+            };
 
-                ctx.add_pc(Source::Val(len));
+            if let Some(rd) = rd {
+                ctx.write_register(rd, Source::Id(res));
             }
-            opcode::I::SICond(cmp_mode) => {
-                let imm = imm as i16 as u32;
-                let src = ctx.load_register(rs1);
-                let cmp = ctx.cmp(Source::Id(src), Source::Val(imm), cmp_mode.into());
 
-                if let Some(rd) = rd {
-                    ctx.write_register(rd, Source::Id(cmp));
-                }
-
-                ctx.add_pc(Source::Val(len));
-            },
-            opcode::I::XORI => {
-                let imm = imm as i16 as u32;
-                let src = ctx.load_register(rs1);
-                let and = ctx.xor(Source::Id(src), Source::Val(imm));
-
-                if let Some(rd) = rd {
-                    ctx.write_register(rd, Source::Id(and));
-                }
-
-                ctx.add_pc(Source::Val(len));
-            },
-            opcode::I::ORI => {
-                let imm = imm as i16 as u32;
-                let src = ctx.load_register(rs1);
-                let and = ctx.or(Source::Id(src), Source::Val(imm));
-
-                if let Some(rd) = rd {
-                    ctx.write_register(rd, Source::Id(and));
-                }
-
-                ctx.add_pc(Source::Val(len));
-            },
-            opcode::I::ANDI => {
-                let imm = imm as i16 as u32;
-                let src = ctx.load_register(rs1);
-                let and = ctx.and(Source::Id(src), Source::Val(imm));
-
-                if let Some(rd) = rd {
-                    ctx.write_register(rd, Source::Id(and));
-                }
-
-                ctx.add_pc(Source::Val(len));
-            },
-            opcode::I::LD(_) => todo!(),
-            opcode::I::LDU(_) => todo!(),
-        },
+            ctx.add_pc(Source::Val(len));
+        }
         instruction::Instruction::R(_) => todo!(),
         instruction::Instruction::S(_) => todo!(),
         instruction::Instruction::U(_) => todo!(),
@@ -269,8 +237,8 @@ pub fn lower_terminal(mut ctx: Context, instr: instruction::Info) -> Vec<self::I
             ctx.ret()
         }
 
-        instruction::Instruction::I(instruction::I {
-            opcode: opcode::I::JALR,
+        instruction::Instruction::IJump(instruction::IJump {
+            opcode: opcode::IJump::JALR,
             rd,
             imm,
             rs1,
@@ -318,11 +286,7 @@ pub fn lower_terminal(mut ctx: Context, instr: instruction::Info) -> Vec<self::I
             let src1 = ctx.load_register(rs1);
             let src2 = ctx.load_register(rs2);
 
-            let cmp = ctx.cmp(
-                Source::Id(src1),
-                Source::Id(src2),
-                cmp_mode.into(),
-            );
+            let cmp = ctx.cmp(Source::Id(src1), Source::Id(src2), cmp_mode.into());
 
             let current_pc = Source::Id(ctx.pc);
 

@@ -62,16 +62,24 @@ pub enum Cmp {
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum I {
-    FENCE,
     ADDI,
     SICond(Cmp),
     XORI,
     ORI,
     ANDI,
-    JALR,
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum IMem {
+    FENCE,
     LD(Width),
     // note that LDU(DWord) doesn't exist, but would be the same as LD(DWord) anyway.
     LDU(Width),
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum IJump {
+    JALR,
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]

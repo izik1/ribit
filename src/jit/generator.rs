@@ -227,10 +227,10 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
             builder.mov_eax_imm(res_pc);
         }
 
-        Instruction::I(instruction::I {
+        Instruction::IJump(instruction::IJump {
             imm,
             rd,
-            opcode: opcode::I::JALR,
+            opcode: opcode::IJump::JALR,
             rs1,
         }) => {
             if let Some(rd) = rd {
@@ -268,9 +268,11 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
                 .mov_Register64Bit_Immediate64Bit(Register64Bit::RAX, return_value.into());
         }
 
-        Instruction::I(_) | Instruction::R(_) | Instruction::S(_) | Instruction::U(_) => {
-            unreachable!("blocks can only end on a branch?")
-        }
+        Instruction::I(_)
+        | Instruction::IMem(_)
+        | Instruction::R(_)
+        | Instruction::S(_)
+        | Instruction::U(_) => unreachable!("blocks can only end on a branch?"),
 
         Instruction::B(instr) => cmp::branch_conditional(builder, instr, next_start_address),
     }
@@ -280,7 +282,6 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
 }
 
 fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::Info) {
-    let next_start_address = instruction.end_address();
     let instruction::Info {
         instruction,
         start_address,
@@ -288,17 +289,14 @@ fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::In
     } = instruction;
 
     match instruction {
-        Instruction::J(_)
-        | Instruction::B(_)
-        | Instruction::Sys(_)
-        | Instruction::I(instruction::I {
-            opcode: opcode::I::JALR,
-            ..
-        }) => unreachable!("blocks cannot contain a branch"),
+        Instruction::J(_) | Instruction::B(_) | Instruction::Sys(_) | Instruction::IJump(_) => {
+            unreachable!("blocks cannot contain a branch")
+        }
 
         Instruction::S(instruction) => generate_store_instruction(builder, instruction),
 
         Instruction::I(instruction) => generate_immediate_instruction(builder, instruction),
+        Instruction::IMem(instruction) => generate_immediate_mem_instruction(builder, instruction),
         Instruction::U(instruction::U { opcode, imm, rd }) => {
             if let Some(rd) = rd {
                 let value = match opcode {
@@ -324,6 +322,23 @@ macro_rules! unwrap_or_return {
     };
 }
 
+fn generate_immediate_mem_instruction(builder: &mut BlockBuilder, instruction: instruction::IMem) {
+    let instruction::IMem {
+        opcode,
+        imm,
+        rs1,
+        rd,
+    } = instruction;
+
+    let rd = unwrap_or_return!(rd);
+
+    match opcode {
+        opcode::IMem::FENCE => todo!("FENCE (nop on single hart system? MFENCE?)"),
+        opcode::IMem::LD(width) => memory::load_rs_imm(builder, rd, rs1, imm, width, true),
+        opcode::IMem::LDU(width) => memory::load_rs_imm(builder, rd, rs1, imm, width, false),
+    }
+}
+
 fn generate_immediate_instruction(builder: &mut BlockBuilder, instruction: instruction::I) {
     let instruction::I {
         opcode,
@@ -332,27 +347,18 @@ fn generate_immediate_instruction(builder: &mut BlockBuilder, instruction: instr
         rd,
     } = instruction;
 
-    match opcode {
-        opcode::I::FENCE => todo!("FENCE (nop on single hart system? MFENCE?)"),
-        opcode::I::ADDI => math::addi(builder, imm as i16 as u32, unwrap_or_return!(rd), rs1),
-        opcode::I::SICond(cmp_mode) => cmp::set_bool_conditional_imm(
-            builder,
-            unwrap_or_return!(rd),
-            rs1,
-            imm as i16 as u32,
-            cmp_mode,
-        ),
+    let imm = imm as i16 as u32;
+    let rd = unwrap_or_return!(rd);
 
-        opcode::I::XORI => math::xori(builder, imm as i16 as u32, unwrap_or_return!(rd), rs1),
-        opcode::I::ORI => math::ori(builder, imm as i16 as u32, unwrap_or_return!(rd), rs1),
-        opcode::I::ANDI => math::andi(builder, imm as i16 as u32, unwrap_or_return!(rd), rs1),
-        opcode::I::JALR => unreachable!("blocks cannot contain a branch"),
-        opcode::I::LD(width) => {
-            memory::load_rs_imm(builder, unwrap_or_return!(rd), rs1, imm, width, true)
+    match opcode {
+        opcode::I::ADDI => math::addi(builder, imm, rd, rs1),
+        opcode::I::SICond(cmp_mode) => {
+            cmp::set_bool_conditional_imm(builder, rd, rs1, imm, cmp_mode)
         }
-        opcode::I::LDU(width) => {
-            memory::load_rs_imm(builder, unwrap_or_return!(rd), rs1, imm, width, false)
-        }
+
+        opcode::I::XORI => math::xori(builder, imm, rd, rs1),
+        opcode::I::ORI => math::ori(builder, imm, rd, rs1),
+        opcode::I::ANDI => math::andi(builder, imm, rd, rs1),
     }
 }
 

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{register, opcode};
+use crate::{opcode, register};
 
 pub mod lower;
 

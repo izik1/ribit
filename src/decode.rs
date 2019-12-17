@@ -53,31 +53,31 @@ pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> 
         )),
 
         // todo: sign extend & set lsb to 0
-        (0b110_0111, 0b000, _) => Instruction::I(instruction::I::from_instruction(
+        (0b110_0111, 0b000, _) => Instruction::IJump(instruction::IJump::from_instruction(
             instruction,
-            opcode::I::JALR,
+            opcode::IJump::JALR,
         )),
 
         (0b110_0011, _, _) => Instruction::B(decode_branch(instruction)?),
-        (0b000_0011, 0b000, _) => Instruction::I(instruction::I::from_instruction(
+        (0b000_0011, 0b000, _) => Instruction::IMem(instruction::IMem::from_instruction(
             instruction,
-            opcode::I::LD(Width::Byte),
+            opcode::IMem::LD(Width::Byte),
         )),
-        (0b000_0011, 0b001, _) => Instruction::I(instruction::I::from_instruction(
+        (0b000_0011, 0b001, _) => Instruction::IMem(instruction::IMem::from_instruction(
             instruction,
-            opcode::I::LD(Width::Word),
+            opcode::IMem::LD(Width::Word),
         )),
-        (0b000_0011, 0b010, _) => Instruction::I(instruction::I::from_instruction(
+        (0b000_0011, 0b010, _) => Instruction::IMem(instruction::IMem::from_instruction(
             instruction,
-            opcode::I::LD(Width::DWord),
+            opcode::IMem::LD(Width::DWord),
         )),
-        (0b000_0011, 0b100, _) => Instruction::I(instruction::I::from_instruction(
+        (0b000_0011, 0b100, _) => Instruction::IMem(instruction::IMem::from_instruction(
             instruction,
-            opcode::I::LDU(Width::Byte),
+            opcode::IMem::LDU(Width::Byte),
         )),
-        (0b000_0011, 0b101, _) => Instruction::I(instruction::I::from_instruction(
+        (0b000_0011, 0b101, _) => Instruction::IMem(instruction::IMem::from_instruction(
             instruction,
-            opcode::I::LDU(Width::Word),
+            opcode::IMem::LDU(Width::Word),
         )),
         (0b010_0011, 0b000, _) => {
             Instruction::S(instruction::S::from_instruction(instruction, Width::Byte))
@@ -166,9 +166,9 @@ pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> 
             instruction,
             opcode::R::Math(opcode::RMath::AND),
         )),
-        (0b000_1111, 0b000, _) => Instruction::I(instruction::I::from_instruction(
+        (0b000_1111, 0b000, _) => Instruction::IMem(instruction::IMem::from_instruction(
             instruction,
-            opcode::I::FENCE,
+            opcode::IMem::FENCE,
         )),
         (0b111_0011, _, _) if instruction & !0b111_0011 == 0 => {
             Instruction::Sys(instruction::Sys::new(opcode::RSys::ECALL))

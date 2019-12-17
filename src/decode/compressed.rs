@@ -80,11 +80,11 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
                 | ((instruction >> 4) & 0b0100);
 
             if funct3 == 0b010 {
-                Instruction::I(instruction::I::new(
+                Instruction::IMem(instruction::IMem::new(
                     imm,
                     rs1,
                     r,
-                    opcode::I::LD(opcode::Width::DWord),
+                    opcode::IMem::LD(opcode::Width::DWord),
                 ))
             } else {
                 Instruction::S(instruction::S::new(imm, rs1, r, opcode::Width::DWord))
@@ -293,11 +293,11 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
                 ));
             }
 
-            Instruction::I(instruction::I::new(
+            Instruction::IMem(instruction::IMem::new(
                 imm,
                 Some(r),
                 Some(r),
-                opcode::I::LD(opcode::Width::DWord),
+                opcode::IMem::LD(opcode::Width::DWord),
             ))
         }
 
@@ -311,7 +311,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
                     return Err(CompressedDecodeError::InvalidInstruction(instruction))
                 }
                 (false, None, rs1) => {
-                    Instruction::I(instruction::I::new(0, rs1, None, opcode::I::JALR))
+                    Instruction::IJump(instruction::IJump::new(0, rs1, None, opcode::IJump::JALR))
                 }
                 (false, rs2, rd) => Instruction::R(instruction::R::new(
                     None,
@@ -320,11 +320,11 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
                     opcode::R::Math(opcode::RMath::ADD),
                 )),
                 (true, None, None) => Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
-                (true, None, rs1) => Instruction::I(instruction::I::new(
+                (true, None, rs1) => Instruction::IJump(instruction::IJump::new(
                     0,
                     rs1,
                     Some(RiscVRegister::X1),
-                    opcode::I::JALR,
+                    opcode::IJump::JALR,
                 )),
                 (true, rs2, r) => Instruction::R(instruction::R::new(
                     r,

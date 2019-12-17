@@ -29,6 +29,8 @@ impl Info {
 pub enum Instruction {
     R(R),
     I(I),
+    IJump(IJump),
+    IMem(IMem),
     S(S),
     B(B),
     U(U),
@@ -39,13 +41,7 @@ pub enum Instruction {
 impl Instruction {
     pub fn is_terminator(&self) -> bool {
         match self {
-            Self::J(_)
-            | Self::B(_)
-            | Self::Sys(_)
-            | Self::I(I {
-                opcode: opcode::I::JALR,
-                ..
-            }) => true,
+            Self::J(_) | Self::B(_) | Self::Sys(_) | Self::IJump(_) => true,
 
             _ => false,
         }
@@ -121,6 +117,75 @@ impl I {
     }
 
     pub(crate) fn from_instruction(instruction: u32, opcode: opcode::I) -> Self {
+        let imm = ((instruction >> 20) & 0x0fff) as u16;
+        let rs1 = decode_rs(instruction).0;
+        let rd = decode_rd(instruction);
+        Self {
+            imm,
+            rs1,
+            rd,
+            opcode,
+        }
+    }
+}
+
+pub struct IJump {
+    pub(crate) imm: u16,
+    pub(crate) rs1: Option<RiscVRegister>,
+    pub(crate) rd: Option<RiscVRegister>,
+    pub(crate) opcode: opcode::IJump,
+}
+
+impl IJump {
+    pub(crate) fn new(
+        imm: u16,
+        rs1: Option<RiscVRegister>,
+        rd: Option<RiscVRegister>,
+        opcode: opcode::IJump,
+    ) -> Self {
+        Self {
+            imm,
+            rs1,
+            rd,
+            opcode,
+        }
+    }
+
+    pub(crate) fn from_instruction(instruction: u32, opcode: opcode::IJump) -> Self {
+        let imm = ((instruction >> 20) & 0x0fff) as u16;
+        let rs1 = decode_rs(instruction).0;
+        let rd = decode_rd(instruction);
+        Self {
+            imm,
+            rs1,
+            rd,
+            opcode,
+        }
+    }
+}
+pub struct IMem {
+    pub(crate) imm: u16,
+    pub(crate) rs1: Option<RiscVRegister>,
+    pub(crate) rd: Option<RiscVRegister>,
+    pub(crate) opcode: opcode::IMem,
+}
+
+impl IMem {
+    pub(crate) fn new(
+        imm: u16,
+        rs1: Option<RiscVRegister>,
+        rd: Option<RiscVRegister>,
+        opcode: opcode::IMem,
+    ) -> Self {
+        Self {
+            imm,
+            rs1,
+            rd,
+            opcode,
+        }
+    }
+
+    pub(crate) fn from_instruction(instruction: u32, opcode: opcode::IMem) -> Self {
         let imm = ((instruction >> 20) & 0x0fff) as u16;
         let rs1 = decode_rs(instruction).0;
         let rd = decode_rd(instruction);
