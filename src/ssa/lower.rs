@@ -1,6 +1,6 @@
 use std::mem;
 
-use super::{CmpKind, Id, Instruction, InstructionId, Source};
+use super::{CmpKind, Id, Instruction, InstructionId, Source, BinOp};
 
 use crate::opcode::RMath;
 use crate::{instruction, opcode, register};
@@ -34,7 +34,8 @@ impl Context {
     pub fn add_pc(&mut self, src: Source) -> Id {
         let id = self.new_id();
 
-        self.instructions.push(Instruction::Add {
+        self.instructions.push(Instruction::BinOp {
+            op: BinOp::Add,
             dest: id,
             src1: src,
             src2: Source::Id(mem::replace(&mut self.pc, id)),
@@ -52,6 +53,10 @@ impl Context {
         let id = self.new_id();
         self.instructions.push(f(id));
         id
+    }
+
+    pub fn binop(&mut self, op: BinOp, src1: Source, src2: Source) -> Id {
+        self.instr_with_id(|dest| Instruction::BinOp { dest, src1, src2, op })
     }
 
     pub fn read_register(&mut self, reg: register::RiscV) -> Id {
@@ -88,35 +93,35 @@ impl Context {
     }
 
     pub fn or(&mut self, src1: Source, src2: Source) -> Id {
-        self.instr_with_id(|dest| Instruction::Or { dest, src1, src2 })
+        self.binop(BinOp::Or, src1, src2)
     }
 
     pub fn sll(&mut self, src1: Source, src2: Source) -> Id {
-        self.instr_with_id(|dest| Instruction::Sll { dest, src1, src2 })
+        self.binop(BinOp::Sll, src1, src2)
     }
 
     pub fn srl(&mut self, src1: Source, src2: Source) -> Id {
-        self.instr_with_id(|dest| Instruction::Srl { dest, src1, src2 })
+        self.binop(BinOp::Srl, src1, src2)
     }
 
     pub fn sra(&mut self, src1: Source, src2: Source) -> Id {
-        self.instr_with_id(|dest| Instruction::Sra { dest, src1, src2 })
+        self.binop(BinOp::Sra, src1, src2)
     }
 
     pub fn xor(&mut self, src1: Source, src2: Source) -> Id {
-        self.instr_with_id(|dest| Instruction::Xor { dest, src1, src2 })
+        self.binop(BinOp::Xor, src1, src2)
     }
 
     pub fn and(&mut self, src1: Source, src2: Source) -> Id {
-        self.instr_with_id(|dest| Instruction::And { dest, src1, src2 })
+        self.binop(BinOp::And, src1, src2)
     }
 
     pub fn add(&mut self, src1: Source, src2: Source) -> Id {
-        self.instr_with_id(|dest| Instruction::Add { dest, src1, src2 })
+        self.binop(BinOp::Add, src1, src2)
     }
 
     pub fn sub(&mut self, src1: Source, src2: Source) -> Id {
-        self.instr_with_id(|dest| Instruction::Sub { dest, src1, src2 })
+        self.binop(BinOp::Sub, src1, src2)
     }
 
     pub fn cmp(&mut self, src1: Source, src2: Source, mode: CmpKind) -> Id {

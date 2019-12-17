@@ -67,6 +67,33 @@ impl fmt::Display for Source {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum BinOp {
+    And,
+    Add,
+    Or,
+    Sll,
+    Srl,
+    Sra,
+    Sub,
+    Xor,
+}
+
+impl fmt::Display for BinOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::And => f.write_str("and"),
+            Self::Add => f.write_str("add"),
+            Self::Or => f.write_str("or"),
+            Self::Sll => f.write_str("sll"),
+            Self::Srl => f.write_str("srl"),
+            Self::Sra => f.write_str("sra"),
+            Self::Sub => f.write_str("sub"),
+            Self::Xor => f.write_str("xor"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum Instruction {
     ReadReg {
@@ -77,49 +104,15 @@ pub enum Instruction {
         dest: register::RiscV,
         src: Source,
     },
-    And {
+    BinOp {
         dest: Id,
         src1: Source,
         src2: Source,
+        op: BinOp,
     },
     LoadConst {
         dest: Id,
         src: u32,
-    },
-    Add {
-        dest: Id,
-        src1: Source,
-        src2: Source,
-    },
-    Or {
-        dest: Id,
-        src1: Source,
-        src2: Source,
-    },
-    Sll {
-        dest: Id,
-        src1: Source,
-        src2: Source,
-    },
-    Srl {
-        dest: Id,
-        src1: Source,
-        src2: Source,
-    },
-    Sra {
-        dest: Id,
-        src1: Source,
-        src2: Source,
-    },
-    Sub {
-        dest: Id,
-        src1: Source,
-        src2: Source,
-    },
-    Xor {
-        dest: Id,
-        src1: Source,
-        src2: Source,
     },
     Cmp {
         dest: Id,
@@ -148,14 +141,7 @@ impl Instruction {
             | Self::ReadReg { dest, .. }
             | Self::LoadConst { dest, .. }
             | Self::Cmp { dest, .. }
-            | Self::Sub { dest, .. }
-            | Self::Or { dest, .. }
-            | Self::Sll { dest, .. }
-            | Self::Srl { dest, .. }
-            | Self::Sra { dest, .. }
-            | Self::Xor { dest, .. }
-            | Self::And { dest, .. }
-            | Self::Add { dest, .. } => Some(*dest),
+            | Self::BinOp { dest, .. } => Some(*dest),
             Self::WriteReg { .. } | Self::Ret { .. } | Self::Fence => None,
         }
     }
@@ -167,14 +153,19 @@ impl fmt::Display for Instruction {
             Self::ReadReg { dest, src } => write!(f, "{} = x{}", dest, src.get()),
             Self::WriteReg { dest, src } => write!(f, "x{} = {}", dest.get(), src),
             Self::LoadConst { dest, src } => write!(f, "{} = {}", dest, src),
-            Self::Or { dest, src1, src2 } => write!(f, "{} = or {}, {}", dest, src1, src2),
-            Self::Sll { dest, src1, src2 } => write!(f, "{} = sll {}, {}", dest, src1, src2),
-            Self::Srl { dest, src1, src2 } => write!(f, "{} = srl {}, {}", dest, src1, src2),
-            Self::Sra { dest, src1, src2 } => write!(f, "{} = sra {}, {}", dest, src1, src2),
-            Self::Xor { dest, src1, src2 } => write!(f, "{} = xor {}, {}", dest, src1, src2),
-            Self::And { dest, src1, src2 } => write!(f, "{} = and {}, {}", dest, src1, src2),
-            Self::Add { dest, src1, src2 } => write!(f, "{} = add {}, {}", dest, src1, src2),
-            Self::Sub { dest, src1, src2 } => write!(f, "{} = sub {}, {}", dest, src1, src2),
+            Self::BinOp {
+                dest,
+                src1,
+                src2,
+                op,
+            } => write!(
+                f,
+                "{dest} = {op} {src1}, {src2}",
+                dest = dest,
+                op = op,
+                src1 = src1,
+                src2 = src2
+            ),
             Self::Cmp {
                 dest,
                 src1,
