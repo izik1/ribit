@@ -45,6 +45,9 @@ impl Context {
 
     fn new_id(&mut self) -> Id {
         let id_num = self.next_id.0;
+
+        assert!(id_num < u16::max_value());
+
         std::mem::replace(&mut self.next_id, Id(id_num + 1))
     }
 
@@ -426,15 +429,8 @@ pub fn lower_terminal(
 #[cfg(test)]
 mod test {
     use super::Context;
-    use crate::ssa::lower::lower_non_terminal;
+    use crate::ssa::{cmp_instrs, lower::lower_non_terminal};
     use crate::{instruction, opcode, register};
-
-    fn cmp_instrs(expected: &[&str], actual: &[super::Instruction]) {
-        for (idx, instr) in actual.iter().enumerate() {
-            assert_eq!(expected[idx], format!("{}", instr));
-            println!("{}", instr);
-        }
-    }
 
     #[test]
     fn jal_basic() {

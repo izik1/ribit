@@ -3,11 +3,12 @@ use std::fmt;
 use crate::{opcode, register, Width};
 
 pub mod lower;
+pub mod opt;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct InstructionId(usize);
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub struct Id(u16);
 
 impl fmt::Display for Id {
@@ -288,5 +289,13 @@ mod test {
                 src: Source::Val(0)
             }
         );
+    }
+}
+
+#[cfg(test)]
+fn cmp_instrs(expected: &[&str], actual: &[Instruction]) {
+    for (idx, instr) in actual.iter().enumerate() {
+        assert_eq!(expected[idx], format!("{}", instr));
+        println!("{}", instr);
     }
 }
