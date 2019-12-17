@@ -186,17 +186,17 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
             let imm5 = imm >> 5;
 
             match (instruction >> 10) & 0b11 {
-                0b00 if imm5 == 0 => Instruction::IShift(instruction::IShift::new(
-                    (instruction >> 2) as u8,
+                0b00 if imm5 == 0 => Instruction::I(instruction::I::new(
+                    (instruction >> 2) & 0x1f,
                     r,
                     r,
-                    opcode::IShift::SRLI,
+                    opcode::I::SRLI,
                 )),
-                0b01 if imm5 == 0 => Instruction::IShift(instruction::IShift::new(
-                    (instruction >> 2) as u8,
+                0b01 if imm5 == 0 => Instruction::I(instruction::I::new(
+                    (instruction >> 2) & 0x1f,
                     r,
                     r,
-                    opcode::IShift::SRAI,
+                    opcode::I::SRAI,
                 )),
                 0b10 => Instruction::I(instruction::I::new(imm, r, r, opcode::I::ANDI)),
                 0b11 if imm5 == 0 => match (instruction >> 5) & 0b11 {
@@ -231,15 +231,15 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
         }
 
         (0b10, 0b000) => {
-            let shamt = (instruction >> 2) as u8;
-
             if ((instruction >> 7) & 0b0010_0000) != 0 {
                 return Err(CompressedDecodeError::InvalidInstruction(instruction));
             }
 
+            let shamt = (instruction >> 2) & 0x1f;
+
             let r = decode_full_register(instruction >> 7);
 
-            Instruction::IShift(instruction::IShift::new(shamt, r, r, opcode::IShift::SLLI))
+            Instruction::I(instruction::I::new(shamt, r, r, opcode::I::SLLI))
         }
 
         // C.FLDSP requires D extension

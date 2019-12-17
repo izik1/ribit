@@ -270,7 +270,6 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
 
         Instruction::I(_)
         | Instruction::IMem(_)
-        | Instruction::IShift(_)
         | Instruction::R(_)
         | Instruction::S(_)
         | Instruction::U(_) => unreachable!("blocks can only end on a branch?"),
@@ -310,7 +309,6 @@ fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::In
         }
 
         Instruction::R(instruction) => generate_register_instruction(builder, instruction),
-        Instruction::IShift(instruction) => generate_ishift_instruction(builder, instruction),
     }
 }
 
@@ -361,6 +359,9 @@ fn generate_immediate_instruction(builder: &mut BlockBuilder, instruction: instr
         opcode::I::XORI => math::xori(builder, imm, rd, rs1),
         opcode::I::ORI => math::ori(builder, imm, rd, rs1),
         opcode::I::ANDI => math::andi(builder, imm, rd, rs1),
+        opcode::I::SLLI => math::shifti(builder, imm, rd, rs1, math::ShiftKind::LL),
+        opcode::I::SRLI => math::shifti(builder, imm, rd, rs1, math::ShiftKind::RL),
+        opcode::I::SRAI => math::shifti(builder, imm, rd, rs1, math::ShiftKind::RA),
     }
 }
 
@@ -572,45 +573,6 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
         | opcode::R::DIVU
         | opcode::R::REM
         | opcode::R::REMU => todo!("M Extension (impl required)"),
-    }
-}
-
-fn generate_ishift_instruction(builder: &mut BlockBuilder, instruction: instruction::IShift) {
-    let instruction::IShift {
-        rd,
-        shamt,
-        rs1,
-        opcode,
-    } = instruction;
-
-    // None of these instructions do anything if rd is 0
-    let rd = unwrap_or_return!(rd);
-
-    let rs = if let Some(rs) = rs1 {
-        rs
-    } else {
-        // no rs -> always 0
-        builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate));
-        return;
-    };
-
-    // high level:
-    // mov dest, src ; ommited if not needed
-    // <shift> dest, shamt
-
-    // before shifting we need to move src -> dest
-    builder.register_mov(rd, rs);
-
-    let shamt = shamt.into();
-
-    let dest = builder.ez_alloc(rd).as_asm_reg32();
-
-    match opcode {
-        // todo: figure out if lea would be better for 1 < shamt < 4.
-        // todo: use lea for shamt == 1 IFF rd != rs
-        opcode::IShift::SLLI => builder.stream.shl_Register32Bit_Immediate8Bit(dest, shamt),
-        opcode::IShift::SRLI => builder.stream.shr_Register32Bit_Immediate8Bit(dest, shamt),
-        opcode::IShift::SRAI => builder.stream.sar_Register32Bit_Immediate8Bit(dest, shamt),
     }
 }
 

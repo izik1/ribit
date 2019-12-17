@@ -53,10 +53,6 @@ pub enum I {
     XORI,
     ORI,
     ANDI,
-}
-
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum IShift {
     SLLI,
     SRLI,
     SRAI,

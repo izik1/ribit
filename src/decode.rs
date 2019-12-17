@@ -112,15 +112,18 @@ pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> 
             instruction,
             opcode::I::ANDI,
         )),
-        (0b001_0011, 0b001, 0b000_0000) => Instruction::IShift(
-            instruction::IShift::from_instruction(instruction, opcode::IShift::SLLI),
-        ),
-        (0b001_0011, 0b101, 0b000_0000) => Instruction::IShift(
-            instruction::IShift::from_instruction(instruction, opcode::IShift::SRLI),
-        ),
-        (0b001_0011, 0b101, 0b010_0000) => Instruction::IShift(
-            instruction::IShift::from_instruction(instruction, opcode::IShift::SRAI),
-        ),
+        (0b001_0011, 0b001, 0b000_0000) => Instruction::I(instruction::I::from_instruction(
+            instruction,
+            opcode::I::SLLI,
+        )),
+        (0b001_0011, 0b101, 0b000_0000) => Instruction::I(instruction::I::from_instruction(
+            instruction,
+            opcode::I::SRLI,
+        )),
+        (0b001_0011, 0b101, 0b010_0000) => Instruction::I(instruction::I::from_instruction(
+            instruction,
+            opcode::I::SRAI,
+        )),
         (0b011_0011, 0b000, 0b000_0000) => Instruction::R(instruction::R::from_instruction(
             instruction,
             opcode::R::ADD,

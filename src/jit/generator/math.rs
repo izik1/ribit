@@ -2,6 +2,12 @@ use super::{BlockBuilder, LoadProfile, Memory, StoreProfile};
 use crate::register;
 use assembler::mnemonic_parameter_types::registers::Register32Bit;
 
+pub enum ShiftKind {
+    LL,
+    RL,
+    RA,
+}
+
 // this fn is a special cookie and uses `lea`, so it doesn't compose well with `additive_mathi`
 pub fn addi(
     builder: &mut BlockBuilder,
@@ -96,5 +102,40 @@ pub fn andi(
                 .stream
                 .and_Register32Bit_Immediate32Bit(rd.as_asm_reg32(), imm.into())
         }
+    }
+}
+
+pub fn shifti(
+    builder: &mut BlockBuilder,
+    imm: u32,
+    rd: register::RiscV,
+    rs: Option<register::RiscV>,
+    kind: ShiftKind,
+) {
+    let rs = if let Some(rs) = rs {
+        rs
+    } else {
+        // no rs -> always 0
+        builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate));
+        return;
+    };
+
+    // high level:
+    // mov dest, src ; ommited if not needed
+    // <shift> dest, shamt
+
+    // before shifting we need to move src -> dest
+    builder.register_mov(rd, rs);
+
+    let shamt = ((imm as u8) & 0x1f).into();
+
+    let dest = builder.ez_alloc(rd).as_asm_reg32();
+
+    match kind {
+        // todo: figure out if lea would be better for 1 < shamt < 4.
+        // todo: use lea for shamt == 1 IFF rd != rs
+        ShiftKind::LL => builder.stream.shl_Register32Bit_Immediate8Bit(dest, shamt),
+        ShiftKind::RL => builder.stream.shr_Register32Bit_Immediate8Bit(dest, shamt),
+        ShiftKind::RA => builder.stream.sar_Register32Bit_Immediate8Bit(dest, shamt),
     }
 }

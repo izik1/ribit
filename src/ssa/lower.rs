@@ -222,6 +222,9 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
                 opcode::I::XORI => ctx.xor(Source::Id(src), Source::Val(imm)),
                 opcode::I::ORI => ctx.or(Source::Id(src), Source::Val(imm)),
                 opcode::I::ANDI => ctx.and(Source::Id(src), Source::Val(imm)),
+                opcode::I::SLLI => ctx.sll(Source::Id(src), Source::Val(imm)),
+                opcode::I::SRLI => ctx.srl(Source::Id(src), Source::Val(imm)),
+                opcode::I::SRAI => ctx.sra(Source::Id(src), Source::Val(imm)),
             };
 
             if let Some(rd) = rd {
@@ -230,6 +233,7 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
 
             ctx.add_pc(Source::Val(len));
         }
+
         instruction::Instruction::R(instruction::R {
             rs1,
             rs2,
@@ -265,7 +269,6 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
 
             ctx.add_pc(Source::Val(len));
         }
-        instruction::Instruction::IShift(_) => todo!(),
         instruction::Instruction::S(_) => todo!(),
         instruction::Instruction::U(_) => todo!(),
     }
