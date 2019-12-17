@@ -270,7 +270,22 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
             ctx.add_pc(Source::Val(len));
         }
         instruction::Instruction::S(_) => todo!(),
-        instruction::Instruction::U(_) => todo!(),
+        instruction::Instruction::U(instruction::U { opcode, imm, rd }) => {
+            // ensure that the immediate only uses the upper 20 bits.
+            let imm = imm & 0xffff_f000;
+
+            let res = match opcode {
+                opcode::U::LUI => ctx.load_const(imm),
+                opcode::U::AUIPC => ctx.add(Source::Id(ctx.pc), Source::Val(imm)),
+            };
+
+            if let Some(rd) = rd {
+                ctx.write_register(rd, Source::Id(res));
+            }
+
+            ctx.add_pc(Source::Val(len));
+            todo!()
+        }
     }
 }
 
