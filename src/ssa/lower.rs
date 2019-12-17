@@ -194,13 +194,7 @@ impl std::ops::Index<InstructionId> for Context {
     }
 }
 
-pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
-    let instruction::Info {
-        instruction,
-        start_address: _start_address,
-        len,
-    } = instr;
-
+pub fn lower_non_terminal(ctx: &mut Context, instruction: instruction::Instruction, len: u32) {
     match instruction {
         instruction::Instruction::J(_)
         | instruction::Instruction::Sys(_)
@@ -209,9 +203,9 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
 
         instruction::Instruction::IMem(instruction::IMem {
             opcode,
-            imm: imm,
-            rs1: rs1,
-            rd: rd,
+            imm,
+            rs1,
+            rd,
         }) => match opcode {
             // todo: finer grained fences.
             opcode::IMem::FENCE => ctx.fence(),
@@ -334,13 +328,11 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
     ctx.add_pc(Source::Val(len));
 }
 
-pub fn lower_terminal(mut ctx: Context, instr: instruction::Info) -> Vec<self::Instruction> {
-    let instruction::Info {
-        instruction,
-        start_address: _start_address,
-        len,
-    } = instr;
-
+pub fn lower_terminal(
+    mut ctx: Context,
+    instruction: instruction::Instruction,
+    len: u32,
+) -> Vec<self::Instruction> {
     match instruction {
         instruction::Instruction::J(instruction::J {
             opcode: opcode::J::JAL,
@@ -450,15 +442,12 @@ mod test {
 
         let instrs = super::lower_terminal(
             ctx,
-            instruction::Info::new(
-                instruction::Instruction::J(instruction::J {
-                    imm: 4096,
-                    rd: Some(register::RiscV::X4),
-                    opcode: opcode::J::JAL,
-                }),
-                0,
-                4,
-            ),
+            instruction::Instruction::J(instruction::J {
+                imm: 4096,
+                rd: Some(register::RiscV::X4),
+                opcode: opcode::J::JAL,
+            }),
+            4,
         );
 
         cmp_instrs(
@@ -479,11 +468,8 @@ mod test {
 
         let instrs = super::lower_terminal(
             ctx,
-            instruction::Info::new(
-                instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
-                0,
-                4,
-            ),
+            instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
+            4,
         );
 
         cmp_instrs(&["%0 = 0", "%1 = add 4, %0", "ret 1, %1"], &instrs);
@@ -494,20 +480,14 @@ mod test {
         let mut ctx = Context::new(0);
         lower_non_terminal(
             &mut ctx,
-            instruction::Info::new(
-                instruction::Instruction::I(instruction::I::new(0, None, None, opcode::I::ADDI)),
-                0,
-                4,
-            ),
+            instruction::Instruction::I(instruction::I::new(0, None, None, opcode::I::ADDI)),
+            4,
         );
 
         let instrs = super::lower_terminal(
             ctx,
-            instruction::Info::new(
-                instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
-                4,
-                4,
-            ),
+            instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
+            4,
         );
 
         cmp_instrs(
@@ -528,25 +508,19 @@ mod test {
         let mut ctx = Context::new(0);
         lower_non_terminal(
             &mut ctx,
-            instruction::Info::new(
-                instruction::Instruction::I(instruction::I::new(
-                    50,
-                    Some(register::RiscV::X1),
-                    None,
-                    opcode::I::ADDI,
-                )),
-                0,
-                4,
-            ),
+            instruction::Instruction::I(instruction::I::new(
+                50,
+                Some(register::RiscV::X1),
+                None,
+                opcode::I::ADDI,
+            )),
+            4,
         );
 
         let instrs = super::lower_terminal(
             ctx,
-            instruction::Info::new(
-                instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
-                4,
-                4,
-            ),
+            instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
+            4,
         );
 
         cmp_instrs(
@@ -567,25 +541,19 @@ mod test {
         let mut ctx = Context::new(0);
         lower_non_terminal(
             &mut ctx,
-            instruction::Info::new(
-                instruction::Instruction::I(instruction::I::new(
-                    50,
-                    None,
-                    Some(register::RiscV::X2),
-                    opcode::I::ADDI,
-                )),
-                0,
-                4,
-            ),
+            instruction::Instruction::I(instruction::I::new(
+                50,
+                None,
+                Some(register::RiscV::X2),
+                opcode::I::ADDI,
+            )),
+            4,
         );
 
         let instrs = super::lower_terminal(
             ctx,
-            instruction::Info::new(
-                instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
-                4,
-                4,
-            ),
+            instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
+            4,
         );
 
         cmp_instrs(

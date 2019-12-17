@@ -173,8 +173,8 @@ impl fmt::Display for Instruction {
                 false => write!(f, "{} = {} mem[{}]", dest, width, src),
             },
 
-            Self::WriteReg { addr, src } => write!(f, "x{} = {}", dest.get(), src),
-            Self::WriteMem { dest, src, width } => write!(f, "mem[{}] = {} {}", dest, width, src),
+            Self::WriteReg { dest, src } => write!(f, "x{} = {}", dest.get(), src),
+            Self::WriteMem { addr, src, width } => write!(f, "mem[{}] = {} {}", addr, width, src),
             Self::LoadConst { dest, src } => write!(f, "{} = {}", dest, src),
             Self::BinOp {
                 dest,
