@@ -9,22 +9,8 @@ pub enum Width {
     DWord,
 }
 
-//todo: split
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum R {
-    Shift(RShift),
-    Math(RMath),
-}
-
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum RShift {
-    SLLI,
-    SRLI,
-    SRAI,
-}
-
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum RMath {
     ADD,
     SUB,
     SLL,
@@ -67,6 +53,13 @@ pub enum I {
     XORI,
     ORI,
     ANDI,
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum IShift {
+    SLLI,
+    SRLI,
+    SRAI,
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]

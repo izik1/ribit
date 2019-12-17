@@ -31,6 +31,7 @@ pub enum Instruction {
     I(I),
     IJump(IJump),
     IMem(IMem),
+    IShift(IShift),
     S(S),
     B(B),
     U(U),
@@ -129,6 +130,41 @@ impl I {
     }
 }
 
+pub struct IShift {
+    pub(crate) shamt: u8,
+    pub(crate) rs1: Option<RiscVRegister>,
+    pub(crate) rd: Option<RiscVRegister>,
+    pub(crate) opcode: opcode::IShift,
+}
+
+impl IShift {
+    pub(crate) fn new(
+        shamt: u8,
+        rs1: Option<RiscVRegister>,
+        rd: Option<RiscVRegister>,
+        opcode: opcode::IShift,
+    ) -> Self {
+        Self {
+            shamt,
+            rs1,
+            rd,
+            opcode,
+        }
+    }
+
+    pub(crate) fn from_instruction(instruction: u32, opcode: opcode::IShift) -> Self {
+        let shamt = ((instruction >> 20) & 0x0fff) as u8 & 0x1f;
+        let rs1 = decode_rs(instruction).0;
+        let rd = decode_rd(instruction);
+        Self {
+            shamt,
+            rs1,
+            rd,
+            opcode,
+        }
+    }
+}
+
 pub struct IJump {
     pub(crate) imm: u16,
     pub(crate) rs1: Option<RiscVRegister>,
@@ -163,6 +199,7 @@ impl IJump {
         }
     }
 }
+
 pub struct IMem {
     pub(crate) imm: u16,
     pub(crate) rs1: Option<RiscVRegister>,

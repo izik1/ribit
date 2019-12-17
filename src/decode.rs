@@ -112,59 +112,55 @@ pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> 
             instruction,
             opcode::I::ANDI,
         )),
-        (0b001_0011, 0b001, 0b000_0000) => Instruction::R(instruction::R::from_instruction(
-            instruction,
-            opcode::R::Shift(opcode::RShift::SLLI),
-        )),
-        (0b001_0011, 0b101, 0b000_0000) => Instruction::R(instruction::R::from_instruction(
-            instruction,
-            opcode::R::Shift(opcode::RShift::SRLI),
-        )),
-        (0b001_0011, 0b101, 0b010_0000) => Instruction::R(instruction::R::from_instruction(
-            instruction,
-            opcode::R::Shift(opcode::RShift::SRAI),
-        )),
+        (0b001_0011, 0b001, 0b000_0000) => Instruction::IShift(
+            instruction::IShift::from_instruction(instruction, opcode::IShift::SLLI),
+        ),
+        (0b001_0011, 0b101, 0b000_0000) => Instruction::IShift(
+            instruction::IShift::from_instruction(instruction, opcode::IShift::SRLI),
+        ),
+        (0b001_0011, 0b101, 0b010_0000) => Instruction::IShift(
+            instruction::IShift::from_instruction(instruction, opcode::IShift::SRAI),
+        ),
         (0b011_0011, 0b000, 0b000_0000) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::ADD),
+            opcode::R::ADD,
         )),
         (0b011_0011, 0b000, 0b010_0000) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::SUB),
+            opcode::R::SUB,
         )),
         (0b011_0011, 0b001, 0b000_0000) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::SLL),
+            opcode::R::SLL,
         )),
         (0b011_0011, 0b010, 0b000_0000) => Instruction::R(instruction::R::from_instruction(
             instruction,
             // SLT
-            opcode::R::Math(opcode::RMath::SCond(opcode::Cmp::Lt)),
+            opcode::R::SCond(opcode::Cmp::Lt),
         )),
         (0b011_0011, 0b011, 0b000_0000) => Instruction::R(instruction::R::from_instruction(
             instruction,
             // SLTU
-            opcode::R::Math(opcode::RMath::SCond(opcode::Cmp::Ltu)),
+            opcode::R::SCond(opcode::Cmp::Ltu),
         )),
         (0b011_0011, 0b100, 0b000_0000) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::XOR),
+            opcode::R::XOR,
         )),
         (0b011_0011, 0b101, 0b000_0000) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::SRL),
+            opcode::R::SRL,
         )),
         (0b011_0011, 0b101, 0b010_0000) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::SRA),
+            opcode::R::SRA,
         )),
-        (0b011_0011, 0b110, 0b000_0000) => Instruction::R(instruction::R::from_instruction(
-            instruction,
-            opcode::R::Math(opcode::RMath::OR),
-        )),
+        (0b011_0011, 0b110, 0b000_0000) => {
+            Instruction::R(instruction::R::from_instruction(instruction, opcode::R::OR))
+        }
         (0b011_0011, 0b111, 0b000_0000) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::AND),
+            opcode::R::AND,
         )),
         (0b000_1111, 0b000, _) => Instruction::IMem(instruction::IMem::from_instruction(
             instruction,
@@ -178,35 +174,35 @@ pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> 
         }
         (0b011_0011, 0b000, _) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::MUL),
+            opcode::R::MUL,
         )),
         (0b011_0011, 0b001, _) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::MULH),
+            opcode::R::MULH,
         )),
         (0b011_0011, 0b010, _) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::MULHSU),
+            opcode::R::MULHSU,
         )),
         (0b011_0011, 0b011, _) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::MULHU),
+            opcode::R::MULHU,
         )),
         (0b011_0011, 0b100, _) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::DIV),
+            opcode::R::DIV,
         )),
         (0b011_0011, 0b101, _) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::DIVU),
+            opcode::R::DIVU,
         )),
         (0b011_0011, 0b110, _) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::REM),
+            opcode::R::REM,
         )),
         (0b011_0011, 0b111, _) => Instruction::R(instruction::R::from_instruction(
             instruction,
-            opcode::R::Math(opcode::RMath::REMU),
+            opcode::R::REMU,
         )),
         _ => return Err(DecodeError::InvalidInstruction(instruction)),
     };

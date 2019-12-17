@@ -186,44 +186,24 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
             let imm5 = imm >> 5;
 
             match (instruction >> 10) & 0b11 {
-                0b00 if imm5 == 0 => Instruction::R(instruction::R::new(
+                0b00 if imm5 == 0 => Instruction::IShift(instruction::IShift::new(
+                    (instruction >> 2) as u8,
                     r,
-                    rs2,
                     r,
-                    opcode::R::Shift(opcode::RShift::SRLI),
+                    opcode::IShift::SRLI,
                 )),
-                0b01 if imm5 == 0 => Instruction::R(instruction::R::new(
+                0b01 if imm5 == 0 => Instruction::IShift(instruction::IShift::new(
+                    (instruction >> 2) as u8,
                     r,
-                    rs2,
                     r,
-                    opcode::R::Shift(opcode::RShift::SRAI),
+                    opcode::IShift::SRAI,
                 )),
                 0b10 => Instruction::I(instruction::I::new(imm, r, r, opcode::I::ANDI)),
                 0b11 if imm5 == 0 => match (instruction >> 5) & 0b11 {
-                    0b00 => Instruction::R(instruction::R::new(
-                        r,
-                        rs2,
-                        r,
-                        opcode::R::Math(opcode::RMath::SUB),
-                    )),
-                    0b01 => Instruction::R(instruction::R::new(
-                        r,
-                        rs2,
-                        r,
-                        opcode::R::Math(opcode::RMath::XOR),
-                    )),
-                    0b10 => Instruction::R(instruction::R::new(
-                        r,
-                        rs2,
-                        r,
-                        opcode::R::Math(opcode::RMath::OR),
-                    )),
-                    0b11 => Instruction::R(instruction::R::new(
-                        r,
-                        rs2,
-                        r,
-                        opcode::R::Math(opcode::RMath::AND),
-                    )),
+                    0b00 => Instruction::R(instruction::R::new(r, rs2, r, opcode::R::SUB)),
+                    0b01 => Instruction::R(instruction::R::new(r, rs2, r, opcode::R::XOR)),
+                    0b10 => Instruction::R(instruction::R::new(r, rs2, r, opcode::R::OR)),
+                    0b11 => Instruction::R(instruction::R::new(r, rs2, r, opcode::R::AND)),
                     _ => unreachable!(),
                 },
                 _ => return Err(CompressedDecodeError::InvalidInstruction(instruction)),
@@ -251,8 +231,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
         }
 
         (0b10, 0b000) => {
-            // shamt is encoded as rs2
-            let rs2 = decode_full_register(instruction >> 2);
+            let shamt = (instruction >> 2) as u8;
 
             if ((instruction >> 7) & 0b0010_0000) != 0 {
                 return Err(CompressedDecodeError::InvalidInstruction(instruction));
@@ -260,12 +239,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
 
             let r = decode_full_register(instruction >> 7);
 
-            Instruction::R(instruction::R::new(
-                r,
-                rs2,
-                r,
-                opcode::R::Shift(opcode::RShift::SLLI),
-            ))
+            Instruction::IShift(instruction::IShift::new(shamt, r, r, opcode::IShift::SLLI))
         }
 
         // C.FLDSP requires D extension
@@ -313,12 +287,9 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
                 (false, None, rs1) => {
                     Instruction::IJump(instruction::IJump::new(0, rs1, None, opcode::IJump::JALR))
                 }
-                (false, rs2, rd) => Instruction::R(instruction::R::new(
-                    None,
-                    rs2,
-                    rd,
-                    opcode::R::Math(opcode::RMath::ADD),
-                )),
+                (false, rs2, rd) => {
+                    Instruction::R(instruction::R::new(None, rs2, rd, opcode::R::ADD))
+                }
                 (true, None, None) => Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
                 (true, None, rs1) => Instruction::IJump(instruction::IJump::new(
                     0,
@@ -326,12 +297,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
                     Some(RiscVRegister::X1),
                     opcode::IJump::JALR,
                 )),
-                (true, rs2, r) => Instruction::R(instruction::R::new(
-                    r,
-                    rs2,
-                    r,
-                    opcode::R::Math(opcode::RMath::ADD),
-                )),
+                (true, rs2, r) => Instruction::R(instruction::R::new(r, rs2, r, opcode::R::ADD)),
             }
         }
 

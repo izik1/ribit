@@ -1,8 +1,7 @@
 use std::mem;
 
-use super::{CmpKind, Id, Instruction, InstructionId, Source, BinOp};
+use super::{BinOp, CmpKind, Id, Instruction, InstructionId, Source};
 
-use crate::opcode::RMath;
 use crate::{instruction, opcode, register};
 
 pub struct Context {
@@ -56,7 +55,12 @@ impl Context {
     }
 
     pub fn binop(&mut self, op: BinOp, src1: Source, src2: Source) -> Id {
-        self.instr_with_id(|dest| Instruction::BinOp { dest, src1, src2, op })
+        self.instr_with_id(|dest| Instruction::BinOp {
+            dest,
+            src1,
+            src2,
+            op,
+        })
     }
 
     pub fn read_register(&mut self, reg: register::RiscV) -> Id {
@@ -236,26 +240,23 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
             let src2 = ctx.load_register(rs2);
 
             let res = match opcode {
-                opcode::R::Math(opcode) => match opcode {
-                    RMath::ADD => ctx.add(Source::Id(src1), Source::Id(src2)),
-                    RMath::SUB => ctx.sub(Source::Id(src1), Source::Id(src2)),
-                    RMath::SLL => ctx.sll(Source::Id(src1), Source::Id(src2)),
-                    RMath::SCond(cmp) => ctx.cmp(Source::Id(src1), Source::Id(src2), cmp.into()),
-                    RMath::XOR => ctx.xor(Source::Id(src1), Source::Id(src2)),
-                    RMath::SRL => ctx.srl(Source::Id(src1), Source::Id(src2)),
-                    RMath::SRA => ctx.sra(Source::Id(src1), Source::Id(src2)),
-                    RMath::OR => ctx.or(Source::Id(src1), Source::Id(src2)),
-                    RMath::AND => ctx.and(Source::Id(src1), Source::Id(src2)),
-                    RMath::MUL => todo!(),
-                    RMath::MULH => todo!(),
-                    RMath::MULHSU => todo!(),
-                    RMath::MULHU => todo!(),
-                    RMath::DIV => todo!(),
-                    RMath::DIVU => todo!(),
-                    RMath::REM => todo!(),
-                    RMath::REMU => todo!(),
-                },
-                opcode::R::Shift(_) => todo!(),
+                opcode::R::ADD => ctx.add(Source::Id(src1), Source::Id(src2)),
+                opcode::R::SUB => ctx.sub(Source::Id(src1), Source::Id(src2)),
+                opcode::R::SLL => ctx.sll(Source::Id(src1), Source::Id(src2)),
+                opcode::R::SCond(cmp) => ctx.cmp(Source::Id(src1), Source::Id(src2), cmp.into()),
+                opcode::R::XOR => ctx.xor(Source::Id(src1), Source::Id(src2)),
+                opcode::R::SRL => ctx.srl(Source::Id(src1), Source::Id(src2)),
+                opcode::R::SRA => ctx.sra(Source::Id(src1), Source::Id(src2)),
+                opcode::R::OR => ctx.or(Source::Id(src1), Source::Id(src2)),
+                opcode::R::AND => ctx.and(Source::Id(src1), Source::Id(src2)),
+                opcode::R::MUL => todo!(),
+                opcode::R::MULH => todo!(),
+                opcode::R::MULHSU => todo!(),
+                opcode::R::MULHU => todo!(),
+                opcode::R::DIV => todo!(),
+                opcode::R::DIVU => todo!(),
+                opcode::R::REM => todo!(),
+                opcode::R::REMU => todo!(),
             };
 
             if let Some(rd) = rd {
@@ -264,6 +265,7 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
 
             ctx.add_pc(Source::Val(len));
         }
+        instruction::Instruction::IShift(_) => todo!(),
         instruction::Instruction::S(_) => todo!(),
         instruction::Instruction::U(_) => todo!(),
     }
@@ -371,7 +373,6 @@ mod test {
     use super::Context;
     use crate::ssa::lower::lower_non_terminal;
     use crate::{instruction, opcode, register};
-    use itertools::FoldWhile::Continue;
 
     fn cmp_instrs(expected: &[&str], actual: &[super::Instruction]) {
         for (idx, instr) in actual.iter().enumerate() {

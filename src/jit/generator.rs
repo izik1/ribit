@@ -270,6 +270,7 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
 
         Instruction::I(_)
         | Instruction::IMem(_)
+        | Instruction::IShift(_)
         | Instruction::R(_)
         | Instruction::S(_)
         | Instruction::U(_) => unreachable!("blocks can only end on a branch?"),
@@ -309,6 +310,7 @@ fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::In
         }
 
         Instruction::R(instruction) => generate_register_instruction(builder, instruction),
+        Instruction::IShift(instruction) => generate_ishift_instruction(builder, instruction),
     }
 }
 
@@ -373,19 +375,6 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
     // None of these instructions do anything if RD is 0
     let rd = unwrap_or_return!(rd);
 
-    match opcode {
-        opcode::R::Shift(opcode) => generate_rshift_instruction(builder, rd, rs2, rs1, opcode),
-        opcode::R::Math(opcode) => generate_rmath_instruction(builder, rd, rs2, rs1, opcode),
-    }
-}
-
-fn generate_rmath_instruction(
-    builder: &mut BlockBuilder,
-    rd: register::RiscV,
-    rs2: Option<register::RiscV>,
-    rs1: Option<register::RiscV>,
-    opcode: opcode::RMath,
-) {
     // a list of identities (a op 0 == ?)
     // S<cc>: depends on CC
     // ADD: additive
@@ -399,11 +388,9 @@ fn generate_rmath_instruction(
 
     match opcode {
         // rd = if cmp(rs1, rs2) {1} else {0}
-        opcode::RMath::SCond(cmp_mode) => {
-            cmp::set_bool_conditional(builder, rd, rs1, rs2, cmp_mode)
-        }
+        opcode::R::SCond(cmp_mode) => cmp::set_bool_conditional(builder, rd, rs1, rs2, cmp_mode),
 
-        opcode::RMath::ADD => match (rs1, rs2) {
+        opcode::R::ADD => match (rs1, rs2) {
             (None, None) => builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate)),
             (Some(rs), None) | (None, Some(rs)) => builder.register_mov(rd, rs),
             (Some(rs1), Some(rs2)) => {
@@ -416,7 +403,7 @@ fn generate_rmath_instruction(
             }
         },
 
-        opcode::RMath::AND => match (rs1, rs2) {
+        opcode::R::AND => match (rs1, rs2) {
             // todo: opt: avoid:
             // mov eax, rs2
             // and eax, rs1
@@ -439,7 +426,7 @@ fn generate_rmath_instruction(
             _ => builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate)),
         },
 
-        opcode::RMath::OR => match (rs1, rs2) {
+        opcode::R::OR => match (rs1, rs2) {
             // todo: opt: avoid:
             // mov eax, rs2
             // or eax, rs1
@@ -463,7 +450,7 @@ fn generate_rmath_instruction(
             }
         },
 
-        opcode::RMath::XOR => match (rs1, rs2) {
+        opcode::R::XOR => match (rs1, rs2) {
             // todo: opt: avoid:
             // mov eax, rs2
             // xor eax, rs1
@@ -487,7 +474,7 @@ fn generate_rmath_instruction(
             }
         },
 
-        opcode::RMath::SLL => match (rs1, rs2) {
+        opcode::R::SLL => match (rs1, rs2) {
             // todo: opt: avoid:
             // mov eax, rs2
             // shl eax, rs1
@@ -509,7 +496,7 @@ fn generate_rmath_instruction(
             }
         },
 
-        opcode::RMath::SRL => match (rs1, rs2) {
+        opcode::R::SRL => match (rs1, rs2) {
             // todo: opt: avoid:
             // mov eax, rs2
             // shr eax, rs1
@@ -531,7 +518,7 @@ fn generate_rmath_instruction(
             }
         },
 
-        opcode::RMath::SUB => match (rs1, rs2) {
+        opcode::R::SUB => match (rs1, rs2) {
             // todo: opt: avoid:
             // mov eax, rs2
             // sub eax, rs1
@@ -555,7 +542,7 @@ fn generate_rmath_instruction(
             }
         },
 
-        opcode::RMath::SRA => match (rs1, rs2) {
+        opcode::R::SRA => match (rs1, rs2) {
             // todo: opt: avoid:
             // mov eax, rs2
             // sar eax, rs1
@@ -577,24 +564,28 @@ fn generate_rmath_instruction(
             }
         },
 
-        opcode::RMath::MUL
-        | opcode::RMath::MULH
-        | opcode::RMath::MULHSU
-        | opcode::RMath::MULHU
-        | opcode::RMath::DIV
-        | opcode::RMath::DIVU
-        | opcode::RMath::REM
-        | opcode::RMath::REMU => todo!("M Extension (impl required)"),
+        opcode::R::MUL
+        | opcode::R::MULH
+        | opcode::R::MULHSU
+        | opcode::R::MULHU
+        | opcode::R::DIV
+        | opcode::R::DIVU
+        | opcode::R::REM
+        | opcode::R::REMU => todo!("M Extension (impl required)"),
     }
 }
 
-fn generate_rshift_instruction(
-    builder: &mut BlockBuilder,
-    rd: register::RiscV,
-    rs2: Option<register::RiscV>,
-    rs1: Option<register::RiscV>,
-    opcode: opcode::RShift,
-) {
+fn generate_ishift_instruction(builder: &mut BlockBuilder, instruction: instruction::IShift) {
+    let instruction::IShift {
+        rd,
+        shamt,
+        rs1,
+        opcode,
+    } = instruction;
+
+    // None of these instructions do anything if rd is 0
+    let rd = unwrap_or_return!(rd);
+
     let rs = if let Some(rs) = rs1 {
         rs
     } else {
@@ -610,16 +601,16 @@ fn generate_rshift_instruction(
     // before shifting we need to move src -> dest
     builder.register_mov(rd, rs);
 
-    let shamt = unwrap_or_return!(rs2).get().into();
+    let shamt = shamt.into();
 
     let dest = builder.ez_alloc(rd).as_asm_reg32();
 
     match opcode {
         // todo: figure out if lea would be better for 1 < shamt < 4.
         // todo: use lea for shamt == 1 IFF rd != rs
-        opcode::RShift::SLLI => builder.stream.shl_Register32Bit_Immediate8Bit(dest, shamt),
-        opcode::RShift::SRLI => builder.stream.shr_Register32Bit_Immediate8Bit(dest, shamt),
-        opcode::RShift::SRAI => builder.stream.sar_Register32Bit_Immediate8Bit(dest, shamt),
+        opcode::IShift::SLLI => builder.stream.shl_Register32Bit_Immediate8Bit(dest, shamt),
+        opcode::IShift::SRLI => builder.stream.shr_Register32Bit_Immediate8Bit(dest, shamt),
+        opcode::IShift::SRAI => builder.stream.sar_Register32Bit_Immediate8Bit(dest, shamt),
     }
 }
 
