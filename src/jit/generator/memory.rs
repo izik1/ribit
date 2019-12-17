@@ -1,6 +1,6 @@
 use super::BlockBuilder;
-use crate::opcode::Width;
 use crate::register;
+use crate::Width;
 
 use assembler::mnemonic_parameter_types::memory::{
     Any16BitMemory, Any32BitMemory, Any8BitMemory, Memory as AssemblerMemory,

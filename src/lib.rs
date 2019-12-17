@@ -9,12 +9,32 @@
 #[macro_use]
 extern crate static_assertions;
 
+use std::fmt;
+
 pub mod decode;
 pub mod instruction;
 pub mod jit;
 pub mod opcode;
 pub mod register;
 pub mod ssa;
+
+// note: RISC-V would have these be: B, H(W), W
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum Width {
+    Byte,
+    Word,
+    DWord,
+}
+
+impl fmt::Display for Width {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Byte => f.write_str("byte"),
+            Self::Word => f.write_str("word"),
+            Self::DWord => f.write_str("dword"),
+        }
+    }
+}
 
 #[repr(u32)]
 enum ReturnCode {

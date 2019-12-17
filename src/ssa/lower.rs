@@ -2,7 +2,7 @@ use std::mem;
 
 use super::{BinOp, CmpKind, Id, Instruction, InstructionId, Source};
 
-use crate::{instruction, opcode, register};
+use crate::{instruction, opcode, register, Width};
 
 pub struct Context {
     next_id: Id,
@@ -80,10 +80,29 @@ impl Context {
         }
     }
 
+    pub fn read_memory(&mut self, src: Source, width: Width, sign_extend: bool) -> Id {
+        self.instr_with_id(|dest| Instruction::ReadMem {
+            dest,
+            src,
+            width,
+            sign_extend,
+        })
+    }
+
     pub fn write_register(&mut self, reg: register::RiscV, val: Source) -> InstructionId {
         self.instructions.push(Instruction::WriteReg {
             dest: reg,
             src: val,
+        });
+
+        InstructionId(self.instructions.len() - 1)
+    }
+
+    pub fn write_memory(&mut self, addr: Source, val: Source, width: Width) -> InstructionId {
+        self.instructions.push(Instruction::WriteMem {
+            addr,
+            src: val,
+            width,
         });
 
         InstructionId(self.instructions.len() - 1)
@@ -190,20 +209,38 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
 
         instruction::Instruction::IMem(instruction::IMem {
             opcode,
-            imm: _imm,
-            rs1: _rs1,
-            rd: _rd,
-        }) => {
-            match opcode {
-                // todo: finer grained fences.
-                opcode::IMem::FENCE => {
-                    ctx.fence();
-                    ctx.add_pc(Source::Val(len));
+            imm: imm,
+            rs1: rs1,
+            rd: rd,
+        }) => match opcode {
+            // todo: finer grained fences.
+            opcode::IMem::FENCE => ctx.fence(),
+            opcode::IMem::LD(width) => {
+                let imm = imm as i16 as u32;
+
+                let src = ctx.load_register(rs1);
+                let offset = ctx.add(Source::Id(src), Source::Val(imm));
+
+                let mem = ctx.read_memory(Source::Id(src), width, true);
+
+                if let Some(rd) = rd {
+                    ctx.write_register(rd, Source::Id(mem));
                 }
-                opcode::IMem::LD(_) => todo!(),
-                opcode::IMem::LDU(_) => todo!(),
             }
-        }
+            // todo: deduplicate with previous
+            opcode::IMem::LDU(width) => {
+                let imm = imm as i16 as u32;
+
+                let src = ctx.load_register(rs1);
+                let offset = ctx.add(Source::Id(src), Source::Val(imm));
+
+                let mem = ctx.read_memory(Source::Id(src), width, false);
+
+                if let Some(rd) = rd {
+                    ctx.write_register(rd, Source::Id(mem));
+                }
+            }
+        },
 
         instruction::Instruction::I(instruction::I {
             opcode,
@@ -216,22 +253,20 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
 
             let res = match opcode {
                 opcode::I::ADDI => ctx.add(Source::Id(src), Source::Val(imm)),
-                opcode::I::SICond(cmp_mode) => {
-                    ctx.cmp(Source::Id(src), Source::Val(imm), cmp_mode.into())
-                }
                 opcode::I::XORI => ctx.xor(Source::Id(src), Source::Val(imm)),
-                opcode::I::ORI => ctx.or(Source::Id(src), Source::Val(imm)),
                 opcode::I::ANDI => ctx.and(Source::Id(src), Source::Val(imm)),
                 opcode::I::SLLI => ctx.sll(Source::Id(src), Source::Val(imm)),
                 opcode::I::SRLI => ctx.srl(Source::Id(src), Source::Val(imm)),
                 opcode::I::SRAI => ctx.sra(Source::Id(src), Source::Val(imm)),
+                opcode::I::ORI => ctx.or(Source::Id(src), Source::Val(imm)),
+                opcode::I::SICond(cmp_mode) => {
+                    ctx.cmp(Source::Id(src), Source::Val(imm), cmp_mode.into())
+                }
             };
 
             if let Some(rd) = rd {
                 ctx.write_register(rd, Source::Id(res));
             }
-
-            ctx.add_pc(Source::Val(len));
         }
 
         instruction::Instruction::R(instruction::R {
@@ -266,10 +301,21 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
             if let Some(rd) = rd {
                 ctx.write_register(rd, Source::Id(res));
             }
-
-            ctx.add_pc(Source::Val(len));
         }
-        instruction::Instruction::S(_) => todo!(),
+        instruction::Instruction::S(instruction::S {
+            width,
+            rs1,
+            rs2,
+            imm,
+        }) => {
+            let imm = imm as i16 as u32;
+
+            let src1 = ctx.load_register(rs1);
+            let addr = ctx.add(Source::Id(src1), Source::Val(imm));
+
+            let src2 = ctx.load_register(rs2);
+            ctx.write_memory(Source::Id(addr), Source::Id(src2), width);
+        }
         instruction::Instruction::U(instruction::U { opcode, imm, rd }) => {
             // ensure that the immediate only uses the upper 20 bits.
             let imm = imm & 0xffff_f000;
@@ -282,11 +328,10 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
             if let Some(rd) = rd {
                 ctx.write_register(rd, Source::Id(res));
             }
-
-            ctx.add_pc(Source::Val(len));
-            todo!()
         }
     }
+
+    ctx.add_pc(Source::Val(len));
 }
 
 pub fn lower_terminal(mut ctx: Context, instr: instruction::Info) -> Vec<self::Instruction> {

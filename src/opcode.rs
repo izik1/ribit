@@ -1,13 +1,7 @@
 // these opcode names are _exact_, and naming rules don't apply to them
 #![allow(clippy::pub_enum_variant_names)]
 
-// note: RISC-V would have these be: B, H(W), W
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum Width {
-    Byte,
-    Word,
-    DWord,
-}
+use crate::Width;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum R {

@@ -1,7 +1,7 @@
 use crate::decode::{decode_rd, decode_rs, sign_extend};
 
-use crate::opcode;
 use crate::register::RiscV as RiscVRegister;
+use crate::{opcode, Width};
 
 // todo: decide on visibility of fields
 
@@ -203,7 +203,7 @@ pub struct S {
     pub(crate) imm: u16,
     pub(crate) rs1: Option<RiscVRegister>,
     pub(crate) rs2: Option<RiscVRegister>,
-    pub(crate) width: opcode::Width,
+    pub(crate) width: Width,
 }
 
 impl S {
@@ -211,7 +211,7 @@ impl S {
         imm: u16,
         rs1: Option<RiscVRegister>,
         rs2: Option<RiscVRegister>,
-        width: opcode::Width,
+        width: Width,
     ) -> Self {
         Self {
             imm,
@@ -221,7 +221,7 @@ impl S {
         }
     }
 
-    pub(crate) fn from_instruction(instruction: u32, width: opcode::Width) -> Self {
+    pub(crate) fn from_instruction(instruction: u32, width: Width) -> Self {
         let (rs1, rs2) = decode_rs(instruction);
 
         let imm = (((instruction >> 19) & 0b0000_1111_1110_0000)

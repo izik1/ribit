@@ -1,14 +1,10 @@
-pub mod compressed;
-
-use crate::DecodeError;
-
 use std::num::NonZeroU8;
 
+pub mod compressed;
+
 use crate::instruction::{self, Instruction};
-
-use crate::register;
-
-use crate::opcode::{self, Width};
+use crate::{opcode, register};
+use crate::{DecodeError, Width};
 
 #[inline]
 fn decode_register(instruction: u32) -> Option<register::RiscV> {

@@ -1,6 +1,6 @@
 use crate::{
     instruction::{self, Instruction},
-    opcode, CompressedDecodeError, Extension,
+    opcode, CompressedDecodeError, Extension, Width,
 };
 
 use crate::register::RiscV as RiscVRegister;
@@ -84,10 +84,10 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
                     imm,
                     rs1,
                     r,
-                    opcode::IMem::LD(opcode::Width::DWord),
+                    opcode::IMem::LD(Width::DWord),
                 ))
             } else {
-                Instruction::S(instruction::S::new(imm, rs1, r, opcode::Width::DWord))
+                Instruction::S(instruction::S::new(imm, rs1, r, Width::DWord))
             }
         }
 
@@ -271,7 +271,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
                 imm,
                 Some(r),
                 Some(r),
-                opcode::IMem::LD(opcode::Width::DWord),
+                opcode::IMem::LD(Width::DWord),
             ))
         }
 
@@ -319,7 +319,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
                 imm,
                 Some(RiscVRegister::X2),
                 rs2,
-                opcode::Width::DWord,
+                Width::DWord,
             ))
         }
 

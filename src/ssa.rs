@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{opcode, register};
+use crate::{opcode, register, Width};
 
 pub mod lower;
 
@@ -104,6 +104,17 @@ pub enum Instruction {
         dest: register::RiscV,
         src: Source,
     },
+    ReadMem {
+        dest: Id,
+        src: Source,
+        width: Width,
+        sign_extend: bool,
+    },
+    WriteMem {
+        addr: Source,
+        src: Source,
+        width: Width,
+    },
     BinOp {
         dest: Id,
         src1: Source,
@@ -139,10 +150,11 @@ impl Instruction {
         match self {
             Self::Select { dest, .. }
             | Self::ReadReg { dest, .. }
+            | Self::ReadMem { dest, .. }
             | Self::LoadConst { dest, .. }
             | Self::Cmp { dest, .. }
             | Self::BinOp { dest, .. } => Some(*dest),
-            Self::WriteReg { .. } | Self::Ret { .. } | Self::Fence => None,
+            Self::WriteReg { .. } | Self::WriteMem { .. } | Self::Ret { .. } | Self::Fence => None,
         }
     }
 }
@@ -151,7 +163,18 @@ impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::ReadReg { dest, src } => write!(f, "{} = x{}", dest, src.get()),
-            Self::WriteReg { dest, src } => write!(f, "x{} = {}", dest.get(), src),
+            Self::ReadMem {
+                dest,
+                src,
+                width,
+                sign_extend,
+            } => match sign_extend {
+                true => write!(f, "{} = signed {} mem[{}]", dest, width, src),
+                false => write!(f, "{} = {} mem[{}]", dest, width, src),
+            },
+
+            Self::WriteReg { addr, src } => write!(f, "x{} = {}", dest.get(), src),
+            Self::WriteMem { dest, src, width } => write!(f, "mem[{}] = {} {}", dest, width, src),
             Self::LoadConst { dest, src } => write!(f, "{} = {}", dest, src),
             Self::BinOp {
                 dest,
@@ -189,7 +212,6 @@ impl fmt::Display for Instruction {
 mod test {
     use super::{lower, Id, Instruction, Source};
     use crate::register;
-    use std::mem;
 
     #[test]
     fn empty() {
