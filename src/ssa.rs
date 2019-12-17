@@ -96,6 +96,26 @@ pub enum Instruction {
         src1: Source,
         src2: Source,
     },
+    Sll {
+        dest: Id,
+        src1: Source,
+        src2: Source,
+    },
+    Srl {
+        dest: Id,
+        src1: Source,
+        src2: Source,
+    },
+    Sra {
+        dest: Id,
+        src1: Source,
+        src2: Source,
+    },
+    Sub {
+        dest: Id,
+        src1: Source,
+        src2: Source,
+    },
     Xor {
         dest: Id,
         src1: Source,
@@ -128,7 +148,11 @@ impl Instruction {
             | Self::ReadReg { dest, .. }
             | Self::LoadConst { dest, .. }
             | Self::Cmp { dest, .. }
+            | Self::Sub { dest, .. }
             | Self::Or { dest, .. }
+            | Self::Sll { dest, .. }
+            | Self::Srl { dest, .. }
+            | Self::Sra { dest, .. }
             | Self::Xor { dest, .. }
             | Self::And { dest, .. }
             | Self::Add { dest, .. } => Some(*dest),
@@ -144,9 +168,13 @@ impl fmt::Display for Instruction {
             Self::WriteReg { dest, src } => write!(f, "x{} = {}", dest.get(), src),
             Self::LoadConst { dest, src } => write!(f, "{} = {}", dest, src),
             Self::Or { dest, src1, src2 } => write!(f, "{} = or {}, {}", dest, src1, src2),
+            Self::Sll { dest, src1, src2 } => write!(f, "{} = sll {}, {}", dest, src1, src2),
+            Self::Srl { dest, src1, src2 } => write!(f, "{} = srl {}, {}", dest, src1, src2),
+            Self::Sra { dest, src1, src2 } => write!(f, "{} = sra {}, {}", dest, src1, src2),
             Self::Xor { dest, src1, src2 } => write!(f, "{} = xor {}, {}", dest, src1, src2),
             Self::And { dest, src1, src2 } => write!(f, "{} = and {}, {}", dest, src1, src2),
             Self::Add { dest, src1, src2 } => write!(f, "{} = add {}, {}", dest, src1, src2),
+            Self::Sub { dest, src1, src2 } => write!(f, "{} = sub {}, {}", dest, src1, src2),
             Self::Cmp {
                 dest,
                 src1,

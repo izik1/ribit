@@ -2,6 +2,7 @@ use std::mem;
 
 use super::{CmpKind, Id, Instruction, InstructionId, Source};
 
+use crate::opcode::RMath;
 use crate::{instruction, opcode, register};
 
 pub struct Context {
@@ -90,6 +91,18 @@ impl Context {
         self.instr_with_id(|dest| Instruction::Or { dest, src1, src2 })
     }
 
+    pub fn sll(&mut self, src1: Source, src2: Source) -> Id {
+        self.instr_with_id(|dest| Instruction::Sll { dest, src1, src2 })
+    }
+
+    pub fn srl(&mut self, src1: Source, src2: Source) -> Id {
+        self.instr_with_id(|dest| Instruction::Srl { dest, src1, src2 })
+    }
+
+    pub fn sra(&mut self, src1: Source, src2: Source) -> Id {
+        self.instr_with_id(|dest| Instruction::Sra { dest, src1, src2 })
+    }
+
     pub fn xor(&mut self, src1: Source, src2: Source) -> Id {
         self.instr_with_id(|dest| Instruction::Xor { dest, src1, src2 })
     }
@@ -100,6 +113,10 @@ impl Context {
 
     pub fn add(&mut self, src1: Source, src2: Source) -> Id {
         self.instr_with_id(|dest| Instruction::Add { dest, src1, src2 })
+    }
+
+    pub fn sub(&mut self, src1: Source, src2: Source) -> Id {
+        self.instr_with_id(|dest| Instruction::Sub { dest, src1, src2 })
     }
 
     pub fn cmp(&mut self, src1: Source, src2: Source, mode: CmpKind) -> Id {
@@ -204,7 +221,44 @@ pub fn lower_non_terminal(ctx: &mut Context, instr: instruction::Info) {
 
             ctx.add_pc(Source::Val(len));
         }
-        instruction::Instruction::R(_) => todo!(),
+        instruction::Instruction::R(instruction::R {
+            rs1,
+            rs2,
+            rd,
+            opcode,
+        }) => {
+            let src1 = ctx.load_register(rs1);
+            let src2 = ctx.load_register(rs2);
+
+            let res = match opcode {
+                opcode::R::Math(opcode) => match opcode {
+                    RMath::ADD => ctx.add(Source::Id(src1), Source::Id(src2)),
+                    RMath::SUB => ctx.sub(Source::Id(src1), Source::Id(src2)),
+                    RMath::SLL => ctx.sll(Source::Id(src1), Source::Id(src2)),
+                    RMath::SCond(cmp) => ctx.cmp(Source::Id(src1), Source::Id(src2), cmp.into()),
+                    RMath::XOR => ctx.xor(Source::Id(src1), Source::Id(src2)),
+                    RMath::SRL => ctx.srl(Source::Id(src1), Source::Id(src2)),
+                    RMath::SRA => ctx.sra(Source::Id(src1), Source::Id(src2)),
+                    RMath::OR => ctx.or(Source::Id(src1), Source::Id(src2)),
+                    RMath::AND => ctx.and(Source::Id(src1), Source::Id(src2)),
+                    RMath::MUL => todo!(),
+                    RMath::MULH => todo!(),
+                    RMath::MULHSU => todo!(),
+                    RMath::MULHU => todo!(),
+                    RMath::DIV => todo!(),
+                    RMath::DIVU => todo!(),
+                    RMath::REM => todo!(),
+                    RMath::REMU => todo!(),
+                },
+                opcode::R::Shift(_) => todo!(),
+            };
+
+            if let Some(rd) = rd {
+                ctx.write_register(rd, Source::Id(res));
+            }
+
+            ctx.add_pc(Source::Val(len));
+        }
         instruction::Instruction::S(_) => todo!(),
         instruction::Instruction::U(_) => todo!(),
     }
