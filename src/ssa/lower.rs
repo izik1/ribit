@@ -1,50 +1,33 @@
 use std::mem;
 
-use super::{BinOp, CmpKind, Id, Instruction, InstructionId, Source};
+use super::{BinOp, CmpKind, Id, Instruction, Source};
 
+use crate::ssa::eval;
 use crate::{instruction, opcode, register, Width};
+use std::collections::HashMap;
 
 pub struct Context {
     next_id: Id,
-    pub pc: Id,
+    pub pc: Source,
     registers: [Option<Source>; 32],
     registers_written: u32,
     instructions: Vec<Instruction>,
 }
 
 impl Context {
-    const fn initial_pc(pc: u32) -> Instruction {
-        let instr = Instruction::LoadConst {
-            dest: Id(0),
-            src: pc,
-        };
-
-        instr
-    }
-
     pub fn new(start_pc: u32) -> Self {
-        let pc = Self::initial_pc(start_pc);
-
         Self {
-            next_id: Id(1),
-            pc: Id(0),
+            next_id: Id(0),
+            pc: Source::Val(start_pc),
             registers: [None; 32],
             registers_written: 0x0000_0000,
-            instructions: vec![pc],
+            instructions: vec![],
         }
     }
 
-    pub fn add_pc(&mut self, src: Source) -> Id {
-        let id = self.new_id();
-
-        self.instructions.push(Instruction::BinOp {
-            op: BinOp::Add,
-            dest: id,
-            src1: src,
-            src2: Source::Id(mem::replace(&mut self.pc, id)),
-        });
-
-        id
+    pub fn add_pc(&mut self, src: Source) -> Source {
+        self.pc = self.add(src, self.pc);
+        self.pc
     }
 
     fn new_id(&mut self) -> Id {
@@ -55,19 +38,23 @@ impl Context {
         std::mem::replace(&mut self.next_id, Id(id_num + 1))
     }
 
-    fn instr_with_id<F: FnOnce(Id) -> Instruction>(&mut self, f: F) -> Id {
+    fn instruction<F: FnOnce(Id) -> Instruction>(&mut self, f: F) -> Source {
         let id = self.new_id();
         self.instructions.push(f(id));
-        id
+        Source::Id(id)
     }
 
-    pub fn binop(&mut self, op: BinOp, src1: Source, src2: Source) -> Id {
-        self.instr_with_id(|dest| Instruction::BinOp {
-            dest,
-            src1,
-            src2,
-            op,
-        })
+    pub fn binop(&mut self, op: BinOp, src1: Source, src2: Source) -> Source {
+        if let (Some(src1), Some(src2)) = (src1.val(), src2.val()) {
+            Source::Val(eval::binop(src1, src2, op))
+        } else {
+            self.instruction(|dest| Instruction::BinOp {
+                dest,
+                src1,
+                src2,
+                op,
+            })
+        }
     }
 
     pub fn read_register(&mut self, reg: register::RiscV) -> Source {
@@ -84,15 +71,11 @@ impl Context {
     }
 
     pub fn load_register(&mut self, reg: Option<register::RiscV>) -> Source {
-        if let Some(reg) = reg {
-            self.read_register(reg)
-        } else {
-            Source::Val(0)
-        }
+        reg.map(|reg| self.read_register(reg)).unwrap_or(Source::Val(0))
     }
 
-    pub fn read_memory(&mut self, src: Source, width: Width, sign_extend: bool) -> Id {
-        self.instr_with_id(|dest| Instruction::ReadMem {
+    pub fn read_memory(&mut self, src: Source, width: Width, sign_extend: bool) -> Source {
+        self.instruction(|dest| Instruction::ReadMem {
             dest,
             src,
             width,
@@ -100,78 +83,75 @@ impl Context {
         })
     }
 
-    pub fn write_register(&mut self, reg: register::RiscV, val: Source) -> InstructionId {
+    pub fn write_register(&mut self, reg: register::RiscV, val: Source) {
         self.registers[reg.get() as usize] = Some(val);
         self.registers_written |= 1 << reg.get();
-
-        InstructionId(self.instructions.len() - 1)
     }
 
-    pub fn write_memory(&mut self, addr: Source, val: Source, width: Width) -> InstructionId {
+    pub fn write_memory(&mut self, addr: Source, val: Source, width: Width) {
         self.instructions.push(Instruction::WriteMem {
             addr,
             src: val,
             width,
         });
-
-        InstructionId(self.instructions.len() - 1)
     }
 
-    pub fn load_const(&mut self, const_val: u32) -> Id {
-        self.instr_with_id(|dest| Instruction::LoadConst {
-            dest,
-            src: const_val,
-        })
-    }
-
-    pub fn or(&mut self, src1: Source, src2: Source) -> Id {
+    pub fn or(&mut self, src1: Source, src2: Source) -> Source {
         self.binop(BinOp::Or, src1, src2)
     }
 
-    pub fn sll(&mut self, src1: Source, src2: Source) -> Id {
+    pub fn sll(&mut self, src1: Source, src2: Source) -> Source {
         self.binop(BinOp::Sll, src1, src2)
     }
 
-    pub fn srl(&mut self, src1: Source, src2: Source) -> Id {
+    pub fn srl(&mut self, src1: Source, src2: Source) -> Source {
         self.binop(BinOp::Srl, src1, src2)
     }
 
-    pub fn sra(&mut self, src1: Source, src2: Source) -> Id {
+    pub fn sra(&mut self, src1: Source, src2: Source) -> Source {
         self.binop(BinOp::Sra, src1, src2)
     }
 
-    pub fn xor(&mut self, src1: Source, src2: Source) -> Id {
+    pub fn xor(&mut self, src1: Source, src2: Source) -> Source {
         self.binop(BinOp::Xor, src1, src2)
     }
 
-    pub fn and(&mut self, src1: Source, src2: Source) -> Id {
+    pub fn and(&mut self, src1: Source, src2: Source) -> Source {
         self.binop(BinOp::And, src1, src2)
     }
 
-    pub fn add(&mut self, src1: Source, src2: Source) -> Id {
+    pub fn add(&mut self, src1: Source, src2: Source) -> Source {
         self.binop(BinOp::Add, src1, src2)
     }
 
-    pub fn sub(&mut self, src1: Source, src2: Source) -> Id {
+    pub fn sub(&mut self, src1: Source, src2: Source) -> Source {
         self.binop(BinOp::Sub, src1, src2)
     }
 
-    pub fn cmp(&mut self, src1: Source, src2: Source, mode: CmpKind) -> Id {
-        self.instr_with_id(|dest| Instruction::Cmp {
-            dest,
-            src1,
-            src2,
-            kind: mode,
-        })
+    pub fn cmp(&mut self, src1: Source, src2: Source, mode: CmpKind) -> Source {
+        if let (Some(src1), Some(src2)) = (src1.val(), src2.val()) {
+            Source::Val(eval::cmp(src1, src2, mode))
+        } else {
+            self.instruction(|dest| Instruction::Cmp {
+                dest,
+                src1,
+                src2,
+                kind: mode,
+            })
+        }
     }
 
-    pub fn select(&mut self, cond: Source, if_true: Source, if_false: Source) -> Id {
-        self.instr_with_id(|dest| Instruction::Select {
-            dest,
-            if_true,
-            if_false,
-            cond,
-        })
+    pub fn select(&mut self, cond: Source, if_true: Source, if_false: Source) -> Source {
+        if let Some(res) = eval::try_select(cond.val(), if_true.val(), if_false.val()) {
+            Source::Val(res)
+        } else {
+            self.instruction(|dest| Instruction::Select {
+                dest,
+                if_true,
+                if_false,
+                cond,
+            })
+        }
     }
 
     pub fn fence(&mut self) {
@@ -179,11 +159,11 @@ impl Context {
     }
 
     pub fn ret_with_code(mut self, addr: Source, code: Source) -> Vec<Instruction> {
-        for (idx, src) in self.registers.iter().enumerate() {
-            let dest = register::RiscV::with_u8(idx as u8);
+        for (idx, src) in self.registers.iter().enumerate().skip(1) {
+            let dest = register::RiscV::with_u8(idx as u8).unwrap();
 
-            if let (Some(dest), Some(src)) = (dest, *src) {
-                if (self.registers_written >> dest.get()) & 1 > 0 {
+            if let Some(src) = *src {
+                if (self.registers_written >> dest.get()) & 1 == 1 {
                     self.instructions.push(Instruction::WriteReg { dest, src });
                 }
             }
@@ -201,15 +181,7 @@ impl Context {
 
     pub fn ret(self) -> Vec<Instruction> {
         let pc = self.pc;
-        self.ret_with_addr(Source::Id(pc))
-    }
-}
-
-impl std::ops::Index<InstructionId> for Context {
-    type Output = Instruction;
-
-    fn index(&self, idx: InstructionId) -> &Self::Output {
-        &self.instructions[idx.0]
+        self.ret_with_addr(pc)
     }
 }
 
@@ -237,7 +209,7 @@ pub fn lower_non_terminal(ctx: &mut Context, instruction: instruction::Instructi
                 let mem = ctx.read_memory(src, width, true);
 
                 if let Some(rd) = rd {
-                    ctx.write_register(rd, Source::Id(mem));
+                    ctx.write_register(rd, mem);
                 }
             }
             // todo: deduplicate with previous
@@ -250,7 +222,7 @@ pub fn lower_non_terminal(ctx: &mut Context, instruction: instruction::Instructi
                 let mem = ctx.read_memory(src, width, false);
 
                 if let Some(rd) = rd {
-                    ctx.write_register(rd, Source::Id(mem));
+                    ctx.write_register(rd, mem);
                 }
             }
         },
@@ -276,7 +248,7 @@ pub fn lower_non_terminal(ctx: &mut Context, instruction: instruction::Instructi
             };
 
             if let Some(rd) = rd {
-                ctx.write_register(rd, Source::Id(res));
+                ctx.write_register(rd, res);
             }
         }
 
@@ -310,7 +282,7 @@ pub fn lower_non_terminal(ctx: &mut Context, instruction: instruction::Instructi
             };
 
             if let Some(rd) = rd {
-                ctx.write_register(rd, Source::Id(res));
+                ctx.write_register(rd, res);
             }
         }
         instruction::Instruction::S(instruction::S {
@@ -325,19 +297,19 @@ pub fn lower_non_terminal(ctx: &mut Context, instruction: instruction::Instructi
             let addr = ctx.add(src1, Source::Val(imm));
 
             let src2 = ctx.load_register(rs2);
-            ctx.write_memory(Source::Id(addr), src2, width);
+            ctx.write_memory(addr, src2, width);
         }
         instruction::Instruction::U(instruction::U { opcode, imm, rd }) => {
             // ensure that the immediate only uses the upper 20 bits.
             let imm = imm & 0xffff_f000;
 
             let res = match opcode {
-                opcode::U::LUI => ctx.load_const(imm),
-                opcode::U::AUIPC => ctx.add(Source::Id(ctx.pc), Source::Val(imm)),
+                opcode::U::LUI => Source::Val(imm),
+                opcode::U::AUIPC => ctx.add(ctx.pc, Source::Val(imm)),
             };
 
             if let Some(rd) = rd {
-                ctx.write_register(rd, Source::Id(res));
+                ctx.write_register(rd, res);
             }
         }
     }
@@ -360,9 +332,9 @@ pub fn lower_terminal(
             if let Some(rd) = rd {
                 // we specifically need to avoid modifying `pc`, since we need the
                 // old value for adding the immediate.
-                let next_pc = ctx.add(Source::Id(ctx.pc), Source::Val(len));
+                let next_pc = ctx.add(ctx.pc, Source::Val(len));
 
-                ctx.write_register(rd, Source::Id(next_pc));
+                ctx.write_register(rd, next_pc);
             }
 
             ctx.add_pc(Source::Val(imm));
@@ -382,9 +354,9 @@ pub fn lower_terminal(
             if let Some(rd) = rd {
                 // we specifically need to avoid modifying `pc`, since we need the
                 // old value for adding the immediate.
-                let next_pc = ctx.add(Source::Id(ctx.pc), Source::Val(len));
+                let next_pc = ctx.add(ctx.pc, Source::Val(len));
 
-                ctx.write_register(rd, Source::Id(next_pc));
+                ctx.write_register(rd, next_pc);
             }
 
             ctx.add_pc(Source::Val(imm));
@@ -407,7 +379,7 @@ pub fn lower_terminal(
 
             let pc = ctx.add_pc(Source::Val(len));
 
-            ctx.ret_with_code(Source::Id(pc), Source::Val(return_code))
+            ctx.ret_with_code(pc, Source::Val(return_code))
         }
 
         instruction::Instruction::B(instruction::B {
@@ -421,19 +393,13 @@ pub fn lower_terminal(
 
             let cmp = ctx.cmp(src1, src2, cmp_mode.into());
 
-            let current_pc = Source::Id(ctx.pc);
+            let continue_pc = ctx.add(ctx.pc, Source::Val(len));
 
-            let continue_pc = ctx.add(current_pc, Source::Val(len));
+            let jump_pc = ctx.add(ctx.pc, Source::Val(imm as i16 as u32));
 
-            let jump_pc = ctx.add(current_pc, Source::Val(imm as i16 as u32));
+            let addr = ctx.select(cmp, jump_pc, continue_pc);
 
-            ctx.pc = ctx.select(
-                Source::Id(cmp),
-                Source::Id(jump_pc),
-                Source::Id(continue_pc),
-            );
-
-            ctx.ret()
+            ctx.ret_with_addr(addr)
         }
 
         _ => panic!("Instruction wasn't a terminal"),
@@ -443,7 +409,7 @@ pub fn lower_terminal(
 #[cfg(test)]
 mod test {
     use super::Context;
-    use crate::ssa::{cmp_instrs, lower::lower_non_terminal, debug_print_instrs};
+    use crate::ssa::{cmp_instrs, debug_print_instrs, lower::lower_non_terminal};
     use crate::{instruction, opcode, register};
 
     #[test]
@@ -460,16 +426,7 @@ mod test {
             4,
         );
 
-        cmp_instrs(
-            &[
-                "%0 = 0",
-                "%1 = add %0, 4",
-                "%2 = add 4096, %0",
-                "x4 = %1",
-                "ret 0, %2",
-            ],
-            &instrs,
-        );
+        cmp_instrs(&["x4 = 4", "ret 0, 4096"], &instrs);
     }
 
     #[test]
@@ -482,7 +439,7 @@ mod test {
             4,
         );
 
-        cmp_instrs(&["%0 = 0", "%1 = add 4, %0", "ret 1, %1"], &instrs);
+        cmp_instrs(&["ret 1, 4"], &instrs);
     }
 
     #[test]
@@ -500,13 +457,41 @@ mod test {
             4,
         );
 
+        cmp_instrs(&["ret 1, 8"], &instrs);
+    }
+
+    #[test]
+    fn branch_0_0_eq() {
+        let ctx = Context::new(0);
+        let instrs = super::lower_terminal(
+            ctx,
+            instruction::Instruction::B(instruction::B::new(1024, None, None, opcode::Cmp::Eq)),
+            4,
+        );
+
+        cmp_instrs(&["ret 0, 1024"], &instrs);
+    }
+
+    #[test]
+    fn branch_0_x1_eq() {
+        let ctx = Context::new(0);
+        let instrs = super::lower_terminal(
+            ctx,
+            instruction::Instruction::B(instruction::B::new(
+                1024,
+                None,
+                Some(register::RiscV::X1),
+                opcode::Cmp::Eq,
+            )),
+            4,
+        );
+
         cmp_instrs(
             &[
-                "%0 = 0",
-                "%1 = add 0, 0",
-                "%2 = add 4, %0",
-                "%3 = add 4, %2",
-                "ret 1, %3",
+                "%0 = x1",
+                "%1 = cmp EQ 0, %0",
+                "%2 = select %1, 1024, 4",
+                "ret 0, %2",
             ],
             &instrs,
         );
@@ -532,17 +517,7 @@ mod test {
             4,
         );
 
-        cmp_instrs(
-            &[
-                "%0 = 0",
-                "%1 = x1",
-                "%2 = add %1, 50",
-                "%3 = add 4, %0",
-                "%4 = add 4, %3",
-                "ret 1, %4",
-            ],
-            &instrs,
-        );
+        cmp_instrs(&["%0 = x1", "%1 = add %0, 50", "ret 1, 8"], &instrs);
     }
 
     #[test]
@@ -565,16 +540,6 @@ mod test {
             4,
         );
 
-        cmp_instrs(
-            &[
-                "%0 = 0",
-                "%1 = add 0, 50",
-                "%2 = add 4, %0",
-                "%3 = add 4, %2",
-                "x2 = %1",
-                "ret 1, %3",
-            ],
-            &instrs,
-        );
+        cmp_instrs(&["x2 = 50", "ret 1, 8"], &instrs);
     }
 }

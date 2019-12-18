@@ -1,4 +1,4 @@
-use crate::ssa::{BinOp, CmpKind, Id, Instruction, Source};
+use crate::ssa::{eval, BinOp, CmpKind, Id, Instruction, Source};
 use std::collections::{HashMap, HashSet};
 
 fn const_id_lookup(consts: &HashMap<Id, u32>, src: &Source) -> Option<u32> {
@@ -45,16 +45,7 @@ pub fn fold_and_prop_consts(graph: &mut [Instruction]) {
                 let src2 = const_prop(&consts, src2);
 
                 let res = match (src1, src2) {
-                    (Some(src1), Some(src2)) => match op {
-                        BinOp::And => src1 & src2,
-                        BinOp::Add => src1.wrapping_add(src2),
-                        BinOp::Or => src1 | src2,
-                        BinOp::Sll => src1 << (src2 & 0x1f),
-                        BinOp::Srl => src1 >> (src2 & 0x1f),
-                        BinOp::Sra => ((src1 as i32) << (src2 & 0x1f)) as u32,
-                        BinOp::Sub => src1.wrapping_sub(src2),
-                        BinOp::Xor => src1 ^ src2,
-                    },
+                    (Some(src1), Some(src2)) => eval::binop(src1, src2, *op),
                     _ => continue,
                 };
 
@@ -75,18 +66,11 @@ pub fn fold_and_prop_consts(graph: &mut [Instruction]) {
                 // todo: write pass for the above.
 
                 let res = match (src1, src2) {
-                    (Some(src1), Some(src2)) => match kind {
-                        CmpKind::Eq => src1 == src2,
-                        CmpKind::Ne => src1 != src2,
-                        CmpKind::Sge => (src1 as i32) >= (src2 as i32),
-                        CmpKind::Sl => (src1 as i32) < (src2 as i32),
-                        CmpKind::Uge => src1 >= src2,
-                        CmpKind::Ul => src1 < src2,
-                    },
+                    (Some(src1), Some(src2)) => eval::cmp(src1, src2, *kind),
                     _ => continue,
                 };
 
-                (*dest, res as u32)
+                (*dest, res)
             }
 
             Instruction::Select {
@@ -99,10 +83,10 @@ pub fn fold_and_prop_consts(graph: &mut [Instruction]) {
                 let if_true = const_prop(&consts, if_true);
                 let if_false = const_prop(&consts, if_false);
 
-                match (cond, if_true, if_false) {
-                    (Some(cond), Some(if_true), _) if cond > 0 => (*dest, if_true),
-                    (Some(cond), _, Some(if_false)) if cond == 0 => (*dest, if_false),
-                    _ => continue,
+                if let Some(res) = eval::try_select(cond, if_true, if_false) {
+                    (*dest, res)
+                } else {
+                    continue;
                 }
             }
 
@@ -209,7 +193,7 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
 
 #[cfg(test)]
 mod test {
-    use crate::ssa::{cmp_instrs, lower, debug_print_instrs};
+    use crate::ssa::{cmp_instrs, debug_print_instrs, lower};
     use crate::{instruction, opcode, register};
 
     #[test]
@@ -228,10 +212,7 @@ mod test {
 
         super::fold_and_prop_consts(&mut instrs);
 
-        cmp_instrs(
-            &["%0 = 0", "%1 = 4", "%2 = 4096", "x4 = 4", "ret 0, 4096"],
-            &instrs,
-        );
+        cmp_instrs(&["x4 = 4", "ret 0, 4096"], &instrs);
     }
 
     #[test]
@@ -298,18 +279,18 @@ mod test {
 
         cmp_instrs(
             &[
-                "%1 = x10",
-                "%2 = x11",
-                "%3 = add %1, %2",
-                "%5 = srl %3, 31",
-                "%7 = and %3, %5",
-                "%9 = add %1, %7",
-                "%12 = x1",
-                "%13 = add %12, 1040",
-                "x10 = %9",
-                "x11 = %7",
-                "x12 = %5",
-                "ret 0, %13",
+                "%0 = x10",
+                "%1 = x11",
+                "%2 = add %0, %1",
+                "%3 = srl %2, 31",
+                "%4 = and %2, %3",
+                "%5 = add %0, %4",
+                "%6 = x1",
+                "%7 = add %6, 1040",
+                "x10 = %5",
+                "x11 = %4",
+                "x12 = %3",
+                "ret 0, %7",
             ],
             &instrs,
         );

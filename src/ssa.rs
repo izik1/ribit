@@ -2,11 +2,9 @@ use std::fmt;
 
 use crate::{opcode, register, Width};
 
+pub mod eval;
 pub mod lower;
 pub mod opt;
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub struct InstructionId(usize);
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub struct Id(u16);
@@ -57,6 +55,22 @@ impl fmt::Display for CmpKind {
 pub enum Source {
     Val(u32),
     Id(Id),
+}
+
+impl Source {
+    pub fn val(self) -> Option<u32> {
+        match self {
+            Self::Val(v) => Some(v),
+            Self::Id(_) => None,
+        }
+    }
+
+    pub fn id(self) -> Option<Id> {
+        match self {
+            Self::Id(id) => Some(id),
+            Self::Val(_) => None,
+        }
+    }
 }
 
 impl fmt::Display for Source {
@@ -223,20 +237,12 @@ mod test {
 
         let instrs = ctx.ret();
 
-        assert_eq!(instrs.len(), 2);
+        assert_eq!(instrs.len(), 1);
 
         assert_eq!(
             instrs[0],
-            Instruction::LoadConst {
-                dest: Id(0),
-                src: START_PC,
-            }
-        );
-
-        assert_eq!(
-            instrs[1],
             Instruction::Ret {
-                addr: Source::Id(Id(0)),
+                addr: Source::Val(START_PC),
                 code: Source::Val(0),
             }
         );
@@ -251,26 +257,28 @@ mod test {
         ctx.read_register(register::RiscV::X1);
         let instrs = ctx.ret();
 
-        assert_eq!(instrs.len(), 4);
+        assert_eq!(instrs.len(), 3);
+
+        assert_eq!(
+            instrs[0],
+            Instruction::ReadReg {
+                dest: Id(0),
+                src: register::RiscV::X1
+            }
+        );
 
         assert_eq!(
             instrs[1],
             Instruction::ReadReg {
                 dest: Id(1),
-                src: register::RiscV::X1
-            }
-        );
-        assert_eq!(
-            instrs[2],
-            Instruction::ReadReg {
-                dest: Id(2),
                 src: register::RiscV::X2
             }
         );
+
         assert_eq!(
-            instrs[3],
+            instrs[2],
             Instruction::Ret {
-                addr: Source::Id(Id(0)),
+                addr: Source::Val(0),
                 code: Source::Val(0),
             }
         );
@@ -283,9 +291,9 @@ mod test {
         ctx.write_register(register::RiscV::X2, Source::Val(0));
         let instrs = ctx.ret();
 
-        assert_eq!(instrs.len(), 3);
+        assert_eq!(instrs.len(), 2);
         assert_eq!(
-            instrs[1],
+            instrs[0],
             Instruction::WriteReg {
                 dest: register::RiscV::X2,
                 src: Source::Val(0)
@@ -302,6 +310,7 @@ fn cmp_instrs(expected: &[&str], actual: &[Instruction]) {
     }
 }
 
+#[cfg_attr(test, allow(dead_code))]
 #[cfg(test)]
 fn debug_print_instrs(instrs: &[Instruction]) {
     for instr in instrs {

@@ -56,6 +56,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn jal_basic() {
         let mut ctx = context::Runtime::new();
 
@@ -126,6 +127,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn reg0_unwritable_imm() {
         let mut ctx = context::Runtime::new();
 
