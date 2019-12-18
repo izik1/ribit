@@ -58,7 +58,6 @@ pub fn fold_and_prop_consts(graph: &mut [Instruction]) {
                     _ => continue,
                 };
 
-                dbg!("test");
                 (*dest, res)
             }
 
@@ -123,13 +122,98 @@ pub fn fold_and_prop_consts(graph: &mut [Instruction]) {
     }
 }
 
+fn mark_live(live_instructions: &mut [bool; 0x1_0000], src: &Source) {
+    if let Source::Id(id) = src {
+        live_instructions[id.0 as usize] = true;
+    }
+}
+
+pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
+    let mut live_ids = [false; 0x1_0000];
+    let mut live_instruction_count = 0;
+
+    for (idx, instruction) in graph.iter().enumerate().rev() {
+        match instruction {
+            Instruction::Ret { addr, code } => {
+                mark_live(&mut live_ids, addr);
+                mark_live(&mut live_ids, code);
+
+                live_instruction_count += 1;
+            }
+
+            Instruction::Fence => live_instruction_count += 1,
+            Instruction::ReadReg { dest, .. } | Instruction::LoadConst { dest, .. } => {
+                if live_ids[dest.0 as usize] {
+                    live_instruction_count += 1;
+                }
+            }
+
+            Instruction::ReadMem { src, .. } => {
+                // hack: I'm not sure when it's safe to remove unused memory reads,
+                // so assume we never can.
+                live_instruction_count += 1;
+                mark_live(&mut live_ids, src);
+            }
+
+            Instruction::WriteReg { src, .. } => {
+                live_instruction_count += 1;
+                mark_live(&mut live_ids, src);
+            }
+
+            Instruction::WriteMem { addr, src, .. } => {
+                live_instruction_count += 1;
+                mark_live(&mut live_ids, addr);
+                mark_live(&mut live_ids, src);
+            }
+
+            Instruction::BinOp {
+                dest, src1, src2, ..
+            }
+            | Instruction::Cmp {
+                dest, src1, src2, ..
+            } => {
+                if live_ids[dest.0 as usize] {
+                    live_instruction_count += 1;
+                    mark_live(&mut live_ids, src1);
+                    mark_live(&mut live_ids, src2);
+                }
+            }
+
+            Instruction::Select {
+                dest,
+                cond,
+                if_true,
+                if_false,
+            } => {
+                if live_ids[dest.0 as usize] {
+                    live_instruction_count += 1;
+                    mark_live(&mut live_ids, cond);
+                    mark_live(&mut live_ids, if_true);
+                    mark_live(&mut live_ids, if_false);
+                }
+            }
+        }
+    }
+
+    let mut instructions = Vec::with_capacity(live_instruction_count);
+
+    for instr in graph.iter().filter(|it| match it.id() {
+        Some(id) => live_ids[id.0 as usize],
+        None => true,
+    }) {
+        instructions.push(instr.clone());
+    }
+
+    instructions
+}
+
 #[cfg(test)]
 mod test {
     use crate::ssa::{cmp_instrs, lower};
     use crate::{instruction, opcode, register};
 
     #[test]
-    fn jal_basic() {
+    fn jal_basic_const_prop() {
         let ctx = lower::Context::new(0);
 
         let mut instrs = lower::lower_terminal(
@@ -148,5 +232,112 @@ mod test {
             &["%0 = 0", "%1 = 4", "x4 = 4", "%2 = 4096", "ret 0, 4096"],
             &instrs,
         );
+    }
+
+    #[test]
+    fn max() {
+        let mut ctx = lower::Context::new(1024);
+
+        lower::lower_non_terminal(
+            &mut ctx,
+            instruction::Instruction::R(instruction::R::new(
+                Some(register::RiscV::X10),
+                Some(register::RiscV::X11),
+                Some(register::RiscV::X11),
+                opcode::R::ADD,
+            )),
+            4,
+        );
+
+        lower::lower_non_terminal(
+            &mut ctx,
+            instruction::Instruction::I(instruction::I::new(
+                31,
+                Some(register::RiscV::X11),
+                Some(register::RiscV::X12),
+                opcode::I::SRLI,
+            )),
+            4,
+        );
+
+        lower::lower_non_terminal(
+            &mut ctx,
+            instruction::Instruction::R(instruction::R::new(
+                Some(register::RiscV::X11),
+                Some(register::RiscV::X12),
+                Some(register::RiscV::X11),
+                opcode::R::AND,
+            )),
+            4,
+        );
+
+        lower::lower_non_terminal(
+            &mut ctx,
+            instruction::Instruction::R(instruction::R::new(
+                Some(register::RiscV::X10),
+                Some(register::RiscV::X11),
+                Some(register::RiscV::X10),
+                opcode::R::ADD,
+            )),
+            4,
+        );
+
+        let mut instrs = lower::lower_terminal(
+            ctx,
+            instruction::Instruction::IJump(instruction::IJump::new(
+                0,
+                Some(register::RiscV::X1),
+                None,
+                opcode::IJump::JALR,
+            )),
+            2,
+        );
+
+        super::fold_and_prop_consts(&mut instrs);
+        let instrs = super::dead_instruction_elimination(&instrs);
+
+        cmp_instrs(
+            &[
+                "%1 = x10",
+                "%2 = x11",
+                "%3 = add %1, %2",
+                "x11 = %3",
+                "%5 = x11",
+                "%6 = srl %5, 31",
+                "x12 = %6",
+                "%8 = x11",
+                "%9 = x12",
+                "%10 = and %8, %9",
+                "x11 = %10",
+                "%12 = x10",
+                "%13 = x11",
+                "%14 = add %12, %13",
+                "x10 = %14",
+                "%17 = x1",
+                "%18 = add %17, 1040",
+                "ret 0, %18",
+            ],
+            &instrs,
+        );
+    }
+
+    #[test]
+    fn jal_basic_die() {
+        let ctx = lower::Context::new(0);
+
+        let mut instrs = lower::lower_terminal(
+            ctx,
+            instruction::Instruction::J(instruction::J {
+                imm: 4096,
+                rd: Some(register::RiscV::X4),
+                opcode: opcode::J::JAL,
+            }),
+            4,
+        );
+
+        super::fold_and_prop_consts(&mut instrs);
+        let instrs = super::dead_instruction_elimination(&instrs);
+
+        cmp_instrs(&["x4 = 4", "ret 0, 4096"], &instrs);
     }
 }

@@ -95,7 +95,7 @@ impl fmt::Display for BinOp {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Instruction {
     ReadReg {
         dest: Id,
