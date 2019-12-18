@@ -16,6 +16,12 @@ impl RiscV {
         (inner.get() < 32).then_with(|| Self(inner))
     }
 
+    #[inline(always)]
+    #[must_use]
+    pub fn with_u8(v: u8) -> Option<Self> {
+        NonZeroU8::new(v).and_then(Self::new)
+    }
+
     /// # Safety
     /// Requires [`inner`] to be 1..=31
     #[inline(always)]

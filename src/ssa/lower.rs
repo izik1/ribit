@@ -7,6 +7,8 @@ use crate::{instruction, opcode, register, Width};
 pub struct Context {
     next_id: Id,
     pub pc: Id,
+    registers: [Option<Source>; 32],
+    registers_written: u32,
     instructions: Vec<Instruction>,
 }
 
@@ -26,6 +28,8 @@ impl Context {
         Self {
             next_id: Id(1),
             pc: Id(0),
+            registers: [None; 32],
+            registers_written: 0x0000_0000,
             instructions: vec![pc],
         }
     }
@@ -66,20 +70,24 @@ impl Context {
         })
     }
 
-    pub fn read_register(&mut self, reg: register::RiscV) -> Id {
-        let id = self.new_id();
+    pub fn read_register(&mut self, reg: register::RiscV) -> Source {
+        self.registers[reg.get() as usize].unwrap_or_else(|| {
+            let id = self.new_id();
 
-        self.instructions
-            .push(Instruction::ReadReg { dest: id, src: reg });
+            self.instructions
+                .push(Instruction::ReadReg { dest: id, src: reg });
 
-        id
+            self.registers[reg.get() as usize] = Some(Source::Id(id));
+
+            Source::Id(id)
+        })
     }
 
-    pub fn load_register(&mut self, reg: Option<register::RiscV>) -> Id {
+    pub fn load_register(&mut self, reg: Option<register::RiscV>) -> Source {
         if let Some(reg) = reg {
             self.read_register(reg)
         } else {
-            self.load_const(0)
+            Source::Val(0)
         }
     }
 
@@ -93,10 +101,8 @@ impl Context {
     }
 
     pub fn write_register(&mut self, reg: register::RiscV, val: Source) -> InstructionId {
-        self.instructions.push(Instruction::WriteReg {
-            dest: reg,
-            src: val,
-        });
+        self.registers[reg.get() as usize] = Some(val);
+        self.registers_written |= 1 << reg.get();
 
         InstructionId(self.instructions.len() - 1)
     }
@@ -173,6 +179,16 @@ impl Context {
     }
 
     pub fn ret_with_code(mut self, addr: Source, code: Source) -> Vec<Instruction> {
+        for (idx, src) in self.registers.iter().enumerate() {
+            let dest = register::RiscV::with_u8(idx as u8);
+
+            if let (Some(dest), Some(src)) = (dest, *src) {
+                if (self.registers_written >> dest.get()) & 1 > 0 {
+                    self.instructions.push(Instruction::WriteReg { dest, src });
+                }
+            }
+        }
+
         self.instructions.push(Instruction::Ret { addr, code });
 
         // todo: assert well formedness here.
@@ -216,9 +232,9 @@ pub fn lower_non_terminal(ctx: &mut Context, instruction: instruction::Instructi
                 let imm = imm as i16 as u32;
 
                 let src = ctx.load_register(rs1);
-                let offset = ctx.add(Source::Id(src), Source::Val(imm));
+                let offset = ctx.add(src, Source::Val(imm));
 
-                let mem = ctx.read_memory(Source::Id(src), width, true);
+                let mem = ctx.read_memory(src, width, true);
 
                 if let Some(rd) = rd {
                     ctx.write_register(rd, Source::Id(mem));
@@ -229,9 +245,9 @@ pub fn lower_non_terminal(ctx: &mut Context, instruction: instruction::Instructi
                 let imm = imm as i16 as u32;
 
                 let src = ctx.load_register(rs1);
-                let offset = ctx.add(Source::Id(src), Source::Val(imm));
+                let offset = ctx.add(src, Source::Val(imm));
 
-                let mem = ctx.read_memory(Source::Id(src), width, false);
+                let mem = ctx.read_memory(src, width, false);
 
                 if let Some(rd) = rd {
                     ctx.write_register(rd, Source::Id(mem));
@@ -249,16 +265,14 @@ pub fn lower_non_terminal(ctx: &mut Context, instruction: instruction::Instructi
             let src = ctx.load_register(rs1);
 
             let res = match opcode {
-                opcode::I::ADDI => ctx.add(Source::Id(src), Source::Val(imm)),
-                opcode::I::XORI => ctx.xor(Source::Id(src), Source::Val(imm)),
-                opcode::I::ANDI => ctx.and(Source::Id(src), Source::Val(imm)),
-                opcode::I::SLLI => ctx.sll(Source::Id(src), Source::Val(imm)),
-                opcode::I::SRLI => ctx.srl(Source::Id(src), Source::Val(imm)),
-                opcode::I::SRAI => ctx.sra(Source::Id(src), Source::Val(imm)),
-                opcode::I::ORI => ctx.or(Source::Id(src), Source::Val(imm)),
-                opcode::I::SICond(cmp_mode) => {
-                    ctx.cmp(Source::Id(src), Source::Val(imm), cmp_mode.into())
-                }
+                opcode::I::ADDI => ctx.add(src, Source::Val(imm)),
+                opcode::I::XORI => ctx.xor(src, Source::Val(imm)),
+                opcode::I::ANDI => ctx.and(src, Source::Val(imm)),
+                opcode::I::SLLI => ctx.sll(src, Source::Val(imm)),
+                opcode::I::SRLI => ctx.srl(src, Source::Val(imm)),
+                opcode::I::SRAI => ctx.sra(src, Source::Val(imm)),
+                opcode::I::ORI => ctx.or(src, Source::Val(imm)),
+                opcode::I::SICond(cmp_mode) => ctx.cmp(src, Source::Val(imm), cmp_mode.into()),
             };
 
             if let Some(rd) = rd {
@@ -276,15 +290,15 @@ pub fn lower_non_terminal(ctx: &mut Context, instruction: instruction::Instructi
             let src2 = ctx.load_register(rs2);
 
             let res = match opcode {
-                opcode::R::ADD => ctx.add(Source::Id(src1), Source::Id(src2)),
-                opcode::R::SUB => ctx.sub(Source::Id(src1), Source::Id(src2)),
-                opcode::R::SLL => ctx.sll(Source::Id(src1), Source::Id(src2)),
-                opcode::R::SCond(cmp) => ctx.cmp(Source::Id(src1), Source::Id(src2), cmp.into()),
-                opcode::R::XOR => ctx.xor(Source::Id(src1), Source::Id(src2)),
-                opcode::R::SRL => ctx.srl(Source::Id(src1), Source::Id(src2)),
-                opcode::R::SRA => ctx.sra(Source::Id(src1), Source::Id(src2)),
-                opcode::R::OR => ctx.or(Source::Id(src1), Source::Id(src2)),
-                opcode::R::AND => ctx.and(Source::Id(src1), Source::Id(src2)),
+                opcode::R::ADD => ctx.add(src1, src2),
+                opcode::R::SUB => ctx.sub(src1, src2),
+                opcode::R::SLL => ctx.sll(src1, src2),
+                opcode::R::SCond(cmp) => ctx.cmp(src1, src2, cmp.into()),
+                opcode::R::XOR => ctx.xor(src1, src2),
+                opcode::R::SRL => ctx.srl(src1, src2),
+                opcode::R::SRA => ctx.sra(src1, src2),
+                opcode::R::OR => ctx.or(src1, src2),
+                opcode::R::AND => ctx.and(src1, src2),
                 opcode::R::MUL => todo!(),
                 opcode::R::MULH => todo!(),
                 opcode::R::MULHSU => todo!(),
@@ -308,10 +322,10 @@ pub fn lower_non_terminal(ctx: &mut Context, instruction: instruction::Instructi
             let imm = imm as i16 as u32;
 
             let src1 = ctx.load_register(rs1);
-            let addr = ctx.add(Source::Id(src1), Source::Val(imm));
+            let addr = ctx.add(src1, Source::Val(imm));
 
             let src2 = ctx.load_register(rs2);
-            ctx.write_memory(Source::Id(addr), Source::Id(src2), width);
+            ctx.write_memory(Source::Id(addr), src2, width);
         }
         instruction::Instruction::U(instruction::U { opcode, imm, rd }) => {
             // ensure that the immediate only uses the upper 20 bits.
@@ -378,7 +392,7 @@ pub fn lower_terminal(
             // adding 0 is the same as not adding, so don't bother with a match here.
             if let Some(src) = rs1 {
                 let src = ctx.read_register(src);
-                ctx.add_pc(Source::Id(src));
+                ctx.add_pc(src);
             }
 
             ctx.ret()
@@ -405,7 +419,7 @@ pub fn lower_terminal(
             let src1 = ctx.load_register(rs1);
             let src2 = ctx.load_register(rs2);
 
-            let cmp = ctx.cmp(Source::Id(src1), Source::Id(src2), cmp_mode.into());
+            let cmp = ctx.cmp(src1, src2, cmp_mode.into());
 
             let current_pc = Source::Id(ctx.pc);
 
@@ -429,7 +443,7 @@ pub fn lower_terminal(
 #[cfg(test)]
 mod test {
     use super::Context;
-    use crate::ssa::{cmp_instrs, lower::lower_non_terminal};
+    use crate::ssa::{cmp_instrs, lower::lower_non_terminal, debug_print_instrs};
     use crate::{instruction, opcode, register};
 
     #[test]
@@ -450,8 +464,8 @@ mod test {
             &[
                 "%0 = 0",
                 "%1 = add %0, 4",
-                "x4 = %1",
                 "%2 = add 4096, %0",
+                "x4 = %1",
                 "ret 0, %2",
             ],
             &instrs,
@@ -489,11 +503,10 @@ mod test {
         cmp_instrs(
             &[
                 "%0 = 0",
-                "%1 = 0",
-                "%2 = add %1, 0",
-                "%3 = add 4, %0",
-                "%4 = add 4, %3",
-                "ret 1, %4",
+                "%1 = add 0, 0",
+                "%2 = add 4, %0",
+                "%3 = add 4, %2",
+                "ret 1, %3",
             ],
             &instrs,
         );
@@ -555,12 +568,11 @@ mod test {
         cmp_instrs(
             &[
                 "%0 = 0",
-                "%1 = 0",
-                "%2 = add %1, 50",
-                "x2 = %2",
-                "%3 = add 4, %0",
-                "%4 = add 4, %3",
-                "ret 1, %4",
+                "%1 = add 0, 50",
+                "%2 = add 4, %0",
+                "%3 = add 4, %2",
+                "x2 = %1",
+                "ret 1, %3",
             ],
             &instrs,
         );

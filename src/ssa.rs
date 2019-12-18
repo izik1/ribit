@@ -213,6 +213,7 @@ impl fmt::Display for Instruction {
 mod test {
     use super::{lower, Id, Instruction, Source};
     use crate::register;
+    use crate::ssa::debug_print_instrs;
 
     #[test]
     fn empty() {
@@ -250,7 +251,8 @@ mod test {
         ctx.read_register(register::RiscV::X1);
         let instrs = ctx.ret();
 
-        assert_eq!(instrs.len(), 5);
+        assert_eq!(instrs.len(), 4);
+
         assert_eq!(
             instrs[1],
             Instruction::ReadReg {
@@ -267,9 +269,9 @@ mod test {
         );
         assert_eq!(
             instrs[3],
-            Instruction::ReadReg {
-                dest: Id(3),
-                src: register::RiscV::X1
+            Instruction::Ret {
+                addr: Source::Id(Id(0)),
+                code: Source::Val(0),
             }
         );
     }
@@ -297,5 +299,12 @@ fn cmp_instrs(expected: &[&str], actual: &[Instruction]) {
     for (idx, instr) in actual.iter().enumerate() {
         assert_eq!(expected[idx], format!("{}", instr));
         println!("{}", instr);
+    }
+}
+
+#[cfg(test)]
+fn debug_print_instrs(instrs: &[Instruction]) {
+    for instr in instrs {
+        println!("{}", instr)
     }
 }

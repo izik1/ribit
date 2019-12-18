@@ -209,7 +209,7 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
 
 #[cfg(test)]
 mod test {
-    use crate::ssa::{cmp_instrs, lower};
+    use crate::ssa::{cmp_instrs, lower, debug_print_instrs};
     use crate::{instruction, opcode, register};
 
     #[test]
@@ -229,7 +229,7 @@ mod test {
         super::fold_and_prop_consts(&mut instrs);
 
         cmp_instrs(
-            &["%0 = 0", "%1 = 4", "x4 = 4", "%2 = 4096", "ret 0, 4096"],
+            &["%0 = 0", "%1 = 4", "%2 = 4096", "x4 = 4", "ret 0, 4096"],
             &instrs,
         );
     }
@@ -301,21 +301,15 @@ mod test {
                 "%1 = x10",
                 "%2 = x11",
                 "%3 = add %1, %2",
-                "x11 = %3",
-                "%5 = x11",
-                "%6 = srl %5, 31",
-                "x12 = %6",
-                "%8 = x11",
-                "%9 = x12",
-                "%10 = and %8, %9",
-                "x11 = %10",
-                "%12 = x10",
-                "%13 = x11",
-                "%14 = add %12, %13",
-                "x10 = %14",
-                "%17 = x1",
-                "%18 = add %17, 1040",
-                "ret 0, %18",
+                "%5 = srl %3, 31",
+                "%7 = and %3, %5",
+                "%9 = add %1, %7",
+                "%12 = x1",
+                "%13 = add %12, 1040",
+                "x10 = %9",
+                "x11 = %7",
+                "x12 = %5",
+                "ret 0, %13",
             ],
             &instrs,
         );
