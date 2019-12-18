@@ -71,7 +71,7 @@ pub fn branch_conditional(
 
     match bool_cmp(rs1, rs2, continue_pc, jump_addr, cmp_mode) {
         CmpValue::Const(addr) => {
-            builder.mov_eax_imm(addr.into());
+            builder.mov_eax_imm(addr);
             return;
         }
 

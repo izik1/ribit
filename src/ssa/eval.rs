@@ -1,6 +1,7 @@
 use super::CmpKind;
 use crate::ssa::BinOp;
 
+#[must_use]
 pub fn cmp(src1: u32, src2: u32, mode: CmpKind) -> u32 {
     let res = match mode {
         CmpKind::Eq => src1 == src2,
@@ -14,6 +15,7 @@ pub fn cmp(src1: u32, src2: u32, mode: CmpKind) -> u32 {
     res as u32
 }
 
+#[must_use]
 pub fn binop(src1: u32, src2: u32, op: BinOp) -> u32 {
     match op {
         BinOp::And => src1 & src2,
@@ -27,20 +29,25 @@ pub fn binop(src1: u32, src2: u32, op: BinOp) -> u32 {
     }
 }
 
+#[must_use]
 pub fn select(cond: u32, if_true: u32, if_false: u32) -> u32 {
-    match cond >= 1 {
-        true => if_true,
-        false => if_false,
+    if cond >= 1 {
+        if_true
+    } else {
+        if_false
     }
 }
 
+#[must_use]
 pub fn partial_select(cond: u32, if_true: Option<u32>, if_false: Option<u32>) -> Option<u32> {
-    match cond >= 1 {
-        true => if_true,
-        false => if_false,
+    if cond >= 1 {
+        if_true
+    } else {
+        if_false
     }
 }
 
+#[must_use]
 pub fn try_select(cond: Option<u32>, if_true: Option<u32>, if_false: Option<u32>) -> Option<u32> {
     cond.and_then(|cond| partial_select(cond, if_true, if_false))
 }

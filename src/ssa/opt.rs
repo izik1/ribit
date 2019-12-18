@@ -1,5 +1,5 @@
-use crate::ssa::{eval, BinOp, CmpKind, Id, Instruction, Source};
-use std::collections::{HashMap, HashSet};
+use crate::ssa::{eval, Id, Instruction, Source};
+use std::collections::HashMap;
 
 fn const_id_lookup(consts: &HashMap<Id, u32>, src: &Source) -> Option<u32> {
     match src {
@@ -25,7 +25,8 @@ pub fn fold_and_prop_consts(graph: &mut [Instruction]) {
     for instruction in graph.iter_mut() {
         let (dest, val) = match instruction {
             Instruction::LoadConst { dest, src } => (*dest, *src),
-            Instruction::ReadReg { .. } => continue,
+
+            Instruction::Fence | Instruction::ReadReg { .. } => continue,
 
             Instruction::WriteReg { src, .. }
             | Instruction::ReadMem { src, .. }
@@ -96,8 +97,6 @@ pub fn fold_and_prop_consts(graph: &mut [Instruction]) {
 
                 continue;
             }
-
-            Instruction::Fence => continue,
         };
 
         *instruction = Instruction::LoadConst { dest, src: val };
@@ -112,11 +111,12 @@ fn mark_live(live_instructions: &mut [bool; 0x1_0000], src: &Source) {
     }
 }
 
+#[must_use]
 pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
     let mut live_ids = [false; 0x1_0000];
     let mut live_instruction_count = 0;
 
-    for (idx, instruction) in graph.iter().enumerate().rev() {
+    for instruction in graph.iter().rev() {
         match instruction {
             Instruction::Ret { addr, code } => {
                 mark_live(&mut live_ids, addr);
@@ -200,7 +200,7 @@ mod test {
     fn jal_basic_const_prop() {
         let ctx = lower::Context::new(0);
 
-        let mut instrs = lower::lower_terminal(
+        let mut instrs = lower::terminal(
             ctx,
             instruction::Instruction::J(instruction::J {
                 imm: 4096,
@@ -219,7 +219,7 @@ mod test {
     fn max() {
         let mut ctx = lower::Context::new(1024);
 
-        lower::lower_non_terminal(
+        lower::non_terminal(
             &mut ctx,
             instruction::Instruction::R(instruction::R::new(
                 Some(register::RiscV::X10),
@@ -230,7 +230,7 @@ mod test {
             4,
         );
 
-        lower::lower_non_terminal(
+        lower::non_terminal(
             &mut ctx,
             instruction::Instruction::I(instruction::I::new(
                 31,
@@ -241,7 +241,7 @@ mod test {
             4,
         );
 
-        lower::lower_non_terminal(
+        lower::non_terminal(
             &mut ctx,
             instruction::Instruction::R(instruction::R::new(
                 Some(register::RiscV::X11),
@@ -252,7 +252,7 @@ mod test {
             4,
         );
 
-        lower::lower_non_terminal(
+        lower::non_terminal(
             &mut ctx,
             instruction::Instruction::R(instruction::R::new(
                 Some(register::RiscV::X10),
@@ -263,7 +263,7 @@ mod test {
             4,
         );
 
-        let mut instrs = lower::lower_terminal(
+        let mut instrs = lower::terminal(
             ctx,
             instruction::Instruction::IJump(instruction::IJump::new(
                 0,
@@ -300,7 +300,7 @@ mod test {
     fn jal_basic_die() {
         let ctx = lower::Context::new(0);
 
-        let mut instrs = lower::lower_terminal(
+        let mut instrs = lower::terminal(
             ctx,
             instruction::Instruction::J(instruction::J {
                 imm: 4096,

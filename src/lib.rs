@@ -116,7 +116,7 @@ impl Cpu {
     fn parse_compressed(&mut self) -> Result<Option<instruction::Info>, DecodeError> {
         use std::convert::TryInto;
 
-        if !(self.pc as usize + 1 < self.memory.len()) {
+        if self.pc as usize + 1 >= self.memory.len() {
             return Err(DecodeError::Other);
         }
 
@@ -125,14 +125,14 @@ impl Cpu {
                 .try_into()
                 .expect("bad slice size expected 2???"),
         );
-        match instr & 0b11 {
-            0b11 => Ok(None),
-            _ => {
-                let instr = decode::compressed::decode_instruction(instr)?;
-                let info = instruction::Info::new(instr, self.pc, 2);
-                self.pc += 2;
-                Ok(Some(info))
-            }
+
+        if instr & 0b11 == 0b11 {
+            Ok(None)
+        } else {
+            let instr = decode::compressed::decode_instruction(instr)?;
+            let info = instruction::Info::new(instr, self.pc, 2);
+            self.pc += 2;
+            Ok(Some(info))
         }
     }
 
@@ -144,7 +144,7 @@ impl Cpu {
             return Ok(compressed);
         }
 
-        if !(self.pc as usize + 3 < self.memory.len()) {
+        if self.pc as usize + 3 >= self.memory.len() {
             return Err(DecodeError::Other);
         }
 
@@ -153,7 +153,8 @@ impl Cpu {
                 .try_into()
                 .expect("bad slice size expected 4???"),
         );
-        let instr = decode::decode_instruction(instr)?;
+
+        let instr = decode::instruction(instr)?;
         let info = instruction::Info::new(instr, self.pc, 4);
         self.pc += 4;
         Ok(info)

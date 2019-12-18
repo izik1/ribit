@@ -58,6 +58,7 @@ pub enum Source {
 }
 
 impl Source {
+    #[must_use]
     pub fn val(self) -> Option<u32> {
         match self {
             Self::Val(v) => Some(v),
@@ -65,6 +66,7 @@ impl Source {
         }
     }
 
+    #[must_use]
     pub fn id(self) -> Option<Id> {
         match self {
             Self::Id(id) => Some(id),
@@ -161,6 +163,7 @@ pub enum Instruction {
 }
 
 impl Instruction {
+    #[must_use]
     pub fn id(&self) -> Option<Id> {
         match self {
             Self::Select { dest, .. }

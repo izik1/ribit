@@ -1,10 +1,6 @@
-use std::mem;
-
 use super::{BinOp, CmpKind, Id, Instruction, Source};
-
 use crate::ssa::eval;
 use crate::{instruction, opcode, register, Width};
-use std::collections::HashMap;
 
 pub struct Context {
     next_id: Id,
@@ -71,7 +67,7 @@ impl Context {
     }
 
     pub fn load_register(&mut self, reg: Option<register::RiscV>) -> Source {
-        reg.map(|reg| self.read_register(reg)).unwrap_or(Source::Val(0))
+        reg.map_or(Source::Val(0), |reg| self.read_register(reg))
     }
 
     pub fn read_memory(&mut self, src: Source, width: Width, sign_extend: bool) -> Source {
@@ -158,6 +154,7 @@ impl Context {
         self.instructions.push(Instruction::Fence)
     }
 
+    #[must_use]
     pub fn ret_with_code(mut self, addr: Source, code: Source) -> Vec<Instruction> {
         for (idx, src) in self.registers.iter().enumerate().skip(1) {
             let dest = register::RiscV::with_u8(idx as u8).unwrap();
@@ -175,17 +172,19 @@ impl Context {
         self.instructions
     }
 
+    #[must_use]
     pub fn ret_with_addr(self, addr: Source) -> Vec<Instruction> {
         self.ret_with_code(addr, Source::Val(0))
     }
 
+    #[must_use]
     pub fn ret(self) -> Vec<Instruction> {
         let pc = self.pc;
         self.ret_with_addr(pc)
     }
 }
 
-pub fn lower_non_terminal(ctx: &mut Context, instruction: instruction::Instruction, len: u32) {
+pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, len: u32) {
     match instruction {
         instruction::Instruction::J(_)
         | instruction::Instruction::Sys(_)
@@ -206,7 +205,7 @@ pub fn lower_non_terminal(ctx: &mut Context, instruction: instruction::Instructi
                 let src = ctx.load_register(rs1);
                 let offset = ctx.add(src, Source::Val(imm));
 
-                let mem = ctx.read_memory(src, width, true);
+                let mem = ctx.read_memory(offset, width, true);
 
                 if let Some(rd) = rd {
                     ctx.write_register(rd, mem);
@@ -219,7 +218,7 @@ pub fn lower_non_terminal(ctx: &mut Context, instruction: instruction::Instructi
                 let src = ctx.load_register(rs1);
                 let offset = ctx.add(src, Source::Val(imm));
 
-                let mem = ctx.read_memory(src, width, false);
+                let mem = ctx.read_memory(offset, width, false);
 
                 if let Some(rd) = rd {
                     ctx.write_register(rd, mem);
@@ -317,7 +316,8 @@ pub fn lower_non_terminal(ctx: &mut Context, instruction: instruction::Instructi
     ctx.add_pc(Source::Val(len));
 }
 
-pub fn lower_terminal(
+#[must_use]
+pub fn terminal(
     mut ctx: Context,
     instruction: instruction::Instruction,
     len: u32,
@@ -409,14 +409,14 @@ pub fn lower_terminal(
 #[cfg(test)]
 mod test {
     use super::Context;
-    use crate::ssa::{cmp_instrs, debug_print_instrs, lower::lower_non_terminal};
+    use crate::ssa::{cmp_instrs, debug_print_instrs, lower::non_terminal};
     use crate::{instruction, opcode, register};
 
     #[test]
     fn jal_basic() {
         let ctx = Context::new(0);
 
-        let instrs = super::lower_terminal(
+        let instrs = super::terminal(
             ctx,
             instruction::Instruction::J(instruction::J {
                 imm: 4096,
@@ -433,7 +433,7 @@ mod test {
     fn sys_break() {
         let ctx = Context::new(0);
 
-        let instrs = super::lower_terminal(
+        let instrs = super::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,
@@ -445,13 +445,13 @@ mod test {
     #[test]
     fn addi_nop() {
         let mut ctx = Context::new(0);
-        lower_non_terminal(
+        non_terminal(
             &mut ctx,
             instruction::Instruction::I(instruction::I::new(0, None, None, opcode::I::ADDI)),
             4,
         );
 
-        let instrs = super::lower_terminal(
+        let instrs = super::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,
@@ -463,7 +463,7 @@ mod test {
     #[test]
     fn branch_0_0_eq() {
         let ctx = Context::new(0);
-        let instrs = super::lower_terminal(
+        let instrs = super::terminal(
             ctx,
             instruction::Instruction::B(instruction::B::new(1024, None, None, opcode::Cmp::Eq)),
             4,
@@ -475,7 +475,7 @@ mod test {
     #[test]
     fn branch_0_x1_eq() {
         let ctx = Context::new(0);
-        let instrs = super::lower_terminal(
+        let instrs = super::terminal(
             ctx,
             instruction::Instruction::B(instruction::B::new(
                 1024,
@@ -500,7 +500,7 @@ mod test {
     #[test]
     fn addi_no_dest() {
         let mut ctx = Context::new(0);
-        lower_non_terminal(
+        non_terminal(
             &mut ctx,
             instruction::Instruction::I(instruction::I::new(
                 50,
@@ -511,7 +511,7 @@ mod test {
             4,
         );
 
-        let instrs = super::lower_terminal(
+        let instrs = super::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,
@@ -523,7 +523,7 @@ mod test {
     #[test]
     fn addi_no_src() {
         let mut ctx = Context::new(0);
-        lower_non_terminal(
+        non_terminal(
             &mut ctx,
             instruction::Instruction::I(instruction::I::new(
                 50,
@@ -534,7 +534,7 @@ mod test {
             4,
         );
 
-        let instrs = super::lower_terminal(
+        let instrs = super::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,

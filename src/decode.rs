@@ -36,7 +36,7 @@ pub const fn sign_extend_32(value: u32, data_bits: u8) -> u32 {
 }
 
 #[allow(clippy::too_many_lines)]
-pub fn decode_instruction(instruction: u32) -> Result<Instruction, DecodeError> {
+pub fn instruction(instruction: u32) -> Result<Instruction, DecodeError> {
     log::debug!("instruction: {:032b}", instruction);
     let funct3 = ((instruction >> 12) & 0b0000_0111) as u8;
     let funct7 = ((instruction >> 25) & 0b0111_1111) as u8;
@@ -232,11 +232,11 @@ fn decode_branch(instruction: u32) -> Result<instruction::B, DecodeError> {
 
 #[cfg(test)]
 mod test {
-    use crate::{instruction::Instruction, opcode};
+    use crate::{decode, instruction::Instruction, opcode};
+
     #[test]
     fn decode_ebreak() {
-        let instruction =
-            super::decode_instruction(0b0000_0000_0001_0000_0000_0000_0111_0011).unwrap();
+        let instruction = decode::instruction(0b0000_0000_0001_0000_0000_0000_0111_0011).unwrap();
         if let Instruction::Sys(instruction) = instruction {
             assert_eq!(instruction.opcode, opcode::RSys::EBREAK)
         } else {
