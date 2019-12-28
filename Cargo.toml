@@ -14,3 +14,6 @@ itertools = "0.8.2"
 rasen = { git = "https://github.com/izik1/rasen", rev = "fea8cfd4b278027c540554a3c9108b35cdea183f" }
 memmap = "0.7.0"
 env_logger = "0.7.1"
+
+[dev-dependencies]
+insta = "0.12.0"

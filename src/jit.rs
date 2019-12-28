@@ -58,7 +58,6 @@ mod test {
     }
 
     #[test]
-    #[ignore]
     fn jal_basic() {
         let mut ctx = context::Runtime::new();
 
@@ -80,7 +79,7 @@ mod test {
         let mut pc = 0;
 
         ctx.execute_basic_block(&mut pc, &mut regs, &mut memory);
-        assert_eq!(pc, 4096 + 4);
+        assert_eq!(pc, 4096);
 
         for idx in 1..regs.len() {
             match idx {
@@ -129,7 +128,6 @@ mod test {
     }
 
     #[test]
-    #[ignore]
     fn reg0_unwritable_imm() {
         let mut ctx = context::Runtime::new();
 
@@ -150,7 +148,7 @@ mod test {
         let mut pc = 0;
 
         ctx.execute_basic_block(&mut pc, &mut regs, &mut memory);
-        assert_eq!(pc, 4096 + 4);
+        assert_eq!(pc, 4096);
 
         for idx in 0..regs.len() {
             match idx {
