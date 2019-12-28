@@ -1,0 +1,16 @@
+---
+source: src/ssa/opt.rs
+expression: DisplayDeferSlice(&instrs)
+---
+%0 = x10
+%1 = x11
+%2 = add %0, %1
+%3 = srl %2, 31
+%4 = and %2, %3
+%5 = add %0, %4
+%6 = x1
+%7 = add %6, 1040
+x10 = %5
+x11 = %4
+x12 = %3
+ret 0, %7

@@ -7,6 +7,7 @@ pub mod lower;
 pub mod opt;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct Id(u16);
 
 impl fmt::Display for Id {
@@ -16,6 +17,7 @@ impl fmt::Display for Id {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub enum CmpKind {
     Eq,
     Ne,
@@ -52,6 +54,7 @@ impl fmt::Display for CmpKind {
 }
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub enum Source {
     Val(u32),
     Id(Id),
@@ -85,6 +88,7 @@ impl fmt::Display for Source {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub enum BinOp {
     And,
     Add,
@@ -112,6 +116,7 @@ impl fmt::Display for BinOp {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub enum Instruction {
     ReadReg {
         dest: Id,
@@ -230,7 +235,6 @@ impl fmt::Display for Instruction {
 mod test {
     use super::{lower, Id, Instruction, Source};
     use crate::register;
-    use crate::ssa::debug_print_instrs;
 
     #[test]
     fn empty() {
@@ -302,21 +306,5 @@ mod test {
                 src: Source::Val(0)
             }
         );
-    }
-}
-
-#[cfg(test)]
-fn cmp_instrs(expected: &[&str], actual: &[Instruction]) {
-    for (idx, instr) in actual.iter().enumerate() {
-        assert_eq!(expected[idx], format!("{}", instr));
-        println!("{}", instr);
-    }
-}
-
-#[cfg_attr(test, allow(dead_code))]
-#[cfg(test)]
-fn debug_print_instrs(instrs: &[Instruction]) {
-    for instr in instrs {
-        println!("{}", instr)
     }
 }

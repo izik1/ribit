@@ -193,8 +193,11 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
 
 #[cfg(test)]
 mod test {
-    use crate::ssa::{cmp_instrs, debug_print_instrs, lower};
+    use crate::ssa::lower;
+    use crate::DisplayDeferSlice;
     use crate::{instruction, opcode, register};
+
+    use insta::{assert_display_snapshot, assert_ron_snapshot};
 
     #[test]
     fn jal_basic_const_prop() {
@@ -212,7 +215,7 @@ mod test {
 
         super::fold_and_prop_consts(&mut instrs);
 
-        cmp_instrs(&["x4 = 4", "ret 0, 4096"], &instrs);
+        assert_display_snapshot!(DisplayDeferSlice(&instrs));
     }
 
     #[test]
@@ -277,23 +280,7 @@ mod test {
         super::fold_and_prop_consts(&mut instrs);
         let instrs = super::dead_instruction_elimination(&instrs);
 
-        cmp_instrs(
-            &[
-                "%0 = x10",
-                "%1 = x11",
-                "%2 = add %0, %1",
-                "%3 = srl %2, 31",
-                "%4 = and %2, %3",
-                "%5 = add %0, %4",
-                "%6 = x1",
-                "%7 = add %6, 1040",
-                "x10 = %5",
-                "x11 = %4",
-                "x12 = %3",
-                "ret 0, %7",
-            ],
-            &instrs,
-        );
+        assert_display_snapshot!(DisplayDeferSlice(&instrs));
     }
 
     #[test]
@@ -313,6 +300,6 @@ mod test {
         super::fold_and_prop_consts(&mut instrs);
         let instrs = super::dead_instruction_elimination(&instrs);
 
-        cmp_instrs(&["x4 = 4", "ret 0, 4096"], &instrs);
+        assert_display_snapshot!(DisplayDeferSlice(&instrs));
     }
 }

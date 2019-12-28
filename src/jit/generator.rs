@@ -7,12 +7,15 @@ mod cmp;
 mod math;
 mod memory;
 
+use crate::jit::Assembler;
 use crate::{
     instruction::{self, Instruction},
     opcode, register,
 };
-use crate::jit::Assembler;
-use rasen::params::{Register, Imm32, Reg32, mem::{Mem, Mem32}};
+use rasen::params::{
+    mem::{Mem, Mem32},
+    Imm32, Reg32, Register,
+};
 
 pub struct BlockBuilder<'a, 'b: 'a> {
     stream: Assembler<'a, 'b>,
@@ -21,10 +24,7 @@ pub struct BlockBuilder<'a, 'b: 'a> {
 }
 
 impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
-    pub(super) fn start(
-        stream: Assembler<'a, 'b>,
-        check_ranges: CheckRanges,
-    ) -> Self {
+    pub(super) fn start(stream: Assembler<'a, 'b>, check_ranges: CheckRanges) -> Self {
         if !raw_cpuid::CpuId::new()
             .get_extended_feature_info()
             .map_or(false, |feats| feats.has_bmi2())
@@ -121,22 +121,18 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
 
     fn mov_eax_imm(&mut self, imm: u32) {
         if imm == 0 {
-            self.stream
-                .xor_reg_reg(Reg32::ZAX, Reg32::ZAX).unwrap();
+            self.stream.xor_reg_reg(Reg32::ZAX, Reg32::ZAX).unwrap();
         } else {
-            self.stream
-                .mov_reg_imm(Reg32::ZAX, Imm32(imm)).unwrap();
+            self.stream.mov_reg_imm(Reg32::ZAX, Imm32(imm)).unwrap();
         }
     }
 
     fn mov_r32_imm32(&mut self, register: register::Native, imm: u32) {
         let register = Reg32(register.as_rasen_reg());
         if imm == 0 {
-            self.stream
-                .xor_reg_reg(register, register).unwrap();
+            self.stream.xor_reg_reg(register, register).unwrap();
         } else {
-            self.stream
-                .mov_reg_imm(register, Imm32(imm)).unwrap();
+            self.stream.mov_reg_imm(register, Imm32(imm)).unwrap();
         }
     }
 
@@ -149,23 +145,28 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 (LoadProfile::Lazy, LoadProfile::Eager),
             );
 
-            self.stream.mov_reg_reg(
-                Reg32(native_dest.as_rasen_reg()),
-                Reg32(native_src.as_rasen_reg()),
-            ).unwrap();
+            self.stream
+                .mov_reg_reg(
+                    Reg32(native_dest.as_rasen_reg()),
+                    Reg32(native_src.as_rasen_reg()),
+                )
+                .unwrap();
             self.register_manager.set_dirty(dest);
         }
     }
 
     fn test_r32(&mut self, register: register::Native) {
         let register = Reg32(register.as_rasen_reg());
-        self.stream
-            .test_reg_reg(register, register).unwrap();
+        self.stream.test_reg_reg(register, register).unwrap();
     }
 
     fn cmp_r32_r32(&mut self, register1: register::Native, register2: register::Native) {
         self.stream
-            .cmp_reg_reg(Reg32(register1.as_rasen_reg()), Reg32(register2.as_rasen_reg())).unwrap();
+            .cmp_reg_reg(
+                Reg32(register1.as_rasen_reg()),
+                Reg32(register2.as_rasen_reg()),
+            )
+            .unwrap();
     }
 }
 
@@ -175,10 +176,15 @@ pub(super) fn generate_register_write_imm(
     rv_reg: register::RiscV,
     value: u32,
 ) {
-    basic_block.mov_mem_imm(
-        Mem32(Mem::base_displacement(Register::Zdi, rv_reg.as_offset() as i32)),
-        Imm32(value),
-    ).unwrap();
+    basic_block
+        .mov_mem_imm(
+            Mem32(Mem::base_displacement(
+                Register::Zdi,
+                rv_reg.as_offset() as i32,
+            )),
+            Imm32(value),
+        )
+        .unwrap();
 }
 
 fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
@@ -219,14 +225,18 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
                 // need to free all the registers before reading from mem (stupid and unoptimized, but it prevents bugs)
                 builder.register_manager.free_all(&mut builder.stream);
 
-                builder.stream.add_reg_mem(
-                    Register::Zax,
-                    Mem32(Mem::base_displacement(Register::Zdi, rs1.as_offset() as i32)),
-                ).unwrap();
-
                 builder
                     .stream
-                    .btr_reg_imm8(Reg32::ZAX, 0_u8).unwrap();
+                    .add_reg_mem(
+                        Register::Zax,
+                        Mem32(Mem::base_displacement(
+                            Register::Zdi,
+                            rs1.as_offset() as i32,
+                        )),
+                    )
+                    .unwrap();
+
+                builder.stream.btr_reg_imm8(Reg32::ZAX, 0_u8).unwrap();
             } else {
                 let imm = imm as i16 as u32;
                 // avoid generating a btr for a constant by clearing the bit here.
@@ -245,7 +255,8 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
             let return_value = BlockReturn::from_parts(next_start_address, return_code).as_u64();
             builder
                 .stream
-                .mov_reg_imm64(Register::Zax, return_value).unwrap();
+                .mov_reg_imm64(Register::Zax, return_value)
+                .unwrap();
         }
 
         Instruction::I(_)
@@ -377,10 +388,13 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
             (Some(rs1), Some(rs2)) => {
                 let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
                 builder.register_manager.set_dirty(rd);
-                builder.stream.lea_reg_mem(
-                    native_rd.as_rasen_reg(),
-                    Mem32(Mem::base_index(rs1.as_rasen_reg(), rs2.as_rasen_reg()).unwrap()),
-                ).unwrap();
+                builder
+                    .stream
+                    .lea_reg_mem(
+                        native_rd.as_rasen_reg(),
+                        Mem32(Mem::base_index(rs1.as_rasen_reg(), rs2.as_rasen_reg()).unwrap()),
+                    )
+                    .unwrap();
             }
         },
 
@@ -395,14 +409,17 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                 let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
                 builder
                     .stream
-                    .mov_reg_reg(Reg32::ZAX, rs2.as_rasen_reg()).unwrap();
+                    .mov_reg_reg(Reg32::ZAX, rs2.as_rasen_reg())
+                    .unwrap();
                 builder
                     .stream
-                    .add_reg_reg(Reg32::ZAX, rs1.as_rasen_reg()).unwrap();
+                    .add_reg_reg(Reg32::ZAX, rs1.as_rasen_reg())
+                    .unwrap();
                 builder.register_manager.set_dirty(rd);
                 builder
                     .stream
-                    .mov_reg_reg(native_rd.as_rasen_reg(), Reg32::ZAX).unwrap();
+                    .mov_reg_reg(native_rd.as_rasen_reg(), Reg32::ZAX)
+                    .unwrap();
             }
             _ => builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate)),
         },
@@ -420,14 +437,17 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                 let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
                 builder
                     .stream
-                    .mov_reg_reg(Reg32::ZAX, rs2.as_rasen_reg()).unwrap();
+                    .mov_reg_reg(Reg32::ZAX, rs2.as_rasen_reg())
+                    .unwrap();
                 builder
                     .stream
-                    .or_reg_reg(Reg32::ZAX, rs1.as_rasen_reg()).unwrap();
+                    .or_reg_reg(Reg32::ZAX, rs1.as_rasen_reg())
+                    .unwrap();
                 builder.register_manager.set_dirty(rd);
                 builder
                     .stream
-                    .mov_reg_reg(native_rd.as_rasen_reg(), Reg32::ZAX).unwrap();
+                    .mov_reg_reg(native_rd.as_rasen_reg(), Reg32::ZAX)
+                    .unwrap();
             }
         },
 
@@ -444,14 +464,17 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                 let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
                 builder
                     .stream
-                    .mov_reg_reg(Reg32::ZAX, rs2.as_rasen_reg()).unwrap();
+                    .mov_reg_reg(Reg32::ZAX, rs2.as_rasen_reg())
+                    .unwrap();
                 builder
                     .stream
-                    .xor_reg_reg(Reg32::ZAX, rs1.as_rasen_reg()).unwrap();
+                    .xor_reg_reg(Reg32::ZAX, rs1.as_rasen_reg())
+                    .unwrap();
                 builder.register_manager.set_dirty(rd);
                 builder
                     .stream
-                    .mov_reg_reg(native_rd.as_rasen_reg(), Reg32::ZAX).unwrap();
+                    .mov_reg_reg(native_rd.as_rasen_reg(), Reg32::ZAX)
+                    .unwrap();
             }
         },
 
@@ -473,7 +496,8 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                         Reg32(native_rd.as_rasen_reg()),
                         rs1.as_rasen_reg(),
                         rs2.as_rasen_reg(),
-                    ).unwrap();
+                    )
+                    .unwrap();
             }
         },
 
@@ -495,7 +519,8 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                         Reg32(native_rd.as_rasen_reg()),
                         rs1.as_rasen_reg(),
                         rs2.as_rasen_reg(),
-                    ).unwrap();
+                    )
+                    .unwrap();
             }
         },
 
@@ -512,14 +537,17 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                 let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
                 builder
                     .stream
-                    .mov_reg_reg(Reg32::ZAX, rs2.as_rasen_reg()).unwrap();
+                    .mov_reg_reg(Reg32::ZAX, rs2.as_rasen_reg())
+                    .unwrap();
                 builder
                     .stream
-                    .sub_reg_reg(Reg32::ZAX, rs1.as_rasen_reg()).unwrap();
+                    .sub_reg_reg(Reg32::ZAX, rs1.as_rasen_reg())
+                    .unwrap();
                 builder.register_manager.set_dirty(rd);
                 builder
                     .stream
-                    .mov_reg_reg(native_rd.as_rasen_reg(), Reg32::ZAX).unwrap();
+                    .mov_reg_reg(native_rd.as_rasen_reg(), Reg32::ZAX)
+                    .unwrap();
             }
         },
 
@@ -541,7 +569,8 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                         Reg32(native_rd.as_rasen_reg()),
                         rs1.as_rasen_reg(),
                         rs2.as_rasen_reg(),
-                    ).unwrap();
+                    )
+                    .unwrap();
             }
         },
 

@@ -20,6 +20,7 @@ pub mod ssa;
 
 // note: RISC-V would have these be: B, H(W), W
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub enum Width {
     Byte,
     Word,
@@ -87,6 +88,22 @@ impl std::fmt::Display for Extension {
     }
 }
 
+pub struct DisplayDeferSlice<'a, T: std::fmt::Display>(&'a [T]);
+
+impl<'a, T: std::fmt::Display> std::fmt::Display for DisplayDeferSlice<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if let Some(item) = self.0.first() {
+            write!(f, "{}", item)?;
+        }
+
+        for item in self.0.iter().skip(1) {
+            write!(f, "\n{}", item)?;
+        }
+
+        Ok(())
+    }
+}
+
 pub struct Cpu {
     // xregs[0] is fixed to 0
     xregs: [u32; XLEN],
@@ -129,7 +146,6 @@ impl Cpu {
                 .try_into()
                 .expect("bad slice size expected 2???"),
         );
-
 
         let instr = decode::compressed::decode_instruction(instr)?;
         let info = instruction::Info::new(instr, self.pc, 2);

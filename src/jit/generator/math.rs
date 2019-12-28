@@ -1,8 +1,8 @@
 use super::{BlockBuilder, LoadProfile, StoreProfile};
-use crate::register;
 use crate::jit::Assembler;
-use rasen::params::{Imm32, Reg32};
+use crate::register;
 use rasen::params::mem::{Mem, Mem32};
+use rasen::params::{Imm32, Reg32};
 
 pub enum ShiftKind {
     LL,
@@ -30,10 +30,13 @@ pub fn addi(
 
             builder.register_manager.set_dirty(rd);
 
-            builder.stream.lea_reg_mem(
-                native_rd.as_rasen_reg(),
-                Mem32(Mem::base_displacement(rs.as_rasen_reg(), imm as i32)),
-            ).unwrap();
+            builder
+                .stream
+                .lea_reg_mem(
+                    native_rd.as_rasen_reg(),
+                    Mem32(Mem::base_displacement(rs.as_rasen_reg(), imm as i32)),
+                )
+                .unwrap();
         }
 
         (Some(rs), _) => {
@@ -41,7 +44,8 @@ pub fn addi(
             builder.register_manager.set_dirty(rd);
             builder
                 .stream
-                .add_reg_imm(rs.as_rasen_reg(), Imm32(imm)).unwrap();
+                .add_reg_imm(rs.as_rasen_reg(), Imm32(imm))
+                .unwrap();
         }
     }
 }
@@ -102,7 +106,8 @@ pub fn andi(
             let rd = builder.ez_alloc(rd);
             builder
                 .stream
-                .and_reg_imm(rd.as_rasen_reg(), Imm32(imm)).unwrap()
+                .and_reg_imm(rd.as_rasen_reg(), Imm32(imm))
+                .unwrap()
         }
     }
 }

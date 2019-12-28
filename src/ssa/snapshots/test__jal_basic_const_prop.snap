@@ -1,0 +1,6 @@
+---
+source: src/ssa/opt.rs
+expression: DisplayDeferSlice(&instrs)
+---
+x4 = 4
+ret 0, 4096

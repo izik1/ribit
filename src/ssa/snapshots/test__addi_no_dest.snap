@@ -1,0 +1,7 @@
+---
+source: src/ssa/lower.rs
+expression: DisplayDeferSlice(&instrs)
+---
+%0 = x1
+%1 = add %0, 50
+ret 1, 8

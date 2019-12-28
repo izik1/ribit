@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
-use crate::register;
 use crate::jit::Assembler;
+use crate::register;
 use rasen::params::mem::{Mem, Mem32};
 use rasen::params::Register;
 
@@ -10,10 +10,15 @@ fn writeback_register(
     native_reg: register::Native,
     rv_reg: register::RiscV,
 ) {
-    basic_block.mov_mem_reg(
-        Mem32(Mem::base_displacement(Register::Zdi, rv_reg.as_offset() as i32)),
-        native_reg.as_rasen_reg(),
-    ).unwrap();
+    basic_block
+        .mov_mem_reg(
+            Mem32(Mem::base_displacement(
+                Register::Zdi,
+                rv_reg.as_offset() as i32,
+            )),
+            native_reg.as_rasen_reg(),
+        )
+        .unwrap();
 }
 
 fn read_register(
@@ -21,10 +26,15 @@ fn read_register(
     native_reg: register::Native,
     rv_reg: register::RiscV,
 ) {
-    basic_block.mov_reg_mem(
-        native_reg.as_rasen_reg(),
-        Mem32(Mem::base_displacement(Register::Zdi, rv_reg.as_offset() as i32)),
-    ).unwrap();
+    basic_block
+        .mov_reg_mem(
+            native_reg.as_rasen_reg(),
+            Mem32(Mem::base_displacement(
+                Register::Zdi,
+                rv_reg.as_offset() as i32,
+            )),
+        )
+        .unwrap();
 }
 
 // todo: use this in the builder (as an optional arg) to allow writing to a register:
@@ -124,11 +134,7 @@ impl RegisterManager {
         }
     }
 
-    pub fn load(
-        &mut self,
-        rv32_reg: register::RiscV,
-        stream: &mut Assembler,
-    ) -> Result<(), ()> {
+    pub fn load(&mut self, rv32_reg: register::RiscV, stream: &mut Assembler) -> Result<(), ()> {
         let native_reg = self.find_native_register(rv32_reg).ok_or(())?;
 
         if self.to_load_map.is_set(rv32_reg) {

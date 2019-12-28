@@ -277,11 +277,7 @@ impl U {
 
         let imm = instruction & 0xffff_f000;
 
-        Self {
-            rd,
-            imm,
-            opcode,
-        }
+        Self { rd, imm, opcode }
     }
 }
 

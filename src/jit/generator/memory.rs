@@ -2,8 +2,11 @@ use super::BlockBuilder;
 use crate::register;
 use crate::Width;
 
-use rasen::params::{Imm32, Register, mem::{Mem8, Mem16, Mem32}, W32, Imm16, Imm8};
 use rasen::params::mem::Mem;
+use rasen::params::{
+    mem::{Mem16, Mem32, Mem8},
+    Imm16, Imm32, Imm8, Register, W32,
+};
 
 #[derive(Clone)]
 pub enum Memory {
@@ -14,10 +17,10 @@ pub enum Memory {
 
 impl Memory {
     pub fn new(width: Width, imm: u16) -> Self {
-        Self::with_mem_width(width, Mem::base_displacement(
-            Register::Zdx,
-            imm_16_to_addr(imm) as i32,
-        ))
+        Self::with_mem_width(
+            width,
+            Mem::base_displacement(Register::Zdx, imm_16_to_addr(imm) as i32),
+        )
     }
 
     fn with_mem_width(width: Width, mem: Mem) -> Self {
@@ -29,10 +32,10 @@ impl Memory {
     }
 
     pub fn mem_eax(width: Width) -> Self {
-        Self::with_mem_width(width, Mem::base_index(
-            Register::Zdx,
-            Register::Zax,
-        ).unwrap())
+        Self::with_mem_width(
+            width,
+            Mem::base_index(Register::Zdx, Register::Zax).unwrap(),
+        )
     }
 }
 
@@ -46,17 +49,11 @@ pub const fn imm_16_to_addr(imm: u16) -> u32 {
 
 pub fn store_src_0(builder: &mut BlockBuilder, displacement: Memory) {
     match displacement {
-        Memory::Byte(displacement) => builder
-            .stream
-            .mov_mem_imm(displacement, Imm8(0)).unwrap(),
+        Memory::Byte(displacement) => builder.stream.mov_mem_imm(displacement, Imm8(0)).unwrap(),
 
-        Memory::Word(displacement) => builder
-            .stream
-            .mov_mem_imm(displacement, Imm16(0)).unwrap(),
+        Memory::Word(displacement) => builder.stream.mov_mem_imm(displacement, Imm16(0)).unwrap(),
 
-        Memory::DWord(displacement) => builder
-            .stream
-            .mov_mem_imm(displacement, Imm32(0)).unwrap(),
+        Memory::DWord(displacement) => builder.stream.mov_mem_imm(displacement, Imm32(0)).unwrap(),
     };
 }
 
@@ -64,15 +61,18 @@ pub fn store(builder: &mut BlockBuilder, base: Memory, src: register::Native) {
     match base {
         Memory::Byte(displacement) => builder
             .stream
-            .mov_mem_reg(displacement, src.as_rasen_reg()).unwrap(),
+            .mov_mem_reg(displacement, src.as_rasen_reg())
+            .unwrap(),
 
         Memory::Word(displacement) => builder
             .stream
-            .mov_mem_reg(displacement, src.as_rasen_reg()).unwrap(),
+            .mov_mem_reg(displacement, src.as_rasen_reg())
+            .unwrap(),
 
         Memory::DWord(displacement) => builder
             .stream
-            .mov_mem_reg(displacement, src.as_rasen_reg()).unwrap(),
+            .mov_mem_reg(displacement, src.as_rasen_reg())
+            .unwrap(),
     };
 }
 
@@ -117,13 +117,16 @@ fn load(builder: &mut BlockBuilder, base: Memory, dest: register::Native) {
     match base {
         Memory::Byte(displacement) => builder
             .stream
-            .movsx_reg_mem8::<W32, _, _>(dest.as_rasen_reg(), displacement).unwrap(),
+            .movsx_reg_mem8::<W32, _, _>(dest.as_rasen_reg(), displacement)
+            .unwrap(),
         Memory::Word(displacement) => builder
             .stream
-            .movsx_reg_mem16::<W32, _, _>(dest.as_rasen_reg(), displacement).unwrap(),
+            .movsx_reg_mem16::<W32, _, _>(dest.as_rasen_reg(), displacement)
+            .unwrap(),
         Memory::DWord(displacement) => builder
             .stream
-            .mov_reg_mem(dest.as_rasen_reg(), displacement).unwrap(),
+            .mov_reg_mem(dest.as_rasen_reg(), displacement)
+            .unwrap(),
     }
 }
 
@@ -131,23 +134,33 @@ fn loadu(builder: &mut BlockBuilder, base: Memory, dest: register::Native) {
     match base {
         Memory::Byte(displacement) => builder
             .stream
-            .movzx_reg_mem8::<W32, _, _>(dest.as_rasen_reg(), displacement).unwrap(),
+            .movzx_reg_mem8::<W32, _, _>(dest.as_rasen_reg(), displacement)
+            .unwrap(),
         Memory::Word(displacement) => builder
             .stream
-            .movzx_reg_mem16::<W32, _, _>(dest.as_rasen_reg(), displacement).unwrap(),
+            .movzx_reg_mem16::<W32, _, _>(dest.as_rasen_reg(), displacement)
+            .unwrap(),
         Memory::DWord(displacement) => builder
             .stream
-            .mov_reg_mem(dest.as_rasen_reg(), displacement).unwrap(),
+            .mov_reg_mem(dest.as_rasen_reg(), displacement)
+            .unwrap(),
     }
 }
 
 pub fn dyn_address(builder: &mut BlockBuilder, base: register::Native, imm: u16) {
-    builder.stream.lea_reg_mem(
-        Register::Zax,
-        Mem32(Mem::base_displacement(base.as_rasen_reg(), (imm as i16 as u32) as i32))
-    ).unwrap();
+    builder
+        .stream
+        .lea_reg_mem(
+            Register::Zax,
+            Mem32(Mem::base_displacement(
+                base.as_rasen_reg(),
+                (imm as i16 as u32) as i32,
+            )),
+        )
+        .unwrap();
 
     builder
         .stream
-        .and_zax_imm(Imm32(crate::MEMORY_SIZE - 1)).unwrap();
+        .and_zax_imm(Imm32(crate::MEMORY_SIZE - 1))
+        .unwrap();
 }

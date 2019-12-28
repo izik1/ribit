@@ -409,8 +409,10 @@ pub fn terminal(
 #[cfg(test)]
 mod test {
     use super::Context;
-    use crate::ssa::{cmp_instrs, debug_print_instrs, lower::non_terminal};
+    use crate::DisplayDeferSlice;
     use crate::{instruction, opcode, register};
+
+    use insta::{assert_display_snapshot, assert_ron_snapshot};
 
     #[test]
     fn jal_basic() {
@@ -426,7 +428,7 @@ mod test {
             4,
         );
 
-        cmp_instrs(&["x4 = 4", "ret 0, 4096"], &instrs);
+        assert_display_snapshot!(DisplayDeferSlice(&instrs));
     }
 
     #[test]
@@ -439,13 +441,13 @@ mod test {
             4,
         );
 
-        cmp_instrs(&["ret 1, 4"], &instrs);
+        assert_display_snapshot!(DisplayDeferSlice(&instrs));
     }
 
     #[test]
     fn addi_nop() {
         let mut ctx = Context::new(0);
-        non_terminal(
+        super::non_terminal(
             &mut ctx,
             instruction::Instruction::I(instruction::I::new(0, None, None, opcode::I::ADDI)),
             4,
@@ -457,7 +459,7 @@ mod test {
             4,
         );
 
-        cmp_instrs(&["ret 1, 8"], &instrs);
+        assert_display_snapshot!(DisplayDeferSlice(&instrs));
     }
 
     #[test]
@@ -469,7 +471,7 @@ mod test {
             4,
         );
 
-        cmp_instrs(&["ret 0, 1024"], &instrs);
+        assert_display_snapshot!(DisplayDeferSlice(&instrs));
     }
 
     #[test]
@@ -486,21 +488,13 @@ mod test {
             4,
         );
 
-        cmp_instrs(
-            &[
-                "%0 = x1",
-                "%1 = cmp EQ 0, %0",
-                "%2 = select %1, 1024, 4",
-                "ret 0, %2",
-            ],
-            &instrs,
-        );
+        assert_display_snapshot!(DisplayDeferSlice(&instrs));
     }
 
     #[test]
     fn addi_no_dest() {
         let mut ctx = Context::new(0);
-        non_terminal(
+        super::non_terminal(
             &mut ctx,
             instruction::Instruction::I(instruction::I::new(
                 50,
@@ -517,13 +511,13 @@ mod test {
             4,
         );
 
-        cmp_instrs(&["%0 = x1", "%1 = add %0, 50", "ret 1, 8"], &instrs);
+        assert_display_snapshot!(DisplayDeferSlice(&instrs));
     }
 
     #[test]
     fn addi_no_src() {
         let mut ctx = Context::new(0);
-        non_terminal(
+        super::non_terminal(
             &mut ctx,
             instruction::Instruction::I(instruction::I::new(
                 50,
@@ -540,6 +534,6 @@ mod test {
             4,
         );
 
-        cmp_instrs(&["x2 = 50", "ret 1, 8"], &instrs);
+        assert_display_snapshot!(DisplayDeferSlice(&instrs));
     }
 }

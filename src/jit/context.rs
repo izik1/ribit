@@ -2,18 +2,23 @@ use std::ops::Range;
 
 use super::{generator::BlockBuilder, ReturnCode};
 use crate::instruction;
-use std::io::Cursor;
 use crate::jit::BasicBlock;
+use std::io::Cursor;
 use std::mem;
 
 mod sbi {
     #[repr(u32)]
     enum StatusCode {
         Success = 0,
+        #[allow(dead_code)]
         ErrFailure = -1i32 as u32,
+        #[allow(dead_code)]
         ErrNotSupported = -2i32 as u32,
+        #[allow(dead_code)]
         ErrInvalidParam = -3i32 as u32,
+        #[allow(dead_code)]
         ErrDenied = -4i32 as u32,
+        #[allow(dead_code)]
         ErrInvalidAddress = -51i32 as u32,
     }
 
@@ -34,7 +39,7 @@ mod sbi {
             _ => {
                 log::warn!("Unsupported!");
                 unsupported()
-            },
+            }
         };
 
         regs[10] = code as u32; // a0
@@ -147,14 +152,26 @@ impl Runtime {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            buffer: Some(memmap::MmapOptions::new().len(4096 * 16).stack().map_anon().unwrap().make_exec().unwrap()),
+            buffer: Some(
+                memmap::MmapOptions::new()
+                    .len(4096 * 16)
+                    .stack()
+                    .map_anon()
+                    .unwrap()
+                    .make_exec()
+                    .unwrap(),
+            ),
             buffer_write_offset: 0,
             blocks: vec![],
             ranges: vec![],
         }
     }
 
-    fn make_fn(&mut self, block_instrs: Vec<instruction::Info>, branch: instruction::Info) -> BasicBlock {
+    fn make_fn(
+        &mut self,
+        block_instrs: Vec<instruction::Info>,
+        branch: instruction::Info,
+    ) -> BasicBlock {
         let buffer = self.buffer.take().expect("Failed to take buffer");
         let mut buffer = buffer.make_mut().unwrap();
         let funct_ptr = unsafe { buffer.as_mut_ptr().add(self.buffer_write_offset as usize) };

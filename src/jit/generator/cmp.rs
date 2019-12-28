@@ -5,7 +5,7 @@ use crate::{
     opcode, register,
 };
 
-use rasen::params::{Imm32, Register, Reg32};
+use rasen::params::{Imm32, Reg32, Register};
 
 fn bool_cmp<T>(
     rs1: Option<register::RiscV>,
@@ -98,12 +98,30 @@ pub fn branch_conditional(
     builder.mov_r32_imm32(register::Native::RCX, jump_addr);
 
     match cmp_mode {
-        opcode::Cmp::Eq => builder.stream.cmove_reg_reg(Reg32::ZAX, Reg32::ZCX).unwrap(),
-        opcode::Cmp::Ne => builder.stream.cmovne_reg_reg(Reg32::ZAX, Reg32::ZCX).unwrap(),
-        opcode::Cmp::Lt => builder.stream.cmovl_reg_reg(Reg32::ZAX, Reg32::ZCX).unwrap(),
-        opcode::Cmp::Ge => builder.stream.cmovge_reg_reg(Reg32::ZAX, Reg32::ZCX).unwrap(),
-        opcode::Cmp::Ltu => builder.stream.cmovb_reg_reg(Reg32::ZAX, Reg32::ZCX).unwrap(),
-        opcode::Cmp::Geu => builder.stream.cmovae_reg_reg(Reg32::ZAX, Reg32::ZCX).unwrap(),
+        opcode::Cmp::Eq => builder
+            .stream
+            .cmove_reg_reg(Reg32::ZAX, Reg32::ZCX)
+            .unwrap(),
+        opcode::Cmp::Ne => builder
+            .stream
+            .cmovne_reg_reg(Reg32::ZAX, Reg32::ZCX)
+            .unwrap(),
+        opcode::Cmp::Lt => builder
+            .stream
+            .cmovl_reg_reg(Reg32::ZAX, Reg32::ZCX)
+            .unwrap(),
+        opcode::Cmp::Ge => builder
+            .stream
+            .cmovge_reg_reg(Reg32::ZAX, Reg32::ZCX)
+            .unwrap(),
+        opcode::Cmp::Ltu => builder
+            .stream
+            .cmovb_reg_reg(Reg32::ZAX, Reg32::ZCX)
+            .unwrap(),
+        opcode::Cmp::Geu => builder
+            .stream
+            .cmovae_reg_reg(Reg32::ZAX, Reg32::ZCX)
+            .unwrap(),
     }
 }
 
@@ -155,7 +173,8 @@ fn set_bool_conditional_internal<F>(
 
             builder
                 .stream
-                .mov_reg_reg(Reg32(native_rd.as_rasen_reg()), Register::Zax).unwrap();
+                .mov_reg_reg(Reg32(native_rd.as_rasen_reg()), Register::Zax)
+                .unwrap();
         }
     }
 }
@@ -226,7 +245,8 @@ pub fn set_bool_conditional_imm(
 
                     builder
                         .stream
-                        .cmp_reg_imm(rs.as_rasen_reg(), Imm32(immediate)).unwrap();
+                        .cmp_reg_imm(rs.as_rasen_reg(), Imm32(immediate))
+                        .unwrap();
                     Some(native_rd.as_rasen_reg())
                 }
             }

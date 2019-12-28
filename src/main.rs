@@ -13,9 +13,11 @@ fn main() {
         if let Err(e) = cpu.run() {
             match e {
                 DecodeError::Other => panic!("Non specfic decode error"),
-                DecodeError::InvalidInstruction(instruction) => {
-                    panic!("Tried to parse invalid instruction: `{:08x}` @ pc {:08x}", instruction, cpu.pc())
-                }
+                DecodeError::InvalidInstruction(instruction) => panic!(
+                    "Tried to parse invalid instruction: `{:08x}` @ pc {:08x}",
+                    instruction,
+                    cpu.pc()
+                ),
                 DecodeError::UnimplementedExtension(ext, instruction) => panic!(
                     "Tried to parse instruction with unimplemented extension `{}`: `{:84x}`",
                     ext, instruction
@@ -23,7 +25,8 @@ fn main() {
                 DecodeError::Compressed(CompressedDecodeError::InvalidInstruction(instruction)) => {
                     panic!(
                         "Tried to parse invalid instruction: `{:04x}`.C @ pc {:08x}",
-                        instruction, cpu.pc()
+                        instruction,
+                        cpu.pc()
                     )
                 }
                 DecodeError::Compressed(CompressedDecodeError::UnimplementedExtension(

@@ -1,0 +1,5 @@
+---
+source: src/ssa/lower.rs
+expression: DisplayDeferSlice(&instrs)
+---
+ret 1, 4
