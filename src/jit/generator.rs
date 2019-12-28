@@ -284,7 +284,7 @@ fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::In
             unreachable!("blocks cannot contain a branch")
         }
 
-        Instruction::S(instruction) => generate_store_instruction(builder, instruction),
+        Instruction::S(instruction) => generate_store_instruction(builder, instruction).unwrap(),
 
         Instruction::I(instruction) => generate_immediate_instruction(builder, instruction),
         Instruction::IMem(instruction) => generate_immediate_mem_instruction(builder, instruction),
@@ -585,7 +585,10 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
     }
 }
 
-fn generate_store_instruction(builder: &mut BlockBuilder, instruction: instruction::S) {
+fn generate_store_instruction(
+    builder: &mut BlockBuilder,
+    instruction: instruction::S,
+) -> std::io::Result<()> {
     let instruction::S {
         imm,
         rs1,
@@ -597,22 +600,22 @@ fn generate_store_instruction(builder: &mut BlockBuilder, instruction: instructi
         (None, None) => memory::store_src_0(builder, memory::Memory::new(width, imm)),
         (None, Some(base)) => {
             let base = builder.ez_alloc(base);
-            memory::dyn_address(builder, base, imm);
+            memory::dyn_address(builder, base, imm)?;
 
-            memory::store_src_0(builder, memory::Memory::mem_eax(width));
+            memory::store_src_0(builder, memory::Memory::mem_eax(width))
         }
 
         (Some(src), None) => {
             let src = builder.ez_alloc(src);
-            memory::store(builder, memory::Memory::new(width, imm), src);
+            memory::store(builder, memory::Memory::new(width, imm), src)
         }
 
         (Some(src), Some(base)) => {
             let (base, src) = builder.ez_alloc2(base, src);
 
-            memory::dyn_address(builder, base, imm);
+            memory::dyn_address(builder, base, imm)?;
 
-            memory::store(builder, memory::Memory::mem_eax(width), src);
+            memory::store(builder, memory::Memory::mem_eax(width), src)
         }
     }
 

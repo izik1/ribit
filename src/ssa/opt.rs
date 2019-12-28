@@ -118,7 +118,7 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
 
     for instruction in graph.iter().rev() {
         match instruction {
-            Instruction::Ret {  addr, code } => {
+            Instruction::Ret { addr, code } => {
                 mark_live(&mut live_ids, *addr);
                 mark_live(&mut live_ids, *code);
 
