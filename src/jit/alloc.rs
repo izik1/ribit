@@ -5,30 +5,22 @@ use crate::register;
 use rasen::params::mem::{Mem, Mem32};
 use rasen::params::Register;
 
-fn writeback_register(
-    basic_block: &mut Assembler,
-    native_reg: register::Native,
-    rv_reg: register::RiscV,
-) {
+fn writeback_register(basic_block: &mut Assembler, native_reg: Register, rv_reg: register::RiscV) {
     basic_block
         .mov_mem_reg(
             Mem32(Mem::base_displacement(
                 Register::Zdi,
                 rv_reg.as_offset() as i32,
             )),
-            native_reg.as_rasen_reg(),
+            native_reg,
         )
         .unwrap();
 }
 
-fn read_register(
-    basic_block: &mut Assembler,
-    native_reg: register::Native,
-    rv_reg: register::RiscV,
-) {
+fn read_register(basic_block: &mut Assembler, native_reg: Register, rv_reg: register::RiscV) {
     basic_block
         .mov_reg_mem(
-            native_reg.as_rasen_reg(),
+            native_reg,
             Mem32(Mem::base_displacement(
                 Register::Zdi,
                 rv_reg.as_offset() as i32,
@@ -84,8 +76,8 @@ impl UsageMask {
 }
 
 pub(super) struct RegisterManager {
-    free_registers: Vec<register::Native>,
-    used_registers: VecDeque<(register::Native, register::RiscV)>,
+    free_registers: Vec<Register>,
+    used_registers: VecDeque<(Register, register::RiscV)>,
     to_load_map: UsageMask,
     to_store_map: UsageMask,
 }
@@ -96,10 +88,9 @@ impl RegisterManager {
             free_registers: vec![
                 // don't allocate RDX, RDX is an arg.
                 // register::Native::RDX,
-                register::Native::RCX,
-                register::Native::R8,
-                register::Native::R9,
-                // register::Native::RAX,
+                Register::Zax,
+                Register::R8,
+                Register::R9,
             ],
             used_registers: VecDeque::new(),
             to_load_map: UsageMask::default(),
@@ -123,7 +114,7 @@ impl RegisterManager {
         self.to_load_map.is_set(register)
     }
 
-    pub fn clobber(&mut self, register: register::Native, stream: &mut Assembler) {
+    pub fn clobber(&mut self, register: Register, stream: &mut Assembler) {
         if let Some(rv32_reg) = self.find_rv32_register(register) {
             if self.to_store_map.is_set(rv32_reg) {
                 writeback_register(stream, register, rv32_reg);
@@ -158,7 +149,7 @@ impl RegisterManager {
 
     pub fn try_alloc_specific(
         &mut self,
-        native_reg: register::Native,
+        native_reg: Register,
         rv_reg: register::RiscV,
         basic_block: &mut Assembler,
     ) -> Result<(), register::RiscV> {
@@ -173,7 +164,7 @@ impl RegisterManager {
 
     pub fn alloc_specific(
         &mut self,
-        native_reg: register::Native,
+        native_reg: Register,
         rv_reg: register::RiscV,
         stream: &mut Assembler,
     ) {
@@ -191,11 +182,11 @@ impl RegisterManager {
         self.used_registers.push_back((native_reg, rv_reg));
     }
 
-    fn is_free(&self, reg: register::Native) -> bool {
+    fn is_free(&self, reg: Register) -> bool {
         self.free_registers.iter().any(|it| *it == reg)
     }
 
-    fn find_rv32_register(&self, reg: register::Native) -> Option<register::RiscV> {
+    fn find_rv32_register(&self, reg: Register) -> Option<register::RiscV> {
         self.used_registers
             .iter()
             .find_map(|(native_reg, alloced_reg)| {
@@ -207,7 +198,7 @@ impl RegisterManager {
             })
     }
 
-    pub fn find_native_register(&self, reg: register::RiscV) -> Option<register::Native> {
+    pub fn find_native_register(&self, reg: register::RiscV) -> Option<Register> {
         self.used_registers
             .iter()
             .find_map(|(native_reg, alloced_reg)| {
@@ -224,7 +215,7 @@ impl RegisterManager {
         rv_reg: register::RiscV,
         basic_block: &mut Assembler,
         load_profile: LoadProfile,
-    ) -> Option<register::Native> {
+    ) -> Option<Register> {
         let native_reg = self.find_native_register(rv_reg).or_else(|| {
             let native_reg = self.free_registers.pop()?;
 
@@ -245,7 +236,7 @@ impl RegisterManager {
         regs: (register::RiscV, register::RiscV, register::RiscV),
         stream: &mut Assembler,
         load_profiles: (LoadProfile, LoadProfile, LoadProfile),
-    ) -> (register::Native, register::Native, register::Native) {
+    ) -> (Register, Register, Register) {
         let reg1 = self.alloc(regs.0, &[regs.1, regs.2], stream, load_profiles.0);
         let reg2 = self.alloc(regs.1, &[regs.0, regs.2], stream, load_profiles.1);
         let reg3 = self.alloc(regs.2, &[regs.0, regs.1], stream, load_profiles.2);
@@ -258,7 +249,7 @@ impl RegisterManager {
         keep_regs: &[register::RiscV],
         basic_block: &mut Assembler,
         load_profiles: (LoadProfile, LoadProfile),
-    ) -> (register::Native, register::Native) {
+    ) -> (Register, Register) {
         // split lines to avoid indeterminant ordering.
         let reg1 = self.alloc(regs.0, keep_regs, basic_block, load_profiles.0);
         let reg2 = self.alloc(regs.1, keep_regs, basic_block, load_profiles.1);
@@ -271,7 +262,7 @@ impl RegisterManager {
         keep_regs: &[register::RiscV],
         basic_block: &mut Assembler,
         load_profile: LoadProfile,
-    ) -> register::Native {
+    ) -> Register {
         if let Some(native_reg) = self.try_alloc(reg, basic_block, load_profile) {
             return native_reg;
         }
@@ -287,7 +278,7 @@ impl RegisterManager {
         &mut self,
         rv32_reg: register::RiscV,
         basic_block: &mut Assembler,
-    ) -> Option<register::Native> {
+    ) -> Option<Register> {
         let idx = self
             .used_registers
             .iter()
@@ -309,7 +300,7 @@ impl RegisterManager {
         &mut self,
         keep_regs: &[register::RiscV],
         basic_block: &mut Assembler,
-    ) -> Option<register::Native> {
+    ) -> Option<Register> {
         let idx = self
             .used_registers
             .iter()

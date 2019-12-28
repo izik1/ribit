@@ -33,20 +33,14 @@ pub fn addi(
 
             builder
                 .stream
-                .lea_reg_mem(
-                    native_rd.as_rasen_reg(),
-                    Mem32(Mem::base_displacement(rs.as_rasen_reg(), imm as i32)),
-                )
+                .lea_reg_mem(native_rd, Mem32(Mem::base_displacement(rs, imm as i32)))
                 .unwrap();
         }
 
         (Some(rs), _) => {
             let rs = builder.ez_alloc(rs);
             builder.register_manager.set_dirty(rd);
-            builder
-                .stream
-                .add_reg_imm(rs.as_rasen_reg(), Imm32(imm))
-                .unwrap();
+            builder.stream.add_reg_imm(rs, Imm32(imm)).unwrap();
         }
     }
 }
@@ -86,7 +80,7 @@ fn additive_mathi<F>(
             }
 
             let rd = builder.ez_alloc(rd);
-            op(&mut builder.stream, rd.as_rasen_reg(), imm);
+            op(&mut builder.stream, rd, imm);
         }
     }
 }
@@ -105,10 +99,7 @@ pub fn andi(
             }
 
             let rd = builder.ez_alloc(rd);
-            builder
-                .stream
-                .and_reg_imm(rd.as_rasen_reg(), Imm32(imm))
-                .unwrap()
+            builder.stream.and_reg_imm(rd, Imm32(imm)).unwrap()
         }
     }
 }
@@ -137,7 +128,7 @@ pub fn shifti(
 
     let shamt = (imm as u8) & 0x1f;
 
-    let dest = Reg32(builder.ez_alloc(rd).as_rasen_reg());
+    let dest = Reg32(builder.ez_alloc(rd));
 
     match kind {
         // todo: figure out if lea would be better for 1 < shamt < 4.

@@ -5,7 +5,7 @@ use crate::Width;
 use rasen::params::mem::Mem;
 use rasen::params::{
     mem::{Mem16, Mem32, Mem8},
-    Imm16, Imm32, Imm8, Register, W32,
+    Imm16, Imm32, Imm8, Reg32, Register,
 };
 use std::io;
 
@@ -58,13 +58,13 @@ pub fn store_src_0(builder: &mut BlockBuilder, displacement: Memory) -> io::Resu
     }
 }
 
-pub fn store(builder: &mut BlockBuilder, base: Memory, src: register::Native) -> io::Result<()> {
+pub fn store(builder: &mut BlockBuilder, base: Memory, src: Register) -> io::Result<()> {
     match base {
-        Memory::Byte(displacement) => builder.stream.mov_mem_reg(displacement, src.as_rasen_reg()),
+        Memory::Byte(displacement) => builder.stream.mov_mem_reg(displacement, src),
 
-        Memory::Word(displacement) => builder.stream.mov_mem_reg(displacement, src.as_rasen_reg()),
+        Memory::Word(displacement) => builder.stream.mov_mem_reg(displacement, src),
 
-        Memory::DWord(displacement) => builder.stream.mov_mem_reg(displacement, src.as_rasen_reg()),
+        Memory::DWord(displacement) => builder.stream.mov_mem_reg(displacement, src),
     }
 }
 
@@ -105,47 +105,28 @@ pub fn load_rs_imm(
     };
 }
 
-fn load(builder: &mut BlockBuilder, base: Memory, dest: register::Native) {
+fn load(builder: &mut BlockBuilder, base: Memory, dest: Register) {
+    let dest = Reg32(dest);
     match base {
-        Memory::Byte(displacement) => builder
-            .stream
-            .movsx_reg_mem8::<W32, _, _>(dest.as_rasen_reg(), displacement)
-            .unwrap(),
-        Memory::Word(displacement) => builder
-            .stream
-            .movsx_reg_mem16::<W32, _, _>(dest.as_rasen_reg(), displacement)
-            .unwrap(),
-        Memory::DWord(displacement) => builder
-            .stream
-            .mov_reg_mem(dest.as_rasen_reg(), displacement)
-            .unwrap(),
+        Memory::Byte(displacement) => builder.stream.movsx_reg_mem8(dest, displacement).unwrap(),
+        Memory::Word(displacement) => builder.stream.movsx_reg_mem16(dest, displacement).unwrap(),
+        Memory::DWord(displacement) => builder.stream.mov_reg_mem(dest, displacement).unwrap(),
     }
 }
 
-fn loadu(builder: &mut BlockBuilder, base: Memory, dest: register::Native) {
+fn loadu(builder: &mut BlockBuilder, base: Memory, dest: Register) {
+    let dest = Reg32(dest);
     match base {
-        Memory::Byte(displacement) => builder
-            .stream
-            .movzx_reg_mem8::<W32, _, _>(dest.as_rasen_reg(), displacement)
-            .unwrap(),
-        Memory::Word(displacement) => builder
-            .stream
-            .movzx_reg_mem16::<W32, _, _>(dest.as_rasen_reg(), displacement)
-            .unwrap(),
-        Memory::DWord(displacement) => builder
-            .stream
-            .mov_reg_mem(dest.as_rasen_reg(), displacement)
-            .unwrap(),
+        Memory::Byte(displacement) => builder.stream.movzx_reg_mem8(dest, displacement).unwrap(),
+        Memory::Word(displacement) => builder.stream.movzx_reg_mem16(dest, displacement).unwrap(),
+        Memory::DWord(displacement) => builder.stream.mov_reg_mem(dest, displacement).unwrap(),
     }
 }
 
-pub fn dyn_address(builder: &mut BlockBuilder, base: register::Native, imm: u16) -> io::Result<()> {
+pub fn dyn_address(builder: &mut BlockBuilder, base: Register, imm: u16) -> io::Result<()> {
     builder.stream.lea_reg_mem(
         Register::Zax,
-        Mem32(Mem::base_displacement(
-            base.as_rasen_reg(),
-            (imm as i16 as u32) as i32,
-        )),
+        Mem32(Mem::base_displacement(base, (imm as i16 as u32) as i32)),
     )?;
 
     builder.stream.and_zax_imm(Imm32(crate::MEMORY_SIZE - 1))

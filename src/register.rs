@@ -1,4 +1,3 @@
-use rasen::params::Register;
 use std::num::NonZeroU8;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
@@ -72,25 +71,4 @@ impl RiscV {
     pub const X29: Self = unsafe { Self::new_unchecked(29) };
     pub const X30: Self = unsafe { Self::new_unchecked(30) };
     pub const X31: Self = unsafe { Self::new_unchecked(31) };
-}
-
-#[derive(Hash, Eq, PartialEq, Copy, Clone)]
-pub enum Native {
-    RDX,
-    RCX,
-    R8,
-    R9,
-    // RAX,
-}
-
-impl Native {
-    #[must_use]
-    pub fn as_rasen_reg(self) -> Register {
-        match self {
-            Self::RDX => Register::Zdx,
-            Self::RCX => Register::Zcx,
-            Self::R8 => Register::R8,
-            Self::R9 => Register::R9,
-        }
-    }
 }

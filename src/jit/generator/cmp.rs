@@ -93,9 +93,20 @@ pub fn branch_conditional(
     // we're about to write over ECX, so make sure nothing is using it.
     builder
         .register_manager
-        .clobber(register::Native::RCX, &mut builder.stream);
+        .clobber(Register::Zcx, &mut builder.stream);
 
-    builder.mov_r32_imm32(register::Native::RCX, jump_addr);
+    builder.mov_r32_imm32(Register::Zcx, jump_addr);
+
+    let cmp_func = match cmp_mode {
+        opcode::Cmp::Eq => rasen::Assembler::cmove_reg_reg,
+        opcode::Cmp::Ne => rasen::Assembler::cmovne_reg_reg,
+        opcode::Cmp::Lt => rasen::Assembler::cmovl_reg_reg,
+        opcode::Cmp::Ge => rasen::Assembler::cmovge_reg_reg,
+        opcode::Cmp::Ltu => rasen::Assembler::cmovb_reg_reg,
+        opcode::Cmp::Geu => rasen::Assembler::cmovae_reg_reg,
+    };
+
+    cmp_func(&mut builder.stream, Reg32::ZAX, Reg32::ZCX).unwrap();
 
     match cmp_mode {
         opcode::Cmp::Eq => builder
@@ -173,7 +184,7 @@ fn set_bool_conditional_internal<F>(
 
             builder
                 .stream
-                .mov_reg_reg(Reg32(native_rd.as_rasen_reg()), Register::Zax)
+                .mov_reg_reg(Reg32(native_rd), Register::Zax)
                 .unwrap();
         }
     }
@@ -221,7 +232,7 @@ pub fn set_bool_conditional_imm(
                     builder.mov_r32_imm32(native_rd, 0);
 
                     builder.test_r32(rs);
-                    Some(native_rd.as_rasen_reg())
+                    Some(native_rd)
                 }
             }
 
@@ -243,11 +254,8 @@ pub fn set_bool_conditional_imm(
                     builder.register_manager.set_dirty(rd);
                     builder.mov_r32_imm32(native_rd, 0);
 
-                    builder
-                        .stream
-                        .cmp_reg_imm(rs.as_rasen_reg(), Imm32(immediate))
-                        .unwrap();
-                    Some(native_rd.as_rasen_reg())
+                    builder.stream.cmp_reg_imm(rs, Imm32(immediate)).unwrap();
+                    Some(native_rd)
                 }
             }
         }
@@ -287,7 +295,7 @@ pub fn set_bool_conditional(
                     builder.mov_r32_imm32(native_rd, 0);
 
                     builder.test_r32(rs);
-                    Some(native_rd.as_rasen_reg())
+                    Some(native_rd)
                 }
             }
 
@@ -305,7 +313,7 @@ pub fn set_bool_conditional(
                     builder.mov_r32_imm32(native_rd, 0);
 
                     builder.cmp_r32_r32(rs1, rs2);
-                    Some(native_rd.as_rasen_reg())
+                    Some(native_rd)
                 }
             }
         }
