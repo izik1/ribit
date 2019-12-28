@@ -14,7 +14,7 @@ fn decode_register(instruction: u32) -> Option<register::RiscV> {
 #[must_use]
 pub fn decode_rs(instruction: u32) -> (Option<register::RiscV>, Option<register::RiscV>) {
     let rs1 = decode_register(instruction >> 15);
-    let rs2 = decode_register(instruction >> 24);
+    let rs2 = decode_register(instruction >> 20);
     (rs1, rs2)
 }
 
@@ -46,6 +46,11 @@ pub fn instruction(instruction: u32) -> Result<Instruction, DecodeError> {
         (0b110_1111, _, _) => Instruction::J(instruction::J::from_instruction(
             instruction,
             opcode::J::JAL,
+        )),
+
+        (0b001_0111, _, _) => Instruction::U(instruction::U::from_instruction(
+            instruction,
+            opcode::U::AUIPC,
         )),
 
         // todo: sign extend & set lsb to 0
@@ -214,6 +219,7 @@ fn decode_branch(instruction: u32) -> Result<instruction::B, DecodeError> {
         | ((instruction << 4) & 0b0000_1000_0000_0000)
         | ((instruction >> 20) & 0b0000_0111_1100_0000)
         | ((instruction >> 7) & 0b0000_0000_0011_1110)) as u16;
+    let imm = sign_extend(imm, 13);
 
     let (rs1, rs2) = decode_rs(instruction);
     let cmp_mode = match ((instruction >> 12) & 0b111) as u8 {

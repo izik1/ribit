@@ -1,8 +1,5 @@
-use assembler::mnemonic_parameter_types::registers::{
-    Register16Bit, Register32Bit, Register64Bit, Register8Bit,
-};
-
 use std::num::NonZeroU8;
+use rasen::params::Register;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct RiscV(NonZeroU8);
@@ -13,7 +10,7 @@ impl RiscV {
     #[inline(always)]
     #[must_use]
     pub fn new(inner: NonZeroU8) -> Option<Self> {
-        (inner.get() < 32).then_with(|| Self(inner))
+        (inner.get() < 32).then(|| Self(inner))
     }
 
     #[inline(always)]
@@ -40,7 +37,7 @@ impl RiscV {
     #[inline(always)]
     #[must_use]
     pub const fn as_offset(self) -> u32 {
-        (self.0.get() << 2) as u32
+        (self.0.get() * 4) as u32
     }
 
     pub const X1: Self = unsafe { Self::new_unchecked(1) };
@@ -86,43 +83,12 @@ pub enum Native {
 }
 
 impl Native {
-    #[must_use]
-    pub fn as_asm_reg64(self) -> Register64Bit {
+    pub fn as_rasen_reg(self) -> Register {
         match self {
-            Self::RDX => Register64Bit::RDX,
-            Self::RCX => Register64Bit::RCX,
-            Self::R8 => Register64Bit::R8,
-            Self::R9 => Register64Bit::R9,
-        }
-    }
-
-    #[must_use]
-    pub fn as_asm_reg32(self) -> Register32Bit {
-        match self {
-            Self::RDX => Register32Bit::EDX,
-            Self::RCX => Register32Bit::ECX,
-            Self::R8 => Register32Bit::R8D,
-            Self::R9 => Register32Bit::R9D,
-        }
-    }
-
-    #[must_use]
-    pub fn as_asm_reg16(self) -> Register16Bit {
-        match self {
-            Self::RDX => Register16Bit::DX,
-            Self::RCX => Register16Bit::CX,
-            Self::R8 => Register16Bit::R8W,
-            Self::R9 => Register16Bit::R9W,
-        }
-    }
-
-    #[must_use]
-    pub fn as_asm_reg8(self) -> Register8Bit {
-        match self {
-            Self::RDX => Register8Bit::DL,
-            Self::RCX => Register8Bit::CL,
-            Self::R8 => Register8Bit::R8B,
-            Self::R9 => Register8Bit::R9B,
+            Self::RDX => Register::Zdx,
+            Self::RCX => Register::Zcx,
+            Self::R8 => Register::R8,
+            Self::R9 => Register::R9,
         }
     }
 }

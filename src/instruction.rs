@@ -1,4 +1,4 @@
-use crate::decode::{decode_rd, decode_rs, sign_extend};
+use crate::decode::{decode_rd, decode_rs, sign_extend, sign_extend_32};
 
 use crate::register::RiscV as RiscVRegister;
 use crate::{opcode, Width};
@@ -271,6 +271,18 @@ impl U {
     pub(crate) fn new(imm: u32, rd: Option<RiscVRegister>, opcode: opcode::U) -> Self {
         Self { imm, rd, opcode }
     }
+
+    pub(crate) fn from_instruction(instruction: u32, opcode: opcode::U) -> Self {
+        let rd = decode_rd(instruction);
+
+        let imm = instruction & 0xffff_f000;
+
+        Self {
+            rd,
+            imm,
+            opcode,
+        }
+    }
 }
 
 pub struct J {
@@ -291,6 +303,8 @@ impl J {
             | ((instruction >> 20) & 0b0000_0000_0000_0111_1111_1110)
             | ((instruction >> 9) & 0b0000_0000_0000_1000_0000_0000)
             | (instruction & 0b0000_1111_1111_0000_0000_0000);
+
+        let imm = sign_extend_32(imm, 21);
 
         Self { imm, rd, opcode }
     }

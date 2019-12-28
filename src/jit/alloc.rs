@@ -1,36 +1,36 @@
 use std::collections::VecDeque;
 
-use assembler::mnemonic_parameter_types::{memory::Memory, registers::Register64Bit};
-
-use assembler::InstructionStream;
-
 use crate::register;
+use crate::jit::Assembler;
+use rasen::params::mem::{Mem, Mem32};
+use rasen::params::Register;
 
 fn writeback_register(
-    basic_block: &mut InstructionStream,
+    basic_block: &mut Assembler,
     native_reg: register::Native,
     rv_reg: register::RiscV,
 ) {
-    basic_block.mov_Any32BitMemory_Register32Bit(
-        Memory::base_64_displacement(Register64Bit::RDI, rv_reg.as_offset().into()),
-        native_reg.as_asm_reg32(),
-    );
+    basic_block.mov_mem_reg(
+        Mem32(Mem::base_displacement(Register::Zdi, rv_reg.as_offset() as i32)),
+        native_reg.as_rasen_reg(),
+    ).unwrap();
 }
 
 fn read_register(
-    basic_block: &mut InstructionStream,
+    basic_block: &mut Assembler,
     native_reg: register::Native,
     rv_reg: register::RiscV,
 ) {
-    basic_block.mov_Register32Bit_Any32BitMemory(
-        native_reg.as_asm_reg32(),
-        Memory::base_64_displacement(Register64Bit::RDI, rv_reg.as_offset().into()),
-    );
+    basic_block.mov_reg_mem(
+        native_reg.as_rasen_reg(),
+        Mem32(Mem::base_displacement(Register::Zdi, rv_reg.as_offset() as i32)),
+    ).unwrap();
 }
 
 // todo: use this in the builder (as an optional arg) to allow writing to a register:
 // without reserving it (Free or None if it isn't already allocated)
 // while reserving it (Allocate or None if it _is_ already allocated)
+#[derive(Debug)]
 pub enum StoreProfile {
     Allocate,
     Free,
@@ -113,7 +113,7 @@ impl RegisterManager {
         self.to_load_map.is_set(register)
     }
 
-    pub fn clobber(&mut self, register: register::Native, stream: &mut InstructionStream) {
+    pub fn clobber(&mut self, register: register::Native, stream: &mut Assembler) {
         if let Some(rv32_reg) = self.find_rv32_register(register) {
             if self.to_store_map.is_set(rv32_reg) {
                 writeback_register(stream, register, rv32_reg);
@@ -127,7 +127,7 @@ impl RegisterManager {
     pub fn load(
         &mut self,
         rv32_reg: register::RiscV,
-        stream: &mut InstructionStream,
+        stream: &mut Assembler,
     ) -> Result<(), ()> {
         let native_reg = self.find_native_register(rv32_reg).ok_or(())?;
 
@@ -154,7 +154,7 @@ impl RegisterManager {
         &mut self,
         native_reg: register::Native,
         rv_reg: register::RiscV,
-        basic_block: &mut InstructionStream,
+        basic_block: &mut Assembler,
     ) -> Result<(), register::RiscV> {
         if let Some(rv_reg) = self.find_rv32_register(native_reg) {
             return Err(rv_reg);
@@ -169,7 +169,7 @@ impl RegisterManager {
         &mut self,
         native_reg: register::Native,
         rv_reg: register::RiscV,
-        stream: &mut InstructionStream,
+        stream: &mut Assembler,
     ) {
         // todo: proper error handling?
         self.free_registers
@@ -216,7 +216,7 @@ impl RegisterManager {
     fn try_alloc(
         &mut self,
         rv_reg: register::RiscV,
-        basic_block: &mut InstructionStream,
+        basic_block: &mut Assembler,
         load_profile: LoadProfile,
     ) -> Option<register::Native> {
         let native_reg = self.find_native_register(rv_reg).or_else(|| {
@@ -237,7 +237,7 @@ impl RegisterManager {
     pub fn alloc_3(
         &mut self,
         regs: (register::RiscV, register::RiscV, register::RiscV),
-        stream: &mut InstructionStream,
+        stream: &mut Assembler,
         load_profiles: (LoadProfile, LoadProfile, LoadProfile),
     ) -> (register::Native, register::Native, register::Native) {
         let reg1 = self.alloc(regs.0, &[regs.1, regs.2], stream, load_profiles.0);
@@ -250,7 +250,7 @@ impl RegisterManager {
         &mut self,
         regs: (register::RiscV, register::RiscV),
         keep_regs: &[register::RiscV],
-        basic_block: &mut InstructionStream,
+        basic_block: &mut Assembler,
         load_profiles: (LoadProfile, LoadProfile),
     ) -> (register::Native, register::Native) {
         // split lines to avoid indeterminant ordering.
@@ -263,7 +263,7 @@ impl RegisterManager {
         &mut self,
         reg: register::RiscV,
         keep_regs: &[register::RiscV],
-        basic_block: &mut InstructionStream,
+        basic_block: &mut Assembler,
         load_profile: LoadProfile,
     ) -> register::Native {
         if let Some(native_reg) = self.try_alloc(reg, basic_block, load_profile) {
@@ -280,7 +280,7 @@ impl RegisterManager {
     pub fn free(
         &mut self,
         rv32_reg: register::RiscV,
-        basic_block: &mut InstructionStream,
+        basic_block: &mut Assembler,
     ) -> Option<register::Native> {
         let idx = self
             .used_registers
@@ -302,7 +302,7 @@ impl RegisterManager {
     pub fn free_first(
         &mut self,
         keep_regs: &[register::RiscV],
-        basic_block: &mut InstructionStream,
+        basic_block: &mut Assembler,
     ) -> Option<register::Native> {
         let idx = self
             .used_registers
@@ -325,7 +325,7 @@ impl RegisterManager {
         Some(native_reg)
     }
 
-    pub fn free_all(&mut self, basic_block: &mut InstructionStream) {
+    pub fn free_all(&mut self, basic_block: &mut Assembler) {
         for (native_reg, rv_reg) in self.used_registers.drain(..) {
             if self.to_store_map.is_set(rv_reg) {
                 writeback_register(basic_block, native_reg, rv_reg);

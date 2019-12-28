@@ -2,52 +2,37 @@ use super::BlockBuilder;
 use crate::register;
 use crate::Width;
 
-use assembler::mnemonic_parameter_types::memory::{
-    Any16BitMemory, Any32BitMemory, Any8BitMemory, Memory as AssemblerMemory,
-};
-use assembler::mnemonic_parameter_types::registers::{Register32Bit, Register64Bit};
+use rasen::params::{Imm32, Register, mem::{Mem8, Mem16, Mem32}, W32, Imm16, Imm8};
+use rasen::params::mem::Mem;
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub enum Memory {
-    Byte(Any8BitMemory),
-    Word(Any16BitMemory),
-    DWord(Any32BitMemory),
+    Byte(Mem8),
+    Word(Mem16),
+    DWord(Mem32),
 }
 
 impl Memory {
     pub fn new(width: Width, imm: u16) -> Self {
-        let addr = imm_16_to_addr(imm);
+        Self::with_mem_width(width, Mem::base_displacement(
+            Register::Zdx,
+            imm_16_to_addr(imm) as i32,
+        ))
+    }
+
+    fn with_mem_width(width: Width, mem: Mem) -> Self {
         match width {
-            Width::Byte => Self::Byte(AssemblerMemory::base_64_displacement(
-                Register64Bit::RDX,
-                addr.into(),
-            )),
-            Width::Word => Self::Word(AssemblerMemory::base_64_displacement(
-                Register64Bit::RDX,
-                addr.into(),
-            )),
-            Width::DWord => Self::DWord(AssemblerMemory::base_64_displacement(
-                Register64Bit::RDX,
-                addr.into(),
-            )),
+            Width::Byte => Self::Byte(Mem8(mem)),
+            Width::Word => Self::Word(Mem16(mem)),
+            Width::DWord => Self::DWord(Mem32(mem)),
         }
     }
 
     pub fn mem_eax(width: Width) -> Self {
-        match width {
-            Width::Byte => Self::Byte(AssemblerMemory::base_64_index_64(
-                Register64Bit::RDX,
-                Register64Bit::RAX,
-            )),
-            Width::Word => Self::Word(AssemblerMemory::base_64_index_64(
-                Register64Bit::RDX,
-                Register64Bit::RAX,
-            )),
-            Width::DWord => Self::DWord(AssemblerMemory::base_64_index_64(
-                Register64Bit::RDX,
-                Register64Bit::RAX,
-            )),
-        }
+        Self::with_mem_width(width, Mem::base_index(
+            Register::Zdx,
+            Register::Zax,
+        ).unwrap())
     }
 }
 
@@ -63,15 +48,15 @@ pub fn store_src_0(builder: &mut BlockBuilder, displacement: Memory) {
     match displacement {
         Memory::Byte(displacement) => builder
             .stream
-            .mov_Any8BitMemory_Immediate8Bit(displacement, 0_u8.into()),
+            .mov_mem_imm(displacement, Imm8(0)).unwrap(),
 
         Memory::Word(displacement) => builder
             .stream
-            .mov_Any16BitMemory_Immediate16Bit(displacement, 0_u16.into()),
+            .mov_mem_imm(displacement, Imm16(0)).unwrap(),
 
         Memory::DWord(displacement) => builder
             .stream
-            .mov_Any32BitMemory_Immediate32Bit(displacement, 0_u32.into()),
+            .mov_mem_imm(displacement, Imm32(0)).unwrap(),
     };
 }
 
@@ -79,15 +64,15 @@ pub fn store(builder: &mut BlockBuilder, base: Memory, src: register::Native) {
     match base {
         Memory::Byte(displacement) => builder
             .stream
-            .mov_Any8BitMemory_Register8Bit(displacement, src.as_asm_reg8()),
+            .mov_mem_reg(displacement, src.as_rasen_reg()).unwrap(),
 
         Memory::Word(displacement) => builder
             .stream
-            .mov_Any16BitMemory_Register16Bit(displacement, src.as_asm_reg16()),
+            .mov_mem_reg(displacement, src.as_rasen_reg()).unwrap(),
 
         Memory::DWord(displacement) => builder
             .stream
-            .mov_Any32BitMemory_Register32Bit(displacement, src.as_asm_reg32()),
+            .mov_mem_reg(displacement, src.as_rasen_reg()).unwrap(),
     };
 }
 
@@ -132,13 +117,13 @@ fn load(builder: &mut BlockBuilder, base: Memory, dest: register::Native) {
     match base {
         Memory::Byte(displacement) => builder
             .stream
-            .movsx_Register32Bit_Any8BitMemory(dest.as_asm_reg32(), displacement),
+            .movsx_reg_mem8::<W32, _, _>(dest.as_rasen_reg(), displacement).unwrap(),
         Memory::Word(displacement) => builder
             .stream
-            .movsx_Register32Bit_Any16BitMemory(dest.as_asm_reg32(), displacement),
+            .movsx_reg_mem16::<W32, _, _>(dest.as_rasen_reg(), displacement).unwrap(),
         Memory::DWord(displacement) => builder
             .stream
-            .mov_Register32Bit_Any32BitMemory(dest.as_asm_reg32(), displacement),
+            .mov_reg_mem(dest.as_rasen_reg(), displacement).unwrap(),
     }
 }
 
@@ -146,23 +131,23 @@ fn loadu(builder: &mut BlockBuilder, base: Memory, dest: register::Native) {
     match base {
         Memory::Byte(displacement) => builder
             .stream
-            .movzx_Register32Bit_Any8BitMemory(dest.as_asm_reg32(), displacement),
+            .movzx_reg_mem8::<W32, _, _>(dest.as_rasen_reg(), displacement).unwrap(),
         Memory::Word(displacement) => builder
             .stream
-            .movzx_Register32Bit_Any16BitMemory(dest.as_asm_reg32(), displacement),
+            .movzx_reg_mem16::<W32, _, _>(dest.as_rasen_reg(), displacement).unwrap(),
         Memory::DWord(displacement) => builder
             .stream
-            .mov_Register32Bit_Any32BitMemory(dest.as_asm_reg32(), displacement),
+            .mov_reg_mem(dest.as_rasen_reg(), displacement).unwrap(),
     }
 }
 
 pub fn dyn_address(builder: &mut BlockBuilder, base: register::Native, imm: u16) {
-    builder.stream.lea_Register32Bit_Any32BitMemory(
-        Register32Bit::EAX,
-        AssemblerMemory::base_64_displacement(base.as_asm_reg64(), (imm as i16 as u32).into()),
-    );
+    builder.stream.lea_reg_mem(
+        Register::Zax,
+        Mem32(Mem::base_displacement(base.as_rasen_reg(), (imm as i16 as u32) as i32))
+    ).unwrap();
 
     builder
         .stream
-        .and_EAX_Immediate32Bit((crate::MEMORY_SIZE - 1).into());
+        .and_zax_imm(Imm32(crate::MEMORY_SIZE - 1)).unwrap();
 }

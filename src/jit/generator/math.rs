@@ -1,6 +1,8 @@
-use super::{BlockBuilder, LoadProfile, Memory, StoreProfile};
+use super::{BlockBuilder, LoadProfile, StoreProfile};
 use crate::register;
-use assembler::mnemonic_parameter_types::registers::Register32Bit;
+use crate::jit::Assembler;
+use rasen::params::{Imm32, Reg32};
+use rasen::params::mem::{Mem, Mem32};
 
 pub enum ShiftKind {
     LL,
@@ -28,10 +30,10 @@ pub fn addi(
 
             builder.register_manager.set_dirty(rd);
 
-            builder.stream.lea_Register32Bit_Any32BitMemory(
-                native_rd.as_asm_reg32(),
-                Memory::base_64_displacement(rs.as_asm_reg64(), imm.into()),
-            );
+            builder.stream.lea_reg_mem(
+                native_rd.as_rasen_reg(),
+                Mem32(Mem::base_displacement(rs.as_rasen_reg(), imm as i32)),
+            ).unwrap();
         }
 
         (Some(rs), _) => {
@@ -39,7 +41,7 @@ pub fn addi(
             builder.register_manager.set_dirty(rd);
             builder
                 .stream
-                .add_Register32Bit_Immediate32Bit(rs.as_asm_reg32(), imm.into());
+                .add_reg_imm(rs.as_rasen_reg(), Imm32(imm)).unwrap();
         }
     }
 }
@@ -51,13 +53,13 @@ pub fn xori(
     rs: Option<register::RiscV>,
 ) {
     additive_mathi(builder, imm, rd, rs, |stream, r, imm| {
-        stream.xor_Register32Bit_Immediate32Bit(r, imm.into())
+        stream.xor_reg_imm(r, Imm32(imm)).unwrap()
     });
 }
 
 pub fn ori(builder: &mut BlockBuilder, imm: u32, rd: register::RiscV, rs: Option<register::RiscV>) {
     additive_mathi(builder, imm, rd, rs, |stream, r, imm| {
-        stream.or_Register32Bit_Immediate32Bit(r, imm.into())
+        stream.or_reg_imm(r, Imm32(imm)).unwrap()
     });
 }
 
@@ -68,7 +70,7 @@ fn additive_mathi<F>(
     rs: Option<register::RiscV>,
     op: F,
 ) where
-    F: FnOnce(&mut assembler::InstructionStream, Register32Bit, u32),
+    F: FnOnce(&mut Assembler, rasen::params::Register, u32),
 {
     match (rs, imm) {
         (None, _) => builder.write_register_imm(rd, imm, Some(StoreProfile::Allocate)),
@@ -79,7 +81,7 @@ fn additive_mathi<F>(
             }
 
             let rd = builder.ez_alloc(rd);
-            op(&mut builder.stream, rd.as_asm_reg32(), imm);
+            op(&mut builder.stream, rd.as_rasen_reg(), imm);
         }
     }
 }
@@ -100,7 +102,7 @@ pub fn andi(
             let rd = builder.ez_alloc(rd);
             builder
                 .stream
-                .and_Register32Bit_Immediate32Bit(rd.as_asm_reg32(), imm.into())
+                .and_reg_imm(rd.as_rasen_reg(), Imm32(imm)).unwrap()
         }
     }
 }
@@ -129,13 +131,13 @@ pub fn shifti(
 
     let shamt = ((imm as u8) & 0x1f).into();
 
-    let dest = builder.ez_alloc(rd).as_asm_reg32();
+    let dest = Reg32(builder.ez_alloc(rd).as_rasen_reg());
 
     match kind {
         // todo: figure out if lea would be better for 1 < shamt < 4.
         // todo: use lea for shamt == 1 IFF rd != rs
-        ShiftKind::LL => builder.stream.shl_Register32Bit_Immediate8Bit(dest, shamt),
-        ShiftKind::RL => builder.stream.shr_Register32Bit_Immediate8Bit(dest, shamt),
-        ShiftKind::RA => builder.stream.sar_Register32Bit_Immediate8Bit(dest, shamt),
+        ShiftKind::LL => builder.stream.shl_reg_imm8(dest, shamt).unwrap(),
+        ShiftKind::RL => builder.stream.shr_reg_imm8(dest, shamt).unwrap(),
+        ShiftKind::RA => builder.stream.sar_reg_imm8(dest, shamt).unwrap(),
     }
 }

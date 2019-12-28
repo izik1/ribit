@@ -3,6 +3,8 @@ mod generator;
 
 pub mod context;
 
+type Assembler<'a, 'b> = rasen::Assembler<'a, std::io::Cursor<&'b mut [u8]>>;
+
 type BasicBlock = unsafe extern "sysv64" fn(
     regs: *mut u32,
     ctx: &mut context::Runtime,

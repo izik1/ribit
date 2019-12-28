@@ -1,9 +1,10 @@
 use std::ops::Range;
 
-use assembler::ExecutableAnonymousMemoryMap;
-
 use super::{generator::BlockBuilder, ReturnCode};
 use crate::instruction;
+use std::io::Cursor;
+use crate::jit::BasicBlock;
+use std::mem;
 
 mod sbi {
     #[repr(u32)]
@@ -30,7 +31,10 @@ mod sbi {
             (0x10, 4) => get_mvendorid(),
             (0x10, 5) => get_marchid(),
             (0x10, 6) => get_mimpid(),
-            _ => unsupported(),
+            _ => {
+                log::warn!("Unsupported!");
+                unsupported()
+            },
         };
 
         regs[10] = code as u32; // a0
@@ -93,12 +97,14 @@ mod sbi {
     }
 
     fn console_putchar(ch: u32) -> (StatusCode, u32) {
+        println!("{:08x}", ch);
         print!("{}", char::from(ch as u8));
         (StatusCode::Success, 0)
     }
 }
 pub struct Runtime {
-    buffer: ExecutableAnonymousMemoryMap,
+    buffer: Option<memmap::Mmap>,
+    buffer_write_offset: u64,
     blocks: Vec<super::BasicBlock>,
     ranges: Vec<Range<u32>>,
 }
@@ -141,10 +147,53 @@ impl Runtime {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            buffer: ExecutableAnonymousMemoryMap::new(4096 * 16, false, true).unwrap(),
+            buffer: Some(memmap::MmapOptions::new().len(4096 * 16).stack().map_anon().unwrap().make_exec().unwrap()),
+            buffer_write_offset: 0,
             blocks: vec![],
             ranges: vec![],
         }
+    }
+
+    fn make_fn(&mut self, block_instrs: Vec<instruction::Info>, branch: instruction::Info) -> BasicBlock {
+        let buffer = self.buffer.take().expect("Failed to take buffer");
+        let mut buffer = buffer.make_mut().unwrap();
+        let funct_ptr = unsafe { buffer.as_mut_ptr().add(self.buffer_write_offset as usize) };
+
+        let mut writer = Cursor::new(buffer.as_mut());
+        writer.set_position(self.buffer_write_offset);
+
+        let stream = rasen::Assembler::new(&mut writer).unwrap();
+
+        let mut build_context = BlockBuilder::start(stream, check_ranges);
+
+        for instruction in block_instrs {
+            build_context.make_instruction(instruction)
+        }
+
+        build_context.complete(branch);
+
+        let start = mem::replace(&mut self.buffer_write_offset, writer.position());
+        let instrs = &buffer[(start as usize)..(self.buffer_write_offset as usize)];
+
+        let mut byte_str = String::new();
+        {
+            let mut bytes = instrs.iter();
+
+            if let Some(byte) = bytes.next() {
+                byte_str.push_str(&format!("{:02x}", byte));
+            }
+
+            for byte in bytes {
+                byte_str.push_str(", ");
+                byte_str.push_str(&format!("{:02x}", byte));
+            }
+        }
+
+        log::debug!("Native block: [{}]", byte_str);
+
+        self.buffer = Some(buffer.make_exec().unwrap());
+
+        unsafe { std::mem::transmute(funct_ptr) }
     }
 
     // todo: signature
@@ -160,17 +209,7 @@ impl Runtime {
 
         let end_pc = branch.end_address();
 
-        let stream = self
-            .buffer
-            .instruction_stream(&assembler::InstructionStreamHints::default());
-
-        let mut build_context = BlockBuilder::start(stream, check_ranges);
-
-        for instruction in block_instrs {
-            build_context.make_instruction(instruction)
-        }
-
-        let funct = build_context.complete(branch);
+        let funct = self.make_fn(block_instrs, branch);
 
         let insert_idx = self
             .ranges

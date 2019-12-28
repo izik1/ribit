@@ -1,33 +1,28 @@
 use super::{
     alloc::{LoadProfile, RegisterManager, StoreProfile},
-    BasicBlock, CheckRanges,
+    CheckRanges,
 };
 
 mod cmp;
 mod math;
 mod memory;
 
-use assembler::mnemonic_parameter_types::{
-    memory::Memory,
-    registers::{Register32Bit, Register64Bit},
-};
-
-use assembler::InstructionStream;
-
 use crate::{
     instruction::{self, Instruction},
     opcode, register,
 };
+use crate::jit::Assembler;
+use rasen::params::{Register, Imm32, Reg32, mem::{Mem, Mem32}};
 
-pub struct BlockBuilder<'a> {
-    stream: assembler::InstructionStream<'a>,
+pub struct BlockBuilder<'a, 'b: 'a> {
+    stream: Assembler<'a, 'b>,
     register_manager: RegisterManager,
     check_ranges: CheckRanges,
 }
 
-impl<'a> BlockBuilder<'a> {
+impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
     pub(super) fn start(
-        stream: assembler::InstructionStream<'a>,
+        stream: Assembler<'a, 'b>,
         check_ranges: CheckRanges,
     ) -> Self {
         if !raw_cpuid::CpuId::new()
@@ -48,32 +43,12 @@ impl<'a> BlockBuilder<'a> {
         generate_instruction(self, instruction);
     }
 
-    pub fn complete(mut self, branch_instruction: instruction::Info) -> BasicBlock {
+    pub fn complete(mut self, branch_instruction: instruction::Info) {
         end_basic_block(&mut self, branch_instruction);
 
         assert!(self.register_manager.is_cleared());
 
-        let funct: BasicBlock =
-            unsafe { std::mem::transmute(self.stream.start_instruction_pointer()) };
-        let (instrs, _) = self.stream.finish();
-
-        let mut byte_str = String::new();
-        {
-            let mut bytes = instrs.iter();
-
-            if let Some(byte) = bytes.next() {
-                byte_str.push_str(&format!("{:02x}", byte));
-            }
-
-            for byte in bytes {
-                byte_str.push_str(", ");
-                byte_str.push_str(&format!("{:02x}", byte));
-            }
-        }
-
-        log::debug!("Native block: [{}]", byte_str);
-
-        funct
+        self.stream.finish().unwrap();
     }
 
     fn write_register_imm(
@@ -147,21 +122,21 @@ impl<'a> BlockBuilder<'a> {
     fn mov_eax_imm(&mut self, imm: u32) {
         if imm == 0 {
             self.stream
-                .xor_Register32Bit_Register32Bit(Register32Bit::EAX, Register32Bit::EAX);
+                .xor_reg_reg(Reg32::ZAX, Reg32::ZAX).unwrap();
         } else {
             self.stream
-                .mov_Register32Bit_Immediate32Bit(Register32Bit::EAX, imm.into());
+                .mov_reg_imm(Reg32::ZAX, Imm32(imm)).unwrap();
         }
     }
 
     fn mov_r32_imm32(&mut self, register: register::Native, imm: u32) {
-        let register = register.as_asm_reg32();
+        let register = Reg32(register.as_rasen_reg());
         if imm == 0 {
             self.stream
-                .xor_Register32Bit_Register32Bit(register, register);
+                .xor_reg_reg(register, register).unwrap();
         } else {
             self.stream
-                .mov_Register32Bit_Immediate32Bit(register, imm.into());
+                .mov_reg_imm(register, Imm32(imm)).unwrap();
         }
     }
 
@@ -174,40 +149,41 @@ impl<'a> BlockBuilder<'a> {
                 (LoadProfile::Lazy, LoadProfile::Eager),
             );
 
-            self.stream.mov_Register32Bit_Register32Bit(
-                native_dest.as_asm_reg32(),
-                native_src.as_asm_reg32(),
-            );
+            self.stream.mov_reg_reg(
+                Reg32(native_dest.as_rasen_reg()),
+                Reg32(native_src.as_rasen_reg()),
+            ).unwrap();
             self.register_manager.set_dirty(dest);
         }
     }
 
     fn test_r32(&mut self, register: register::Native) {
-        let register = register.as_asm_reg32();
+        let register = Reg32(register.as_rasen_reg());
         self.stream
-            .test_Register32Bit_Register32Bit(register, register);
+            .test_reg_reg(register, register).unwrap();
     }
 
     fn cmp_r32_r32(&mut self, register1: register::Native, register2: register::Native) {
         self.stream
-            .cmp_Register32Bit_Register32Bit(register1.as_asm_reg32(), register2.as_asm_reg32());
+            .cmp_reg_reg(Reg32(register1.as_rasen_reg()), Reg32(register2.as_rasen_reg())).unwrap();
     }
 }
 
 // todo: support native_register arguments
 pub(super) fn generate_register_write_imm(
-    basic_block: &mut InstructionStream,
+    basic_block: &mut Assembler,
     rv_reg: register::RiscV,
     value: u32,
 ) {
-    basic_block.mov_Any32BitMemory_Immediate32Bit(
-        Memory::base_64_displacement(Register64Bit::RDI, rv_reg.as_offset().into()),
-        value.into(),
-    );
+    basic_block.mov_mem_imm(
+        Mem32(Mem::base_displacement(Register::Zdi, rv_reg.as_offset() as i32)),
+        Imm32(value),
+    ).unwrap();
 }
 
 fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
     let start_address = branch.start_address;
+    let len = branch.len;
     let next_start_address = branch.end_address();
 
     let branch_instruction = branch.instruction;
@@ -239,14 +215,18 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
 
             if let Some(rs1) = rs1 {
                 builder.mov_eax_imm(imm as i16 as u32);
-                builder.stream.add_Register32Bit_Any32BitMemory(
-                    Register32Bit::EAX,
-                    Memory::base_64_displacement(Register64Bit::RDI, rs1.as_offset().into()),
-                );
+
+                // need to free all the registers before reading from mem (stupid and unoptimized, but it prevents bugs)
+                builder.register_manager.free_all(&mut builder.stream);
+
+                builder.stream.add_reg_mem(
+                    Register::Zax,
+                    Mem32(Mem::base_displacement(Register::Zdi, rs1.as_offset() as i32)),
+                ).unwrap();
 
                 builder
                     .stream
-                    .btr_Register32Bit_Immediate8Bit(Register32Bit::EAX, 0_u8.into());
+                    .btr_reg_imm8(Reg32::ZAX, 0_u8).unwrap();
             } else {
                 let imm = imm as i16 as u32;
                 // avoid generating a btr for a constant by clearing the bit here.
@@ -265,7 +245,7 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
             let return_value = BlockReturn::from_parts(next_start_address, return_code).as_u64();
             builder
                 .stream
-                .mov_Register64Bit_Immediate64Bit(Register64Bit::RAX, return_value.into());
+                .mov_reg_imm64(Register::Zax, return_value).unwrap();
         }
 
         Instruction::I(_)
@@ -274,11 +254,11 @@ fn end_basic_block(builder: &mut BlockBuilder, branch: instruction::Info) {
         | Instruction::S(_)
         | Instruction::U(_) => unreachable!("blocks can only end on a branch?"),
 
-        Instruction::B(instr) => cmp::branch_conditional(builder, instr, next_start_address),
+        Instruction::B(instr) => cmp::branch_conditional(builder, instr, start_address, len),
     }
 
     builder.register_manager.free_all(&mut builder.stream);
-    builder.stream.ret();
+    builder.stream.ret().unwrap();
 }
 
 fn generate_instruction(builder: &mut BlockBuilder, instruction: instruction::Info) {
@@ -397,10 +377,10 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
             (Some(rs1), Some(rs2)) => {
                 let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
                 builder.register_manager.set_dirty(rd);
-                builder.stream.lea_Register32Bit_Any32BitMemory(
-                    native_rd.as_asm_reg32(),
-                    Memory::base_64_index_64(rs1.as_asm_reg64(), rs2.as_asm_reg64()),
-                );
+                builder.stream.lea_reg_mem(
+                    native_rd.as_rasen_reg(),
+                    Mem32(Mem::base_index(rs1.as_rasen_reg(), rs2.as_rasen_reg()).unwrap()),
+                ).unwrap();
             }
         },
 
@@ -415,14 +395,14 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                 let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
                 builder
                     .stream
-                    .mov_Register32Bit_Register32Bit(Register32Bit::EAX, rs2.as_asm_reg32());
+                    .mov_reg_reg(Reg32::ZAX, rs2.as_rasen_reg()).unwrap();
                 builder
                     .stream
-                    .add_Register32Bit_Register32Bit(Register32Bit::EAX, rs1.as_asm_reg32());
+                    .add_reg_reg(Reg32::ZAX, rs1.as_rasen_reg()).unwrap();
                 builder.register_manager.set_dirty(rd);
                 builder
                     .stream
-                    .mov_Register32Bit_Register32Bit(native_rd.as_asm_reg32(), Register32Bit::EAX);
+                    .mov_reg_reg(native_rd.as_rasen_reg(), Reg32::ZAX).unwrap();
             }
             _ => builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate)),
         },
@@ -440,14 +420,14 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                 let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
                 builder
                     .stream
-                    .mov_Register32Bit_Register32Bit(Register32Bit::EAX, rs2.as_asm_reg32());
+                    .mov_reg_reg(Reg32::ZAX, rs2.as_rasen_reg()).unwrap();
                 builder
                     .stream
-                    .or_Register32Bit_Register32Bit(Register32Bit::EAX, rs1.as_asm_reg32());
+                    .or_reg_reg(Reg32::ZAX, rs1.as_rasen_reg()).unwrap();
                 builder.register_manager.set_dirty(rd);
                 builder
                     .stream
-                    .mov_Register32Bit_Register32Bit(native_rd.as_asm_reg32(), Register32Bit::EAX);
+                    .mov_reg_reg(native_rd.as_rasen_reg(), Reg32::ZAX).unwrap();
             }
         },
 
@@ -464,14 +444,14 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                 let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
                 builder
                     .stream
-                    .mov_Register32Bit_Register32Bit(Register32Bit::EAX, rs2.as_asm_reg32());
+                    .mov_reg_reg(Reg32::ZAX, rs2.as_rasen_reg()).unwrap();
                 builder
                     .stream
-                    .xor_Register32Bit_Register32Bit(Register32Bit::EAX, rs1.as_asm_reg32());
+                    .xor_reg_reg(Reg32::ZAX, rs1.as_rasen_reg()).unwrap();
                 builder.register_manager.set_dirty(rd);
                 builder
                     .stream
-                    .mov_Register32Bit_Register32Bit(native_rd.as_asm_reg32(), Register32Bit::EAX);
+                    .mov_reg_reg(native_rd.as_rasen_reg(), Reg32::ZAX).unwrap();
             }
         },
 
@@ -489,11 +469,11 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                 builder.register_manager.set_dirty(rd);
                 builder
                     .stream
-                    .shlx_Register32Bit_Register32Bit_Register32Bit(
-                        native_rd.as_asm_reg32(),
-                        rs1.as_asm_reg32(),
-                        rs2.as_asm_reg32(),
-                    );
+                    .shlx_reg_reg_reg(
+                        Reg32(native_rd.as_rasen_reg()),
+                        rs1.as_rasen_reg(),
+                        rs2.as_rasen_reg(),
+                    ).unwrap();
             }
         },
 
@@ -511,11 +491,11 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                 builder.register_manager.set_dirty(rd);
                 builder
                     .stream
-                    .shrx_Register32Bit_Register32Bit_Register32Bit(
-                        native_rd.as_asm_reg32(),
-                        rs1.as_asm_reg32(),
-                        rs2.as_asm_reg32(),
-                    );
+                    .shrx_reg_reg_reg(
+                        Reg32(native_rd.as_rasen_reg()),
+                        rs1.as_rasen_reg(),
+                        rs2.as_rasen_reg(),
+                    ).unwrap();
             }
         },
 
@@ -532,14 +512,14 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                 let (native_rd, rs1, rs2) = builder.ez_alloc_3op(rd, (rs1, rs2));
                 builder
                     .stream
-                    .mov_Register32Bit_Register32Bit(Register32Bit::EAX, rs2.as_asm_reg32());
+                    .mov_reg_reg(Reg32::ZAX, rs2.as_rasen_reg()).unwrap();
                 builder
                     .stream
-                    .sub_Register32Bit_Register32Bit(Register32Bit::EAX, rs1.as_asm_reg32());
+                    .sub_reg_reg(Reg32::ZAX, rs1.as_rasen_reg()).unwrap();
                 builder.register_manager.set_dirty(rd);
                 builder
                     .stream
-                    .mov_Register32Bit_Register32Bit(native_rd.as_asm_reg32(), Register32Bit::EAX);
+                    .mov_reg_reg(native_rd.as_rasen_reg(), Reg32::ZAX).unwrap();
             }
         },
 
@@ -557,11 +537,11 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                 builder.register_manager.set_dirty(rd);
                 builder
                     .stream
-                    .sarx_Register32Bit_Register32Bit_Register32Bit(
-                        native_rd.as_asm_reg32(),
-                        rs1.as_asm_reg32(),
-                        rs2.as_asm_reg32(),
-                    );
+                    .sarx_reg_reg_reg(
+                        Reg32(native_rd.as_rasen_reg()),
+                        rs1.as_rasen_reg(),
+                        rs2.as_rasen_reg(),
+                    ).unwrap();
             }
         },
 
@@ -586,19 +566,19 @@ fn generate_store_instruction(builder: &mut BlockBuilder, instruction: instructi
 
     match (rs1, rs2) {
         (None, None) => memory::store_src_0(builder, memory::Memory::new(width, imm)),
-        (Some(base), None) => {
+        (None, Some(base)) => {
             let base = builder.ez_alloc(base);
             memory::dyn_address(builder, base, imm);
 
             memory::store_src_0(builder, memory::Memory::mem_eax(width));
         }
 
-        (None, Some(src)) => {
+        (Some(src), None) => {
             let src = builder.ez_alloc(src);
             memory::store(builder, memory::Memory::new(width, imm), src);
         }
 
-        (Some(base), Some(src)) => {
+        (Some(src), Some(base)) => {
             let (base, src) = builder.ez_alloc2(base, src);
 
             memory::dyn_address(builder, base, imm);

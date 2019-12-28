@@ -96,13 +96,17 @@ pub struct Cpu {
 }
 
 impl Cpu {
+    pub fn pc(&self) -> u32 {
+        self.pc
+    }
+
     pub fn new(program: &[u8]) -> Self {
         assert!(MEMORY_SIZE as usize >= program.len());
         let mut memory = vec![0; MEMORY_SIZE as usize].into_boxed_slice();
-        memory[..program.len()].copy_from_slice(program);
+        memory[0x10000..][..program.len()].copy_from_slice(program);
 
         let xregs = [0; XLEN];
-        let pc = 0;
+        let pc = 0x10000;
         let jit = jit::context::Runtime::new();
 
         Self {
@@ -113,51 +117,47 @@ impl Cpu {
         }
     }
 
-    fn parse_compressed(&mut self) -> Result<Option<instruction::Info>, DecodeError> {
+    fn parse_compressed(&mut self) -> Result<instruction::Info, DecodeError> {
         use std::convert::TryInto;
 
         if self.pc as usize + 1 >= self.memory.len() {
             return Err(DecodeError::Other);
         }
 
-        let instr = u16::from_le_bytes(
+        let instr = u16::from_be_bytes(
             self.memory[(self.pc as usize)..][..2]
                 .try_into()
                 .expect("bad slice size expected 2???"),
         );
 
-        if instr & 0b11 == 0b11 {
-            Ok(None)
-        } else {
-            let instr = decode::compressed::decode_instruction(instr)?;
-            let info = instruction::Info::new(instr, self.pc, 2);
-            self.pc += 2;
-            Ok(Some(info))
-        }
+
+        let instr = decode::compressed::decode_instruction(instr)?;
+        let info = instruction::Info::new(instr, self.pc, 2);
+        self.pc += 2;
+        Ok(info)
     }
 
     fn parse_instruction(&mut self) -> Result<instruction::Info, DecodeError> {
         use std::convert::TryInto;
 
-        let compressed = self.parse_compressed()?;
-        if let Some(compressed) = compressed {
-            return Ok(compressed);
-        }
-
         if self.pc as usize + 3 >= self.memory.len() {
             return Err(DecodeError::Other);
         }
 
-        let instr = u32::from_le_bytes(
+        let instr = u32::from_be_bytes(
             self.memory[(self.pc as usize)..][..4]
                 .try_into()
                 .expect("bad slice size expected 4???"),
         );
 
-        let instr = decode::instruction(instr)?;
-        let info = instruction::Info::new(instr, self.pc, 4);
-        self.pc += 4;
-        Ok(info)
+        if instr & 0b11 == 0b11 {
+            let instr = decode::instruction(instr)?;
+            let info = instruction::Info::new(instr, self.pc, 4);
+            self.pc += 4;
+            Ok(info)
+        } else {
+            self.parse_compressed()
+        }
     }
 
     fn create_block(&mut self) -> Result<(), DecodeError> {

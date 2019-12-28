@@ -5,7 +5,7 @@ use crate::{
     opcode, register,
 };
 
-use assembler::mnemonic_parameter_types::registers::{Register32Bit, Register8Bit};
+use rasen::params::{Imm32, Register, Reg32};
 
 fn bool_cmp<T>(
     rs1: Option<register::RiscV>,
@@ -42,11 +42,9 @@ fn bool_cmp<T>(
 pub fn branch_conditional(
     builder: &mut BlockBuilder,
     instruction: instruction::B,
-    continue_pc: u32,
+    start_pc: u32,
+    len: u32,
 ) {
-    use Register32Bit::EAX;
-    use Register32Bit::ECX;
-
     let instruction::B {
         rs1,
         rs2,
@@ -54,7 +52,9 @@ pub fn branch_conditional(
         cmp_mode,
     } = instruction;
 
-    let jump_addr = continue_pc.wrapping_add(imm as i16 as u32);
+    let continue_pc: u32 = start_pc.wrapping_add(len);
+
+    let jump_addr = start_pc.wrapping_add(imm as i16 as u32);
 
     // The operation looks something like this on a high level
     // ; both registers:
@@ -98,12 +98,12 @@ pub fn branch_conditional(
     builder.mov_r32_imm32(register::Native::RCX, jump_addr);
 
     match cmp_mode {
-        opcode::Cmp::Eq => builder.stream.cmove_Register32Bit_Register32Bit(EAX, ECX),
-        opcode::Cmp::Ne => builder.stream.cmovne_Register32Bit_Register32Bit(EAX, ECX),
-        opcode::Cmp::Lt => builder.stream.cmovl_Register32Bit_Register32Bit(EAX, ECX),
-        opcode::Cmp::Ge => builder.stream.cmovge_Register32Bit_Register32Bit(EAX, ECX),
-        opcode::Cmp::Ltu => builder.stream.cmovb_Register32Bit_Register32Bit(EAX, ECX),
-        opcode::Cmp::Geu => builder.stream.cmovae_Register32Bit_Register32Bit(EAX, ECX),
+        opcode::Cmp::Eq => builder.stream.cmove_reg_reg(Reg32::ZAX, Reg32::ZCX).unwrap(),
+        opcode::Cmp::Ne => builder.stream.cmovne_reg_reg(Reg32::ZAX, Reg32::ZCX).unwrap(),
+        opcode::Cmp::Lt => builder.stream.cmovl_reg_reg(Reg32::ZAX, Reg32::ZCX).unwrap(),
+        opcode::Cmp::Ge => builder.stream.cmovge_reg_reg(Reg32::ZAX, Reg32::ZCX).unwrap(),
+        opcode::Cmp::Ltu => builder.stream.cmovb_reg_reg(Reg32::ZAX, Reg32::ZCX).unwrap(),
+        opcode::Cmp::Geu => builder.stream.cmovae_reg_reg(Reg32::ZAX, Reg32::ZCX).unwrap(),
     }
 }
 
@@ -136,16 +136,16 @@ fn set_bool_conditional_internal<F>(
     cmp_mode: opcode::Cmp,
     f: F,
 ) where
-    F: FnOnce(&mut BlockBuilder, register::RiscV, opcode::Cmp) -> Option<Register8Bit>,
+    F: FnOnce(&mut BlockBuilder, register::RiscV, opcode::Cmp) -> Option<Register>,
 {
     if let Some(cmp_reg) = f(builder, rd, cmp_mode) {
         match cmp_mode {
-            opcode::Cmp::Lt => builder.stream.setb_Register8Bit(cmp_reg),
-            opcode::Cmp::Ltu => builder.stream.setl_Register8Bit(cmp_reg),
+            opcode::Cmp::Lt => builder.stream.setb_reg8(cmp_reg).unwrap(),
+            opcode::Cmp::Ltu => builder.stream.setl_reg8(cmp_reg).unwrap(),
             _ => todo!("extended S(I)_ instruction (non-standard, low priority)"),
         }
 
-        if cmp_reg == Register8Bit::AL {
+        if cmp_reg == Register::Zax {
             let native_rd =
                 builder
                     .register_manager
@@ -155,7 +155,7 @@ fn set_bool_conditional_internal<F>(
 
             builder
                 .stream
-                .mov_Register32Bit_Register32Bit(native_rd.as_asm_reg32(), Register32Bit::EAX);
+                .mov_reg_reg(Reg32(native_rd.as_rasen_reg()), Register::Zax).unwrap();
         }
     }
 }
@@ -196,13 +196,13 @@ pub fn set_bool_conditional_imm(
                     builder.mov_eax_imm(0);
 
                     builder.test_r32(rs);
-                    Some(Register8Bit::AL)
+                    Some(Register::Zax)
                 } else {
                     builder.register_manager.set_dirty(rd);
                     builder.mov_r32_imm32(native_rd, 0);
 
                     builder.test_r32(rs);
-                    Some(native_rd.as_asm_reg8())
+                    Some(native_rd.as_rasen_reg())
                 }
             }
 
@@ -219,15 +219,15 @@ pub fn set_bool_conditional_imm(
                     builder.mov_eax_imm(0);
 
                     builder.test_r32(rs);
-                    Some(Register8Bit::AL)
+                    Some(Register::Zax)
                 } else {
                     builder.register_manager.set_dirty(rd);
                     builder.mov_r32_imm32(native_rd, 0);
 
                     builder
                         .stream
-                        .cmp_Register32Bit_Immediate32Bit(rs.as_asm_reg32(), immediate.into());
-                    Some(native_rd.as_asm_reg8())
+                        .cmp_reg_imm(rs.as_rasen_reg(), Imm32(immediate)).unwrap();
+                    Some(native_rd.as_rasen_reg())
                 }
             }
         }
@@ -261,13 +261,13 @@ pub fn set_bool_conditional(
                     builder.mov_eax_imm(0);
 
                     builder.test_r32(rs);
-                    Some(Register8Bit::AL)
+                    Some(Register::Zax)
                 } else {
                     builder.register_manager.set_dirty(rd);
                     builder.mov_r32_imm32(native_rd, 0);
 
                     builder.test_r32(rs);
-                    Some(native_rd.as_asm_reg8())
+                    Some(native_rd.as_rasen_reg())
                 }
             }
 
@@ -279,13 +279,13 @@ pub fn set_bool_conditional(
                     builder.mov_eax_imm(0);
 
                     builder.cmp_r32_r32(rs1, rs2);
-                    Some(Register8Bit::AL)
+                    Some(Register::Zax)
                 } else {
                     builder.register_manager.set_dirty(rd);
                     builder.mov_r32_imm32(native_rd, 0);
 
                     builder.cmp_r32_r32(rs1, rs2);
-                    Some(native_rd.as_asm_reg8())
+                    Some(native_rd.as_rasen_reg())
                 }
             }
         }
