@@ -2,10 +2,9 @@ use super::BlockBuilder;
 use crate::register;
 use crate::Width;
 
-use rasen::params::mem::Mem;
 use rasen::params::{
-    mem::{Mem16, Mem32, Mem8},
-    Imm16, Imm32, Imm8, Reg32, Register,
+    mem::{Mem16, Mem32, Mem8, Mem},
+    imm::{Imm16, Imm32, Imm8}, reg::Reg32, Register,
 };
 use std::io;
 

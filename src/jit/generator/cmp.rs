@@ -5,7 +5,7 @@ use crate::{
     opcode, register,
 };
 
-use rasen::params::{Imm32, Reg32, Register};
+use rasen::params::{imm::Imm32, reg::Reg32, Register};
 
 fn bool_cmp<T>(
     rs1: Option<register::RiscV>,
@@ -184,7 +184,7 @@ fn set_bool_conditional_internal<F>(
 
             builder
                 .stream
-                .mov_reg_reg(Reg32(native_rd), Register::Zax)
+                .mov_reg_reg(Reg32(native_rd), Reg32::ZAX)
                 .unwrap();
         }
     }

@@ -197,7 +197,7 @@ mod test {
     use crate::DisplayDeferSlice;
     use crate::{instruction, opcode, register};
 
-    use insta::{assert_display_snapshot, assert_ron_snapshot};
+    use insta::assert_display_snapshot;
 
     #[test]
     fn jal_basic_const_prop() {
