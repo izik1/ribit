@@ -113,10 +113,12 @@ pub struct Cpu {
 }
 
 impl Cpu {
+    #[must_use]
     pub fn pc(&self) -> u32 {
         self.pc
     }
 
+    #[must_use]
     pub fn new(program: &[u8]) -> Self {
         assert!(MEMORY_SIZE as usize >= program.len());
         let mut memory = vec![0; MEMORY_SIZE as usize].into_boxed_slice();

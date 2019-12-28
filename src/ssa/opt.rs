@@ -1,16 +1,16 @@
 use crate::ssa::{eval, Id, Instruction, Source};
 use std::collections::HashMap;
 
-fn const_id_lookup(consts: &HashMap<Id, u32>, src: &Source) -> Option<u32> {
+fn const_id_lookup(consts: &HashMap<Id, u32>, src: Source) -> Option<u32> {
     match src {
         Source::Id(id) => Some(id),
         Source::Val(_) => None,
     }
-    .and_then(|it| consts.get(it).copied())
+    .and_then(|it| consts.get(&it).copied())
 }
 
 fn const_prop(consts: &HashMap<Id, u32>, src: &mut Source) -> Option<u32> {
-    if let Some(v) = const_id_lookup(consts, src) {
+    if let Some(v) = const_id_lookup(consts, *src) {
         *src = Source::Val(v);
         Some(v)
     } else if let Source::Val(v) = src {
@@ -105,7 +105,7 @@ pub fn fold_and_prop_consts(graph: &mut [Instruction]) {
     }
 }
 
-fn mark_live(live_instructions: &mut [bool; 0x1_0000], src: &Source) {
+fn mark_live(live_instructions: &mut [bool; 0x1_0000], src: Source) {
     if let Source::Id(id) = src {
         live_instructions[id.0 as usize] = true;
     }
@@ -118,9 +118,9 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
 
     for instruction in graph.iter().rev() {
         match instruction {
-            Instruction::Ret { addr, code } => {
-                mark_live(&mut live_ids, addr);
-                mark_live(&mut live_ids, code);
+            Instruction::Ret {  addr, code } => {
+                mark_live(&mut live_ids, *addr);
+                mark_live(&mut live_ids, *code);
 
                 live_instruction_count += 1;
             }
@@ -136,18 +136,18 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
                 // hack: I'm not sure when it's safe to remove unused memory reads,
                 // so assume we never can.
                 live_instruction_count += 1;
-                mark_live(&mut live_ids, src);
+                mark_live(&mut live_ids, *src);
             }
 
             Instruction::WriteReg { src, .. } => {
                 live_instruction_count += 1;
-                mark_live(&mut live_ids, src);
+                mark_live(&mut live_ids, *src);
             }
 
             Instruction::WriteMem { addr, src, .. } => {
                 live_instruction_count += 1;
-                mark_live(&mut live_ids, addr);
-                mark_live(&mut live_ids, src);
+                mark_live(&mut live_ids, *addr);
+                mark_live(&mut live_ids, *src);
             }
 
             Instruction::BinOp {
@@ -158,8 +158,8 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
             } => {
                 if live_ids[dest.0 as usize] {
                     live_instruction_count += 1;
-                    mark_live(&mut live_ids, src1);
-                    mark_live(&mut live_ids, src2);
+                    mark_live(&mut live_ids, *src1);
+                    mark_live(&mut live_ids, *src2);
                 }
             }
 
@@ -171,9 +171,9 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
             } => {
                 if live_ids[dest.0 as usize] {
                     live_instruction_count += 1;
-                    mark_live(&mut live_ids, cond);
-                    mark_live(&mut live_ids, if_true);
-                    mark_live(&mut live_ids, if_false);
+                    mark_live(&mut live_ids, *cond);
+                    mark_live(&mut live_ids, *if_true);
+                    mark_live(&mut live_ids, *if_false);
                 }
             }
         }

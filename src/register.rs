@@ -84,6 +84,7 @@ pub enum Native {
 }
 
 impl Native {
+    #[must_use]
     pub fn as_rasen_reg(self) -> Register {
         match self {
             Self::RDX => Register::Zdx,

@@ -8,18 +8,19 @@ use std::mem;
 
 mod sbi {
     #[repr(u32)]
+    #[derive(Copy, Clone)]
     enum StatusCode {
-        Success = 0,
+        Success = 0_u32,
         #[allow(dead_code)]
-        ErrFailure = -1i32 as u32,
+        ErrFailure = -1_i32 as u32,
         #[allow(dead_code)]
-        ErrNotSupported = -2i32 as u32,
+        ErrNotSupported = -2_i32 as u32,
         #[allow(dead_code)]
-        ErrInvalidParam = -3i32 as u32,
+        ErrInvalidParam = -3_i32 as u32,
         #[allow(dead_code)]
-        ErrDenied = -4i32 as u32,
+        ErrDenied = -4_i32 as u32,
         #[allow(dead_code)]
-        ErrInvalidAddress = -51i32 as u32,
+        ErrInvalidAddress = -5_1i32 as u32,
     }
 
     pub fn call(regs: &mut [u32; crate::XLEN]) {
@@ -57,7 +58,7 @@ mod sbi {
 
     const fn get_sbi_impl_id() -> (StatusCode, u32) {
         // no error, id = 0xfabadaba
-        (StatusCode::Success, 0xfabadaba)
+        (StatusCode::Success, 0xfaba_daba)
     }
 
     const fn get_sbi_impl_version() -> (StatusCode, u32) {
@@ -143,6 +144,7 @@ impl Runtime {
         }
     }
 
+    #[must_use]
     pub fn lookup_block(&self, start_address: u32) -> bool {
         self.ranges
             .binary_search_by_key(&start_address, |range| range.start)

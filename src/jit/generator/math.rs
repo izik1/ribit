@@ -4,6 +4,7 @@ use crate::register;
 use rasen::params::mem::{Mem, Mem32};
 use rasen::params::{Imm32, Reg32};
 
+#[derive(Copy, Clone)]
 pub enum ShiftKind {
     LL,
     RL,
@@ -134,7 +135,7 @@ pub fn shifti(
     // before shifting we need to move src -> dest
     builder.register_mov(rd, rs);
 
-    let shamt = ((imm as u8) & 0x1f).into();
+    let shamt = (imm as u8) & 0x1f;
 
     let dest = Reg32(builder.ez_alloc(rd).as_rasen_reg());
 

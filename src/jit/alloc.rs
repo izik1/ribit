@@ -40,7 +40,7 @@ fn read_register(
 // todo: use this in the builder (as an optional arg) to allow writing to a register:
 // without reserving it (Free or None if it isn't already allocated)
 // while reserving it (Allocate or None if it _is_ already allocated)
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum StoreProfile {
     Allocate,
     Free,

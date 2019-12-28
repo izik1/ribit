@@ -39,9 +39,10 @@ pub enum Instruction {
 }
 
 impl Instruction {
+    #[must_use]
     pub fn is_terminator(&self) -> bool {
         match self {
-            Self::J(_) | Self::B(_) | Self::Sys(_) | Self::IJump(_) => true,
+            Self::J(_) | Self::B(_) | Self::Sys(_) | Self::IJump(_)  => true,
 
             _ => false,
         }

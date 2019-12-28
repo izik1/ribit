@@ -11,6 +11,7 @@ pub struct Context {
 }
 
 impl Context {
+    #[must_use]
     pub fn new(start_pc: u32) -> Self {
         Self {
             next_id: Id(0),
