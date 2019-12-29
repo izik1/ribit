@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::{opcode, register, Width};
 
+pub mod analysis;
 pub mod eval;
 pub mod lower;
 pub mod opt;
@@ -114,9 +115,7 @@ impl fmt::Display for BinOp {
         }
     }
 }
-
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(test, derive(serde::Serialize))]
 pub enum Instruction {
     ReadReg {
         dest: Id,
@@ -229,6 +228,68 @@ impl fmt::Display for Instruction {
             Self::Ret { addr, code } => write!(f, "ret {}, {}", code, addr),
         }
     }
+}
+
+#[cfg(test)]
+fn max_fn() -> Vec<Instruction> {
+    use crate::instruction;
+
+    let mut ctx = lower::Context::new(1024);
+
+    lower::non_terminal(
+        &mut ctx,
+        instruction::Instruction::R(instruction::R::new(
+            Some(register::RiscV::X10),
+            Some(register::RiscV::X11),
+            Some(register::RiscV::X11),
+            opcode::R::ADD,
+        )),
+        4,
+    );
+
+    lower::non_terminal(
+        &mut ctx,
+        instruction::Instruction::I(instruction::I::new(
+            31,
+            Some(register::RiscV::X11),
+            Some(register::RiscV::X12),
+            opcode::I::SRLI,
+        )),
+        4,
+    );
+
+    lower::non_terminal(
+        &mut ctx,
+        instruction::Instruction::R(instruction::R::new(
+            Some(register::RiscV::X11),
+            Some(register::RiscV::X12),
+            Some(register::RiscV::X11),
+            opcode::R::AND,
+        )),
+        4,
+    );
+
+    lower::non_terminal(
+        &mut ctx,
+        instruction::Instruction::R(instruction::R::new(
+            Some(register::RiscV::X10),
+            Some(register::RiscV::X11),
+            Some(register::RiscV::X10),
+            opcode::R::ADD,
+        )),
+        4,
+    );
+
+    lower::terminal(
+        ctx,
+        instruction::Instruction::IJump(instruction::IJump::new(
+            0,
+            Some(register::RiscV::X1),
+            None,
+            opcode::IJump::JALR,
+        )),
+        2,
+    )
 }
 
 #[cfg(test)]

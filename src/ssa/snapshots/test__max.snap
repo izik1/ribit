@@ -6,11 +6,11 @@ expression: DisplayDeferSlice(&instrs)
 %1 = x11
 %2 = add %0, %1
 %3 = srl %2, 31
+x12 = %3
 %4 = and %2, %3
+x11 = %4
 %5 = add %0, %4
+x10 = %5
 %6 = x1
 %7 = add %6, 1040
-x10 = %5
-x11 = %4
-x12 = %3
 ret 0, %7

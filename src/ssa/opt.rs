@@ -191,6 +191,44 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
     instructions
 }
 
+/// Moves register writes to be as close to their computations as possible.
+pub fn register_writeback_shrinking(graph: &[Instruction]) -> Vec<Instruction> {
+    let mut stores = vec![];
+    let mut instrs = Vec::with_capacity(graph.len());
+
+    for instr in graph {
+        match instr {
+            Instruction::WriteReg {
+                dest,
+                src: Source::Id(id),
+            } => {
+                stores.push((*dest, *id));
+            }
+
+            _ => instrs.push(instr.clone()),
+        }
+    }
+
+    for idx in (0..instrs.len()).rev() {
+        if let Some(store_idx) = instrs[idx]
+            .id()
+            .and_then(|id| stores.iter().copied().position(|(_, src)| src == id))
+        {
+            let store = stores.remove(store_idx);
+            // insert _after_ the instruction we just looked at
+            instrs.insert(
+                idx + 1,
+                Instruction::WriteReg {
+                    dest: store.0,
+                    src: Source::Id(store.1),
+                },
+            );
+        }
+    }
+
+    instrs
+}
+
 #[cfg(test)]
 mod test {
     use crate::ssa::lower;
@@ -220,65 +258,11 @@ mod test {
 
     #[test]
     fn max() {
-        let mut ctx = lower::Context::new(1024);
-
-        lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::R(instruction::R::new(
-                Some(register::RiscV::X10),
-                Some(register::RiscV::X11),
-                Some(register::RiscV::X11),
-                opcode::R::ADD,
-            )),
-            4,
-        );
-
-        lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::I(instruction::I::new(
-                31,
-                Some(register::RiscV::X11),
-                Some(register::RiscV::X12),
-                opcode::I::SRLI,
-            )),
-            4,
-        );
-
-        lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::R(instruction::R::new(
-                Some(register::RiscV::X11),
-                Some(register::RiscV::X12),
-                Some(register::RiscV::X11),
-                opcode::R::AND,
-            )),
-            4,
-        );
-
-        lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::R(instruction::R::new(
-                Some(register::RiscV::X10),
-                Some(register::RiscV::X11),
-                Some(register::RiscV::X10),
-                opcode::R::ADD,
-            )),
-            4,
-        );
-
-        let mut instrs = lower::terminal(
-            ctx,
-            instruction::Instruction::IJump(instruction::IJump::new(
-                0,
-                Some(register::RiscV::X1),
-                None,
-                opcode::IJump::JALR,
-            )),
-            2,
-        );
+        let mut instrs = crate::ssa::max_fn();
 
         super::fold_and_prop_consts(&mut instrs);
         let instrs = super::dead_instruction_elimination(&instrs);
+        let instrs = super::register_writeback_shrinking(&instrs);
 
         assert_display_snapshot!(DisplayDeferSlice(&instrs));
     }

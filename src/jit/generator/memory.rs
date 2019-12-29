@@ -3,8 +3,10 @@ use crate::register;
 use crate::Width;
 
 use rasen::params::{
-    mem::{Mem16, Mem32, Mem8, Mem},
-    imm::{Imm16, Imm32, Imm8}, reg::Reg32, Register,
+    imm::{Imm16, Imm32, Imm8},
+    mem::{Mem, Mem16, Mem32, Mem8},
+    reg::Reg32,
+    Register,
 };
 use std::io;
 

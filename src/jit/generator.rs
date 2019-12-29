@@ -13,8 +13,10 @@ use crate::{
     opcode, register,
 };
 use rasen::params::{
+    imm::Imm32,
     mem::{Mem, Mem32},
-    imm::Imm32, reg::Reg32, Register,
+    reg::Reg32,
+    Register,
 };
 
 pub struct BlockBuilder<'a, 'b: 'a> {
@@ -401,7 +403,10 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                 builder.stream.mov_reg_reg(Reg32::ZAX, Reg32(rs2)).unwrap();
                 builder.stream.add_reg_reg(Reg32::ZAX, Reg32(rs1)).unwrap();
                 builder.register_manager.set_dirty(rd);
-                builder.stream.mov_reg_reg(Reg32(native_rd), Reg32::ZAX).unwrap();
+                builder
+                    .stream
+                    .mov_reg_reg(Reg32(native_rd), Reg32::ZAX)
+                    .unwrap();
             }
             _ => builder.write_register_imm(rd, 0, Some(StoreProfile::Allocate)),
         },
@@ -420,7 +425,10 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                 builder.stream.mov_reg_reg(Reg32::ZAX, Reg32(rs2)).unwrap();
                 builder.stream.or_reg_reg(Reg32::ZAX, Reg32(rs1)).unwrap();
                 builder.register_manager.set_dirty(rd);
-                builder.stream.mov_reg_reg(Reg32(native_rd), Reg32::ZAX).unwrap();
+                builder
+                    .stream
+                    .mov_reg_reg(Reg32(native_rd), Reg32::ZAX)
+                    .unwrap();
             }
         },
 
@@ -438,7 +446,10 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                 builder.stream.mov_reg_reg(Reg32::ZAX, Reg32(rs2)).unwrap();
                 builder.stream.xor_reg_reg(Reg32::ZAX, Reg32(rs1)).unwrap();
                 builder.register_manager.set_dirty(rd);
-                builder.stream.mov_reg_reg(Reg32(native_rd), Reg32::ZAX).unwrap();
+                builder
+                    .stream
+                    .mov_reg_reg(Reg32(native_rd), Reg32::ZAX)
+                    .unwrap();
             }
         },
 
@@ -494,7 +505,10 @@ fn generate_register_instruction(builder: &mut BlockBuilder, instruction: instru
                 builder.stream.mov_reg_reg(Reg32::ZAX, Reg32(rs2)).unwrap();
                 builder.stream.sub_reg_reg(Reg32::ZAX, Reg32(rs1)).unwrap();
                 builder.register_manager.set_dirty(rd);
-                builder.stream.mov_reg_reg(Reg32(native_rd), Reg32::ZAX).unwrap();
+                builder
+                    .stream
+                    .mov_reg_reg(Reg32(native_rd), Reg32::ZAX)
+                    .unwrap();
             }
         },
 

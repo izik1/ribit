@@ -1,7 +1,11 @@
 use super::{BlockBuilder, LoadProfile, StoreProfile};
 use crate::jit::Assembler;
 use crate::register;
-use rasen::params::{imm::Imm32, reg::Reg32, mem::{Mem, Mem32}};
+use rasen::params::{
+    imm::Imm32,
+    mem::{Mem, Mem32},
+    reg::Reg32,
+};
 
 #[derive(Copy, Clone)]
 pub enum ShiftKind {
