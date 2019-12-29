@@ -115,25 +115,40 @@ impl fmt::Display for BinOp {
         }
     }
 }
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[repr(u8)]
+pub enum Arg {
+    Register = 0,
+    Memory = 1,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Instruction {
+    Arg {
+        dest: Id,
+        src: Arg,
+    },
     ReadReg {
         dest: Id,
+        base: Source,
         src: register::RiscV,
     },
     WriteReg {
         dest: register::RiscV,
+        base: Source,
         src: Source,
     },
     ReadMem {
         dest: Id,
         src: Source,
+        base: Source,
         width: Width,
         sign_extend: bool,
     },
     WriteMem {
         addr: Source,
         src: Source,
+        base: Source,
         width: Width,
     },
     BinOp {
@@ -175,6 +190,7 @@ impl Instruction {
             | Self::ReadMem { dest, .. }
             | Self::LoadConst { dest, .. }
             | Self::Cmp { dest, .. }
+            | Self::Arg { dest, .. }
             | Self::BinOp { dest, .. } => Some(*dest),
             Self::WriteReg { .. } | Self::WriteMem { .. } | Self::Ret { .. } | Self::Fence => None,
         }
@@ -184,20 +200,22 @@ impl Instruction {
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::ReadReg { dest, src } => write!(f, "{} = x{}", dest, src.get()),
+            Self::ReadReg { dest, base, src } => write!(f, "{} = x({}){}", dest, base, src.get()),
             Self::ReadMem {
                 dest,
                 src,
+                base,
                 width,
                 sign_extend,
             } => match sign_extend {
-                true => write!(f, "{} = signed {} mem[{}]", dest, width, src),
-                false => write!(f, "{} = {} mem[{}]", dest, width, src),
+                true => write!(f, "{} = signed {} m({}){}", dest, width, base, src),
+                false => write!(f, "{} = {} m({}){}", dest, width, base, src),
             },
 
-            Self::WriteReg { dest, src } => write!(f, "x{} = {}", dest.get(), src),
-            Self::WriteMem { addr, src, width } => write!(f, "mem[{}] = {} {}", addr, width, src),
+            Self::WriteReg { base, dest, src } => write!(f, "x({}){} = {}", base, dest.get(), src),
+            Self::WriteMem { base, addr, src, width } => write!(f, "m({}){} = {} {}", base, addr, width, src),
             Self::LoadConst { dest, src } => write!(f, "{} = {}", dest, src),
+            Self::Arg { dest, src } => write!(f, "{} = args[{}]", dest, *src as u8),
             Self::BinOp {
                 dest,
                 src1,
@@ -296,6 +314,7 @@ fn max_fn() -> Vec<Instruction> {
 mod test {
     use super::{lower, Id, Instruction, Source};
     use crate::register;
+    use crate::ssa::Arg;
 
     #[test]
     fn empty() {
@@ -325,26 +344,44 @@ mod test {
         ctx.read_register(register::RiscV::X1);
         let instrs = ctx.ret();
 
-        assert_eq!(instrs.len(), 3);
+        assert_eq!(instrs.len(), 5);
 
         assert_eq!(
             instrs[0],
-            Instruction::ReadReg {
+            Instruction::Arg {
                 dest: Id(0),
-                src: register::RiscV::X1
+                src: Arg::Register,
             }
         );
 
         assert_eq!(
             instrs[1],
-            Instruction::ReadReg {
+            Instruction::Arg {
                 dest: Id(1),
-                src: register::RiscV::X2
+                src: Arg::Memory,
             }
         );
 
         assert_eq!(
             instrs[2],
+            Instruction::ReadReg {
+                dest: Id(2),
+                src: register::RiscV::X1,
+                base: Source::Id(Id(0)),
+            }
+        );
+
+        assert_eq!(
+            instrs[3],
+            Instruction::ReadReg {
+                dest: Id(3),
+                src: register::RiscV::X2,
+                base: Source::Id(Id(0)),
+            }
+        );
+
+        assert_eq!(
+            instrs[4],
             Instruction::Ret {
                 addr: Source::Val(0),
                 code: Source::Val(0),
@@ -364,7 +401,8 @@ mod test {
             instrs[0],
             Instruction::WriteReg {
                 dest: register::RiscV::X2,
-                src: Source::Val(0)
+                src: Source::Val(0),
+                base: Source::Id(Id(0)),
             }
         );
     }

@@ -49,20 +49,28 @@ pub fn lifetimes(instrs: &[Instruction]) -> Lifetimes {
                 update_lifetime(&mut lifetimes, *src2, idx);
             }
 
-            Instruction::ReadReg { dest, .. } | Instruction::LoadConst { dest, .. } => {
+            Instruction::ReadReg { dest, base, .. } => {
+                update_lifetime(&mut lifetimes, *base, idx);
                 update_lifetime(&mut lifetimes, Source::Id(*dest), idx);
             }
 
-            Instruction::WriteReg { src, .. } => {
+            Instruction::Arg { dest, .. } | Instruction::LoadConst { dest, .. } => {
+                update_lifetime(&mut lifetimes, Source::Id(*dest), idx);
+            }
+
+            Instruction::WriteReg { src, base, .. } => {
+                update_lifetime(&mut lifetimes, *base, idx);
                 update_lifetime(&mut lifetimes, *src, idx);
             }
 
-            Instruction::ReadMem { dest, src, .. } => {
+            Instruction::ReadMem { dest, src, base, .. } => {
+                update_lifetime(&mut lifetimes, *base, idx);
                 update_lifetime(&mut lifetimes, Source::Id(*dest), idx);
                 update_lifetime(&mut lifetimes, *src, idx);
             }
 
-            Instruction::WriteMem { addr, src, .. } => {
+            Instruction::WriteMem { addr, src, base, .. } => {
+                update_lifetime(&mut lifetimes, *base, idx);
                 update_lifetime(&mut lifetimes, *addr, idx);
                 update_lifetime(&mut lifetimes, *src, idx);
             }

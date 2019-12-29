@@ -1,11 +1,13 @@
 use super::{BinOp, CmpKind, Id, Instruction, Source};
-use crate::ssa::eval;
+use crate::ssa::{eval, Arg};
 use crate::{instruction, opcode, register, Width};
 
 pub struct Context {
     next_id: Id,
     pub pc: Source,
     registers: [Option<Source>; 32],
+    register_arg: Option<Source>,
+    memory_arg: Option<Source>,
     registers_written: u32,
     instructions: Vec<Instruction>,
 }
@@ -13,13 +15,23 @@ pub struct Context {
 impl Context {
     #[must_use]
     pub fn new(start_pc: u32) -> Self {
-        Self {
+        let mut self_ = Self {
             next_id: Id(0),
             pc: Source::Val(start_pc),
             registers: [None; 32],
+            register_arg: None,
+            memory_arg: None,
             registers_written: 0x0000_0000,
             instructions: vec![],
-        }
+        };
+
+        self_.register_arg = Some(self_.arg(Arg::Register));
+        self_.memory_arg = Some(self_.arg(Arg::Memory));
+        self_
+    }
+
+    fn arg(&mut self, arg: Arg) -> Source {
+        self.instruction(|id| Instruction::Arg { dest: id, src: arg })
     }
 
     pub fn add_pc(&mut self, src: Source) -> Source {
@@ -58,8 +70,11 @@ impl Context {
         self.registers[reg.get() as usize].unwrap_or_else(|| {
             let id = self.new_id();
 
-            self.instructions
-                .push(Instruction::ReadReg { dest: id, src: reg });
+            self.instructions.push(Instruction::ReadReg {
+                dest: id,
+                base: self.register_arg.expect("Register arg wasn't initialized?"),
+                src: reg,
+            });
 
             self.registers[reg.get() as usize] = Some(Source::Id(id));
 
@@ -72,9 +87,11 @@ impl Context {
     }
 
     pub fn read_memory(&mut self, src: Source, width: Width, sign_extend: bool) -> Source {
+        let base = self.memory_arg.expect("Memory arg wasn't initialized?");
         self.instruction(|dest| Instruction::ReadMem {
             dest,
             src,
+            base,
             width,
             sign_extend,
         })
@@ -88,6 +105,7 @@ impl Context {
     pub fn write_memory(&mut self, addr: Source, val: Source, width: Width) {
         self.instructions.push(Instruction::WriteMem {
             addr,
+            base: self.memory_arg.expect("Memory arg wasn't initialized?"),
             src: val,
             width,
         });
@@ -162,7 +180,11 @@ impl Context {
 
             if let Some(src) = *src {
                 if (self.registers_written >> dest.get()) & 1 == 1 {
-                    self.instructions.push(Instruction::WriteReg { dest, src });
+                    self.instructions.push(Instruction::WriteReg {
+                        dest,
+                        base: self.register_arg.expect("Register arg wasn't initialized?"),
+                        src,
+                    });
                 }
             }
         }
@@ -410,10 +432,11 @@ pub fn terminal(
 #[cfg(test)]
 mod test {
     use super::Context;
-    use crate::DisplayDeferSlice;
+    use crate::{DisplayDeferSlice, Width};
     use crate::{instruction, opcode, register};
 
     use insta::assert_display_snapshot;
+    use crate::ssa::opt::register_writeback_shrinking;
 
     #[test]
     fn jal_basic() {
@@ -502,6 +525,51 @@ mod test {
                 Some(register::RiscV::X1),
                 None,
                 opcode::I::ADDI,
+            )),
+            4,
+        );
+
+        let instrs = super::terminal(
+            ctx,
+            instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
+            4,
+        );
+
+        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+    }
+
+    #[test]
+    fn mem_read_write() {
+        let mut ctx = Context::new(0);
+        super::non_terminal(
+            &mut ctx,
+            instruction::Instruction::IMem(instruction::IMem::new(
+                0,
+                Some(register::RiscV::X1),
+                Some(register::RiscV::X2),
+                opcode::IMem::LD(Width::DWord),
+            )),
+            4,
+        );
+
+        super::non_terminal(
+            &mut ctx,
+            instruction::Instruction::I(instruction::I::new(
+                100,
+                Some(register::RiscV::X2),
+                Some(register::RiscV::X2),
+                opcode::I::ADDI,
+            )),
+            4
+        );
+
+        super::non_terminal(
+            &mut ctx,
+            instruction::Instruction::S(instruction::S::new(
+                50,
+                Some(register::RiscV::X2),
+                Some(register::RiscV::X1),
+                Width::DWord,
             )),
             4,
         );

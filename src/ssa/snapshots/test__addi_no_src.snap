@@ -2,5 +2,7 @@
 source: src/ssa/lower.rs
 expression: DisplayDeferSlice(&instrs)
 ---
-x2 = 50
+%0 = args[0]
+%1 = args[1]
+x(%0)2 = 50
 ret 1, 8
