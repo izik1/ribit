@@ -1,0 +1,14 @@
+---
+source: src/jit/register_alloc.rs
+expression: "super::ShowAllocs{allocs: &allocs,}"
+---
+%0 => zdi
+%2 => zax
+%3 => zcx
+%4 => zcx
+%5 => zdx
+%6 => zcx
+%7 => zax
+%8 => zax
+%9 => zax
+

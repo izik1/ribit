@@ -7,7 +7,7 @@ pub mod eval;
 pub mod lower;
 pub mod opt;
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, PartialOrd, Ord)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub struct Id(u16);
 
@@ -213,7 +213,12 @@ impl fmt::Display for Instruction {
             },
 
             Self::WriteReg { base, dest, src } => write!(f, "x({}){} = {}", base, dest.get(), src),
-            Self::WriteMem { base, addr, src, width } => write!(f, "m({}){} = {} {}", base, addr, width, src),
+            Self::WriteMem {
+                base,
+                addr,
+                src,
+                width,
+            } => write!(f, "m({}){} = {} {}", base, addr, width, src),
             Self::LoadConst { dest, src } => write!(f, "{} = {}", dest, src),
             Self::Arg { dest, src } => write!(f, "{} = args[{}]", dest, *src as u8),
             Self::BinOp {
@@ -249,7 +254,7 @@ impl fmt::Display for Instruction {
 }
 
 #[cfg(test)]
-fn max_fn() -> Vec<Instruction> {
+pub(crate) fn max_fn() -> Vec<Instruction> {
     use crate::instruction;
 
     let mut ctx = lower::Context::new(1024);
@@ -324,10 +329,26 @@ mod test {
 
         let instrs = ctx.ret();
 
-        assert_eq!(instrs.len(), 1);
+        assert_eq!(instrs.len(), 3);
 
         assert_eq!(
             instrs[0],
+            Instruction::Arg {
+                src: Arg::Register,
+                dest: Id(0),
+            }
+        );
+
+        assert_eq!(
+            instrs[1],
+            Instruction::Arg {
+                src: Arg::Memory,
+                dest: Id(1),
+            }
+        );
+
+        assert_eq!(
+            instrs[2],
             Instruction::Ret {
                 addr: Source::Val(START_PC),
                 code: Source::Val(0),
@@ -396,9 +417,26 @@ mod test {
         ctx.write_register(register::RiscV::X2, Source::Val(0));
         let instrs = ctx.ret();
 
-        assert_eq!(instrs.len(), 2);
+        assert_eq!(instrs.len(), 4);
+
         assert_eq!(
             instrs[0],
+            Instruction::Arg {
+                src: Arg::Register,
+                dest: Id(0),
+            }
+        );
+
+        assert_eq!(
+            instrs[1],
+            Instruction::Arg {
+                src: Arg::Memory,
+                dest: Id(1),
+            }
+        );
+
+        assert_eq!(
+            instrs[2],
             Instruction::WriteReg {
                 dest: register::RiscV::X2,
                 src: Source::Val(0),

@@ -432,11 +432,10 @@ pub fn terminal(
 #[cfg(test)]
 mod test {
     use super::Context;
-    use crate::{DisplayDeferSlice, Width};
     use crate::{instruction, opcode, register};
+    use crate::{DisplayDeferSlice, Width};
 
     use insta::assert_display_snapshot;
-    use crate::ssa::opt::register_writeback_shrinking;
 
     #[test]
     fn jal_basic() {
@@ -560,7 +559,7 @@ mod test {
                 Some(register::RiscV::X2),
                 opcode::I::ADDI,
             )),
-            4
+            4,
         );
 
         super::non_terminal(

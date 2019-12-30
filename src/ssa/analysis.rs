@@ -63,13 +63,17 @@ pub fn lifetimes(instrs: &[Instruction]) -> Lifetimes {
                 update_lifetime(&mut lifetimes, *src, idx);
             }
 
-            Instruction::ReadMem { dest, src, base, .. } => {
+            Instruction::ReadMem {
+                dest, src, base, ..
+            } => {
                 update_lifetime(&mut lifetimes, *base, idx);
                 update_lifetime(&mut lifetimes, Source::Id(*dest), idx);
                 update_lifetime(&mut lifetimes, *src, idx);
             }
 
-            Instruction::WriteMem { addr, src, base, .. } => {
+            Instruction::WriteMem {
+                addr, src, base, ..
+            } => {
                 update_lifetime(&mut lifetimes, *base, idx);
                 update_lifetime(&mut lifetimes, *addr, idx);
                 update_lifetime(&mut lifetimes, *src, idx);
@@ -151,8 +155,7 @@ impl fmt::Display for ShowLifetimes<'_, '_> {
 #[cfg(test)]
 mod test {
     use super::ShowLifetimes;
-    use crate::ssa::{lower, opt};
-    use crate::{instruction, opcode, register};
+    use crate::ssa::opt;
 
     use insta::assert_display_snapshot;
 

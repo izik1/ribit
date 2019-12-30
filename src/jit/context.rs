@@ -20,7 +20,7 @@ mod sbi {
         #[allow(dead_code)]
         ErrDenied = -4_i32 as u32,
         #[allow(dead_code)]
-        ErrInvalidAddress = -5_1i32 as u32,
+        ErrInvalidAddress = -5_i32 as u32,
     }
 
     pub fn call(regs: &mut [u32; crate::XLEN]) {

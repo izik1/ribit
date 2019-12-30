@@ -1,5 +1,9 @@
+// going to delete all of this once the ssa can handle it,
+// so don't worry about the dead code.
+#[allow(dead_code)]
 mod alloc;
 mod generator;
+pub mod register_alloc;
 
 pub mod context;
 

@@ -30,7 +30,7 @@ pub fn fold_and_prop_consts(graph: &mut [Instruction]) {
             Instruction::ReadReg { base, .. } => {
                 const_prop(&consts, base);
                 continue;
-            },
+            }
 
             Instruction::WriteReg { src, base, .. }
             | Instruction::ReadMem { src, base, .. }
@@ -132,32 +132,51 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
 
             Instruction::Fence => live_instruction_count += 1,
 
-            Instruction::ReadReg { src: _, dest: _, base} => {
-                live_instruction_count += 1;
+            Instruction::ReadReg {
+                src: _,
+                dest,
+                base,
+            } => {
                 mark_live(&mut live_ids, *base);
-            }
 
-
-            Instruction::ReadReg { dest, .. } | Instruction::LoadConst { dest, .. } | Instruction::Arg { dest, .. } => {
                 if live_ids[dest.0 as usize] {
                     live_instruction_count += 1;
                 }
             }
 
-            Instruction::ReadMem { src, base, dest: _, sign_extend: _, width: _} => {
-                // hack: I'm not sure when it's safe to remove unused memory reads,
-                // so assume we never can.
-                live_instruction_count += 1;
-                mark_live(&mut live_ids, *src);
+            Instruction::LoadConst { dest, .. }
+            | Instruction::Arg { dest, .. } => {
+                if live_ids[dest.0 as usize] {
+                    live_instruction_count += 1;
+                }
             }
 
-            Instruction::WriteReg { src, dest: _, base} => {
+            Instruction::ReadMem {
+                src,
+                base,
+                dest: _,
+                sign_extend: _,
+                width: _,
+            } => {
+                // hack: I'm not sure when it's safe to remove unused memory reads,
+                // so assume we never can.
                 live_instruction_count += 1;
                 mark_live(&mut live_ids, *src);
                 mark_live(&mut live_ids, *base);
             }
 
-            Instruction::WriteMem { addr, src, base, width: _ } => {
+            Instruction::WriteReg { src, dest: _, base } => {
+                live_instruction_count += 1;
+                mark_live(&mut live_ids, *src);
+                mark_live(&mut live_ids, *base);
+            }
+
+            Instruction::WriteMem {
+                addr,
+                src,
+                base,
+                width: _,
+            } => {
                 live_instruction_count += 1;
                 mark_live(&mut live_ids, *addr);
                 mark_live(&mut live_ids, *src);
@@ -215,7 +234,7 @@ pub fn register_writeback_shrinking(graph: &[Instruction]) -> Vec<Instruction> {
             Instruction::WriteReg {
                 dest,
                 src: Source::Id(id),
-                base
+                base,
             } => {
                 stores.push((*dest, *id, *base));
             }
@@ -236,7 +255,7 @@ pub fn register_writeback_shrinking(graph: &[Instruction]) -> Vec<Instruction> {
                 Instruction::WriteReg {
                     dest: store.0,
                     src: Source::Id(store.1),
-                    base: store.2
+                    base: store.2,
                 },
             );
         }
@@ -248,8 +267,8 @@ pub fn register_writeback_shrinking(graph: &[Instruction]) -> Vec<Instruction> {
 #[cfg(test)]
 mod test {
     use crate::ssa::lower;
-    use crate::{DisplayDeferSlice, Width};
     use crate::{instruction, opcode, register};
+    use crate::{DisplayDeferSlice, Width};
 
     use insta::assert_display_snapshot;
 
@@ -294,7 +313,7 @@ mod test {
                 Some(register::RiscV::X2),
                 opcode::I::ADDI,
             )),
-            4
+            4,
         );
 
         lower::non_terminal(
