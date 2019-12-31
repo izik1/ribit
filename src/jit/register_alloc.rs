@@ -45,13 +45,6 @@ fn register_from_index(bit: u8) -> Register {
     }
 }
 
-fn first_unallocated(allocated: u16) -> Option<u8> {
-    match (!allocated).trailing_zeros() {
-        it if it < 16 => Some(it as u8),
-        _ => None,
-    }
-}
-
 fn arg_register(arg: Arg) -> Register {
     match arg {
         Arg::Register => Register::Zdi,
@@ -59,81 +52,102 @@ fn arg_register(arg: Arg) -> Register {
     }
 }
 
+#[derive(Debug)]
+struct RegisterAllocator {
+    currently_allocated: u16,
+    allocations: HashMap<Id, Register>,
+}
+
+impl RegisterAllocator {
+    fn new() -> Self {
+        Self {
+            currently_allocated: system_v_abi_saved() | (1 << Register::Zsp as u16),
+            allocations: HashMap::new(),
+        }
+    }
+
+    fn first_unallocated(&self) -> Option<u8> {
+        match (!self.currently_allocated).trailing_zeros() {
+            it if it < 16 => Some(it as u8),
+            // this should only ever be _equal_ to 16, due to the contract of `trailing zeros`
+            _ => None,
+        }
+
+    }
+
+    fn allocate(&mut self, id: Id) -> Result<(), RegisterSpill> {
+        // todo: create and return a RegisterSpill
+        let reg = register_from_index(self.first_unallocated().unwrap());
+        self.currently_allocated |= 1 << (reg as u16);
+        self.allocations.insert(id, reg);
+        Ok(())
+    }
+
+    // todo: this doesn't handle instructions with a lifetime of 1 (dies the same instruction it's created)
+    fn deallocate_unused(&mut self, lifetimes: &Lifetimes, idx: usize) {
+        for reg in self
+            .allocations
+            .iter()
+            .filter_map(|(id, reg)| (lifetimes[id].end == idx).then_some(*reg))
+        {
+            // ensure that there is indeed a register allocated there.
+            assert_eq!(!self.currently_allocated & (1 << reg as u16), 0);
+            self.currently_allocated &= !(1 << reg as u16)
+        }
+    }
+
+    fn allocate_args(&mut self, graph: &[Instruction]) -> Option<usize> {
+        for (idx, instr) in graph.iter().enumerate() {
+            match instr {
+                Instruction::Arg { dest, src } => {
+                    let reg = arg_register(*src);
+                    // shouldn't ever happen, but better to check anyway.
+                    assert_eq!(self.currently_allocated & (reg as u16), 0);
+                    self.currently_allocated |= 1 << (reg as u16);
+
+                    self.allocations.insert(*dest, reg);
+                }
+                _ => return Some(idx),
+            }
+        }
+
+        None
+    }
+}
+
+impl Default for RegisterAllocator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // todo: fill this out
 #[derive(Debug)]
 pub struct RegisterSpill;
 
-// todo: this doesn't handle instructions with a lifetime of 1 (dies the same instruction it's created)
-fn deallocate_unused(
-    allocated: &mut u16,
-    lifetimes: &Lifetimes,
-    allocations: &mut HashMap<Id, Register>,
-    idx: usize,
-) {
-    for reg in allocations
-        .iter()
-        .filter_map(|(id, reg)| (lifetimes[id].end == idx).then_some(*reg))
-    {
-        // ensure that there is indeed a register allocated there.
-        assert_eq!(!*allocated & (1 << reg as u16), 0);
-        *allocated &= !(1 << reg as u16)
-    }
-}
-
-fn allocate_args(
-    allocated: &mut u16,
-    allocations: &mut HashMap<Id, Register>,
-    graph: &[Instruction],
-) -> Option<usize> {
-    for (idx, instr) in graph.iter().enumerate() {
-        match instr {
-            Instruction::Arg { dest, src } => {
-                let reg = arg_register(*src);
-                // shouldn't ever happen, but better to check anyway.
-                assert_eq!(*allocated & (reg as u16), 0);
-                *allocated |= 1 << (reg as u16);
-
-                allocations.insert(*dest, reg);
-            }
-            _ => return Some(idx),
-        }
-    }
-
-    None
-}
-
 pub fn allocate_registers(graph: &[Instruction]) -> Result<HashMap<Id, Register>, RegisterSpill> {
-    let mut allocated = system_v_abi_saved() | (1 << Register::Zsp as u16);
-    let lifetimes = analysis::lifetimes(&graph);
-    // todo: find an efficient way of pre-checking lifetimes to avoid unneeded work on spills.
+    let mut allocator = RegisterAllocator::new();
 
-    let mut allocations = HashMap::new();
+    let start = match allocator.allocate_args(graph) {
+        Some(idx) => idx,
+        None => return Ok(allocator.allocations),
+    };
+
+    // todo: find an efficient way of pre-checking lifetimes to avoid unneeded work on spills.
+    let lifetimes = analysis::lifetimes(&graph);
 
     // avoid any ids where it dies right when it's created.
     // this prevents allocating instructions where a register would be leaked.
     // todo: handle the actual problem rather than this bandaid.
     assert!(!lifetimes.values().any(|it| it.start == it.end));
 
-    // use loop here to avoid having to use `!#[feature(label_break_value)]`
-
-    let start = match allocate_args(&mut allocated, &mut allocations, graph) {
-        Some(idx) => idx,
-        None => return Ok(allocations),
-    };
-
     for (idx, instr) in graph[start..].iter().enumerate() {
         let idx = idx + start;
-        deallocate_unused(&mut allocated, &lifetimes, &mut allocations, idx);
-
-        if let Some(id) = instr.id() {
-            // todo: create and return a RegisterSpill
-            let reg = register_from_index(first_unallocated(allocated).unwrap());
-            allocated |= 1 << (reg as u16);
-            allocations.insert(id, reg);
-        }
+        allocator.deallocate_unused(&lifetimes, idx);
+        instr.id().iter().try_for_each(|id| allocator.allocate(*id))?;
     }
 
-    Ok(allocations)
+    Ok(allocator.allocations)
 }
 
 struct FmtRegister(Register);
