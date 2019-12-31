@@ -1,3 +1,4 @@
+use crate::ssa::analysis::Lifetimes;
 use crate::ssa::{analysis, Arg, Id, Instruction};
 use rasen::params::Register;
 use std::collections::HashMap;
@@ -62,6 +63,45 @@ fn arg_register(arg: Arg) -> Register {
 #[derive(Debug)]
 pub struct RegisterSpill;
 
+// todo: this doesn't handle instructions with a lifetime of 1 (dies the same instruction it's created)
+fn deallocate_unused(
+    allocated: &mut u16,
+    lifetimes: &Lifetimes,
+    allocations: &mut HashMap<Id, Register>,
+    idx: usize,
+) {
+    for reg in allocations
+        .iter()
+        .filter_map(|(id, reg)| (lifetimes[id].end == idx).then_some(*reg))
+    {
+        // ensure that there is indeed a register allocated there.
+        assert_eq!(!*allocated & (1 << reg as u16), 0);
+        *allocated &= !(1 << reg as u16)
+    }
+}
+
+fn allocate_args(
+    allocated: &mut u16,
+    allocations: &mut HashMap<Id, Register>,
+    graph: &[Instruction],
+) -> Option<usize> {
+    for (idx, instr) in graph.iter().enumerate() {
+        match instr {
+            Instruction::Arg { dest, src } => {
+                let reg = arg_register(*src);
+                // shouldn't ever happen, but better to check anyway.
+                assert_eq!(*allocated & (reg as u16), 0);
+                *allocated |= 1 << (reg as u16);
+
+                allocations.insert(*dest, reg);
+            }
+            _ => return Some(idx),
+        }
+    }
+
+    None
+}
+
 pub fn allocate_registers(graph: &[Instruction]) -> Result<HashMap<Id, Register>, RegisterSpill> {
     let mut allocated = system_v_abi_saved() | (1 << Register::Zsp as u16);
     let lifetimes = analysis::lifetimes(&graph);
@@ -69,43 +109,23 @@ pub fn allocate_registers(graph: &[Instruction]) -> Result<HashMap<Id, Register>
 
     let mut allocations = HashMap::new();
 
-    let mut non_arg = false;
-
     // avoid any ids where it dies right when it's created.
     // this prevents allocating instructions where a register would be leaked.
     // todo: handle the actual problem rather than this bandaid.
     assert!(!lifetimes.values().any(|it| it.start == it.end));
 
-    for (idx, instr) in graph.iter().enumerate() {
-        if !non_arg {
-            if let Instruction::Arg { dest, src } = instr {
-                let reg = arg_register(*src);
-                // shouldn't ever happen, but better to check anyway.
-                assert_eq!(allocated & (reg as u16), 0);
-                allocated |= 1 << (reg as u16);
+    // use loop here to avoid having to use `!#[feature(label_break_value)]`
 
-                allocations.insert(*dest, reg);
-                continue;
-            } else {
-                non_arg = true;
-            }
-        }
+    let start = match allocate_args(&mut allocated, &mut allocations, graph) {
+        Some(idx) => idx,
+        None => return Ok(allocations),
+    };
 
-        for reg in allocations
-            .iter()
-            .filter_map(|(id, reg)| (lifetimes[id].end == idx).then_some(*reg))
-        {
-            // ensure that there is indeed a register allocated there.
-            assert_eq!(!allocated & (1 << reg as u16), 0);
-            allocated &= !(1 << reg as u16)
-        }
+    for (idx, instr) in graph[start..].iter().enumerate() {
+        let idx = idx + start;
+        deallocate_unused(&mut allocated, &lifetimes, &mut allocations, idx);
 
-        let id = match instr {
-            Instruction::Arg { .. } => panic!("Arg found after prelude (it shouldn't be here)"),
-            _ => instr.id(),
-        };
-
-        if let Some(id) = id {
+        if let Some(id) = instr.id() {
             // todo: create and return a RegisterSpill
             let reg = register_from_index(first_unallocated(allocated).unwrap());
             allocated |= 1 << (reg as u16);
@@ -182,7 +202,7 @@ mod test {
                 lifetimes.replace(&id.to_string(), &super::FmtRegister(*register).to_string());
         }
 
-        // the main snapshot (long form, allows
+        // the main snapshot (long form, allows human readability)
         assert_snapshot!(lifetimes);
         assert_display_snapshot!(super::ShowAllocs { allocs: &allocs });
     }

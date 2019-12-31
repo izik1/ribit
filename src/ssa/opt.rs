@@ -132,11 +132,7 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
 
             Instruction::Fence => live_instruction_count += 1,
 
-            Instruction::ReadReg {
-                src: _,
-                dest,
-                base,
-            } => {
+            Instruction::ReadReg { src: _, dest, base } => {
                 mark_live(&mut live_ids, *base);
 
                 if live_ids[dest.0 as usize] {
@@ -144,8 +140,7 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
                 }
             }
 
-            Instruction::LoadConst { dest, .. }
-            | Instruction::Arg { dest, .. } => {
+            Instruction::LoadConst { dest, .. } | Instruction::Arg { dest, .. } => {
                 if live_ids[dest.0 as usize] {
                     live_instruction_count += 1;
                 }
