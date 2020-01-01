@@ -26,7 +26,10 @@ pub fn fold_and_prop_consts(graph: &mut [Instruction]) {
         let (dest, val) = match instruction {
             Instruction::LoadConst { dest, src } => (*dest, *src),
 
-            Instruction::Fence | Instruction::Arg { .. } => continue,
+            Instruction::Fence
+            | Instruction::Arg { .. }
+            | Instruction::ReadStack { .. }
+            | Instruction::WriteStack { .. } => continue,
             Instruction::ReadReg { base, .. } => {
                 const_prop(&consts, base);
                 continue;
@@ -140,7 +143,9 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
                 }
             }
 
-            Instruction::LoadConst { dest, .. } | Instruction::Arg { dest, .. } => {
+            Instruction::ReadStack { dest, src: _ }
+            | Instruction::LoadConst { dest, .. }
+            | Instruction::Arg { dest, .. } => {
                 if live_ids[dest.0 as usize] {
                     live_instruction_count += 1;
                 }
@@ -164,6 +169,11 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
                 live_instruction_count += 1;
                 mark_live(&mut live_ids, *src);
                 mark_live(&mut live_ids, *base);
+            }
+
+            Instruction::WriteStack { dest: _, src } => {
+                live_instruction_count += 1;
+                mark_live(&mut live_ids, Source::Id(*src));
             }
 
             Instruction::WriteMem {

@@ -17,6 +17,15 @@ impl fmt::Display for Id {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, PartialOrd, Ord)]
+pub struct StackIndex(pub u8);
+
+impl fmt::Display for StackIndex {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "!s{}", self.0)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub enum CmpKind {
@@ -128,6 +137,15 @@ pub enum Instruction {
         dest: Id,
         src: Arg,
     },
+    // A const should never be put on the stack.
+    WriteStack {
+        dest: StackIndex,
+        src: Id,
+    },
+    ReadStack {
+        dest: Id,
+        src: StackIndex,
+    },
     ReadReg {
         dest: Id,
         base: Source,
@@ -188,11 +206,17 @@ impl Instruction {
             Self::Select { dest, .. }
             | Self::ReadReg { dest, .. }
             | Self::ReadMem { dest, .. }
+            | Self::ReadStack { dest, .. }
             | Self::LoadConst { dest, .. }
             | Self::Cmp { dest, .. }
             | Self::Arg { dest, .. }
             | Self::BinOp { dest, .. } => Some(*dest),
-            Self::WriteReg { .. } | Self::WriteMem { .. } | Self::Ret { .. } | Self::Fence => None,
+
+            Self::WriteStack { .. }
+            | Self::WriteReg { .. }
+            | Self::WriteMem { .. }
+            | Self::Ret { .. }
+            | Self::Fence => None,
         }
     }
 }
@@ -201,6 +225,7 @@ impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::ReadReg { dest, base, src } => write!(f, "{} = x({}){}", dest, base, src.get()),
+
             Self::ReadMem {
                 dest,
                 src,
@@ -212,13 +237,19 @@ impl fmt::Display for Instruction {
                 false => write!(f, "{} = {} m({}){}", dest, width, base, src),
             },
 
+            Self::ReadStack { dest, src } => write!(f, "{} = {}", dest, src),
+
             Self::WriteReg { base, dest, src } => write!(f, "x({}){} = {}", base, dest.get(), src),
+
             Self::WriteMem {
                 base,
                 addr,
                 src,
                 width,
             } => write!(f, "m({}){} = {} {}", base, addr, width, src),
+
+            Self::WriteStack { dest, src } => write!(f, "{} = {}", dest, src),
+
             Self::LoadConst { dest, src } => write!(f, "{} = {}", dest, src),
             Self::Arg { dest, src } => write!(f, "{} = args[{}]", dest, *src as u8),
             Self::BinOp {
@@ -249,6 +280,73 @@ impl fmt::Display for Instruction {
             } => write!(f, "{} = select {}, {}, {}", dest, cond, if_true, if_false),
             Self::Fence => write!(f, "fence"),
             Self::Ret { addr, code } => write!(f, "ret {}, {}", code, addr),
+        }
+    }
+}
+
+pub fn update_reference(src: &mut Source, old: Id, new: Id) {
+    match src {
+        Source::Id(id) if *id == old => *id = new,
+        _ => {}
+    }
+}
+
+pub fn update_references(graph: &mut [Instruction], old: Id, new: Id) {
+    for instr in graph {
+        match instr {
+            Instruction::Fence
+            | Instruction::Arg { .. }
+            | Instruction::LoadConst { .. }
+            | Instruction::ReadStack { .. } => {}
+
+            Instruction::BinOp {
+                dest, src1, src2, ..
+            }
+            | Instruction::Cmp {
+                dest, src1, src2, ..
+            } => {
+                update_reference(src1, old, new);
+                update_reference(src2, old, new);
+            }
+
+            Instruction::ReadReg { dest, base, .. } => {
+                update_reference(base, old, new);
+            }
+
+            Instruction::WriteStack { dest: _, src } => {
+                if *src == old {
+                    *src = new
+                }
+            }
+
+            Instruction::WriteReg { src, base, .. } | Instruction::ReadMem { src, base, .. } => {
+                update_reference(base, old, new);
+                update_reference(src, old, new);
+            }
+
+            Instruction::WriteMem {
+                addr, src, base, ..
+            } => {
+                update_reference(base, old, new);
+                update_reference(addr, old, new);
+                update_reference(src, old, new);
+            }
+
+            Instruction::Select {
+                cond,
+                if_true,
+                if_false,
+                dest: _,
+            } => {
+                update_reference(cond, old, new);
+                update_reference(if_true, old, new);
+                update_reference(if_false, old, new);
+            }
+
+            Instruction::Ret { addr, code } => {
+                update_reference(addr, old, new);
+                update_reference(code, old, new);
+            }
         }
     }
 }

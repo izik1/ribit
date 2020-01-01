@@ -1,4 +1,4 @@
-use crate::ssa::analysis::Lifetimes;
+use crate::ssa::analysis::{Lifetime, Lifetimes};
 use crate::ssa::{analysis, Arg, Id, Instruction};
 use rasen::params::Register;
 use std::collections::HashMap;
@@ -66,18 +66,15 @@ impl RegisterAllocator {
         }
     }
 
-    fn first_unallocated(&self) -> Option<u8> {
+    fn first_unallocated(&self) -> Option<Register> {
         match (!self.currently_allocated).trailing_zeros() {
-            it if it < 16 => Some(it as u8),
+            it if it < 16 => Some(register_from_index(it as u8)),
             // this should only ever be _equal_ to 16, due to the contract of `trailing zeros`
             _ => None,
         }
-
     }
 
-    fn allocate(&mut self, id: Id) -> Result<(), RegisterSpill> {
-        // todo: create and return a RegisterSpill
-        let reg = register_from_index(self.first_unallocated().unwrap());
+    fn allocate(&mut self, id: Id, reg: Register) -> Result<(), RegisterSpill> {
         self.currently_allocated |= 1 << (reg as u16);
         self.allocations.insert(id, reg);
         Ok(())
@@ -123,7 +120,7 @@ impl Default for RegisterAllocator {
 
 // todo: fill this out
 #[derive(Debug)]
-pub struct RegisterSpill;
+pub struct RegisterSpill(pub usize);
 
 pub fn allocate_registers(graph: &[Instruction]) -> Result<HashMap<Id, Register>, RegisterSpill> {
     let mut allocator = RegisterAllocator::new();
@@ -139,12 +136,21 @@ pub fn allocate_registers(graph: &[Instruction]) -> Result<HashMap<Id, Register>
     // avoid any ids where it dies right when it's created.
     // this prevents allocating instructions where a register would be leaked.
     // todo: handle the actual problem rather than this bandaid.
-    assert!(!lifetimes.values().any(|it| it.start == it.end));
+    assert!(!lifetimes.values().copied().any(Lifetime::is_empty));
 
     for (idx, instr) in graph[start..].iter().enumerate() {
         let idx = idx + start;
+
         allocator.deallocate_unused(&lifetimes, idx);
-        instr.id().iter().try_for_each(|id| allocator.allocate(*id))?;
+
+        if let Some(id) = instr.id() {
+            // todo: create and return a RegisterSpill
+
+            match allocator.first_unallocated() {
+                Some(reg) => allocator.allocate(id, reg)?,
+                None => return Err(RegisterSpill(idx)),
+            }
+        }
     }
 
     Ok(allocator.allocations)
