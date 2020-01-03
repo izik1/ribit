@@ -200,7 +200,7 @@ mod test {
 
     #[test]
     fn max_lifetimes() {
-        let mut instrs = crate::ssa::max_fn();
+        let (mut instrs, _) = crate::ssa::max_fn();
 
         opt::fold_and_prop_consts(&mut instrs);
         let instrs = opt::dead_instruction_elimination(&instrs);

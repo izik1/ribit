@@ -281,7 +281,7 @@ mod test {
     fn jal_basic_const_prop() {
         let ctx = lower::Context::new(0);
 
-        let mut instrs = lower::terminal(
+        let (mut instrs, _) = lower::terminal(
             ctx,
             instruction::Instruction::J(instruction::J {
                 imm: 4096,
@@ -332,7 +332,7 @@ mod test {
             4,
         );
 
-        let mut instrs = lower::terminal(
+        let (mut instrs, _) = lower::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,
@@ -347,7 +347,7 @@ mod test {
 
     #[test]
     fn max() {
-        let mut instrs = crate::ssa::max_fn();
+        let (mut instrs, _) = crate::ssa::max_fn();
 
         super::fold_and_prop_consts(&mut instrs);
         let instrs = super::dead_instruction_elimination(&instrs);
@@ -360,7 +360,7 @@ mod test {
     fn jal_basic_die() {
         let ctx = lower::Context::new(0);
 
-        let mut instrs = lower::terminal(
+        let (mut instrs, _) = lower::terminal(
             ctx,
             instruction::Instruction::J(instruction::J {
                 imm: 4096,

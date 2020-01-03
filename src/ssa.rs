@@ -7,6 +7,26 @@ pub mod eval;
 pub mod lower;
 pub mod opt;
 
+pub struct IdAllocator {
+    next_id: Id,
+}
+
+impl IdAllocator {
+    pub fn new() -> Self {
+        Self {
+            next_id: Id(0),
+        }
+    }
+
+    pub fn allocate(&mut self) -> Id {
+        let id_num = self.next_id.0;
+
+        assert!(id_num < u16::max_value());
+
+        std::mem::replace(&mut self.next_id, Id(id_num + 1))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, PartialOrd, Ord)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub struct Id(u16);
@@ -300,16 +320,16 @@ pub fn update_references(graph: &mut [Instruction], old: Id, new: Id) {
             | Instruction::ReadStack { .. } => {}
 
             Instruction::BinOp {
-                dest, src1, src2, ..
+                dest: _, src1, src2, ..
             }
             | Instruction::Cmp {
-                dest, src1, src2, ..
+                dest: _, src1, src2, ..
             } => {
                 update_reference(src1, old, new);
                 update_reference(src2, old, new);
             }
 
-            Instruction::ReadReg { dest, base, .. } => {
+            Instruction::ReadReg { dest: _, base, .. } => {
                 update_reference(base, old, new);
             }
 
@@ -352,7 +372,7 @@ pub fn update_references(graph: &mut [Instruction], old: Id, new: Id) {
 }
 
 #[cfg(test)]
-pub(crate) fn max_fn() -> Vec<Instruction> {
+pub(crate) fn max_fn() -> (Vec<Instruction>, IdAllocator) {
     use crate::instruction;
 
     let mut ctx = lower::Context::new(1024);
@@ -425,7 +445,7 @@ mod test {
 
         let ctx = lower::Context::new(START_PC);
 
-        let instrs = ctx.ret();
+        let (instrs, _) = ctx.ret();
 
         assert_eq!(instrs.len(), 3);
 
@@ -461,7 +481,7 @@ mod test {
         ctx.read_register(register::RiscV::X1);
         ctx.read_register(register::RiscV::X2);
         ctx.read_register(register::RiscV::X1);
-        let instrs = ctx.ret();
+        let (instrs, _) = ctx.ret();
 
         assert_eq!(instrs.len(), 5);
 
@@ -513,7 +533,7 @@ mod test {
         let mut ctx = lower::Context::new(0);
 
         ctx.write_register(register::RiscV::X2, Source::Val(0));
-        let instrs = ctx.ret();
+        let (instrs, _) = ctx.ret();
 
         assert_eq!(instrs.len(), 4);
 

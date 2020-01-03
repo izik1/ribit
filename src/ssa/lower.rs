@@ -1,9 +1,9 @@
 use super::{BinOp, CmpKind, Id, Instruction, Source};
-use crate::ssa::{eval, Arg};
+use crate::ssa::{eval, Arg, IdAllocator};
 use crate::{instruction, opcode, register, Width};
 
 pub struct Context {
-    next_id: Id,
+    id_allocator: IdAllocator,
     pub pc: Source,
     registers: [Option<Source>; 32],
     register_arg: Option<Source>,
@@ -16,7 +16,7 @@ impl Context {
     #[must_use]
     pub fn new(start_pc: u32) -> Self {
         let mut self_ = Self {
-            next_id: Id(0),
+            id_allocator: IdAllocator::new(),
             pc: Source::Val(start_pc),
             registers: [None; 32],
             register_arg: None,
@@ -39,16 +39,8 @@ impl Context {
         self.pc
     }
 
-    fn new_id(&mut self) -> Id {
-        let id_num = self.next_id.0;
-
-        assert!(id_num < u16::max_value());
-
-        std::mem::replace(&mut self.next_id, Id(id_num + 1))
-    }
-
     fn instruction<F: FnOnce(Id) -> Instruction>(&mut self, f: F) -> Source {
-        let id = self.new_id();
+        let id = self.id_allocator.allocate();
         self.instructions.push(f(id));
         Source::Id(id)
     }
@@ -68,7 +60,7 @@ impl Context {
 
     pub fn read_register(&mut self, reg: register::RiscV) -> Source {
         self.registers[reg.get() as usize].unwrap_or_else(|| {
-            let id = self.new_id();
+            let id = self.id_allocator.allocate();
 
             self.instructions.push(Instruction::ReadReg {
                 dest: id,
@@ -174,7 +166,7 @@ impl Context {
     }
 
     #[must_use]
-    pub fn ret_with_code(mut self, addr: Source, code: Source) -> Vec<Instruction> {
+    pub fn ret_with_code(mut self, addr: Source, code: Source) -> (Vec<Instruction>, IdAllocator) {
         for (idx, src) in self.registers.iter().enumerate().skip(1) {
             let dest = register::RiscV::with_u8(idx as u8).unwrap();
 
@@ -192,16 +184,16 @@ impl Context {
         self.instructions.push(Instruction::Ret { addr, code });
 
         // todo: assert well formedness here.
-        self.instructions
+        (self.instructions, self.id_allocator)
     }
 
     #[must_use]
-    pub fn ret_with_addr(self, addr: Source) -> Vec<Instruction> {
+    pub fn ret_with_addr(self, addr: Source) -> (Vec<Instruction>, IdAllocator) {
         self.ret_with_code(addr, Source::Val(0))
     }
 
     #[must_use]
-    pub fn ret(self) -> Vec<Instruction> {
+    pub fn ret(self) -> (Vec<Instruction>, IdAllocator) {
         let pc = self.pc;
         self.ret_with_addr(pc)
     }
@@ -344,7 +336,7 @@ pub fn terminal(
     mut ctx: Context,
     instruction: instruction::Instruction,
     len: u32,
-) -> Vec<self::Instruction> {
+) -> (Vec<Instruction>, IdAllocator) {
     match instruction {
         instruction::Instruction::J(instruction::J {
             opcode: opcode::J::JAL,
@@ -441,7 +433,7 @@ mod test {
     fn jal_basic() {
         let ctx = Context::new(0);
 
-        let instrs = super::terminal(
+        let (instrs, _) = super::terminal(
             ctx,
             instruction::Instruction::J(instruction::J {
                 imm: 4096,
@@ -458,7 +450,7 @@ mod test {
     fn sys_break() {
         let ctx = Context::new(0);
 
-        let instrs = super::terminal(
+        let (instrs, _) = super::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,
@@ -476,7 +468,7 @@ mod test {
             4,
         );
 
-        let instrs = super::terminal(
+        let (instrs, _) = super::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,
@@ -488,7 +480,7 @@ mod test {
     #[test]
     fn branch_0_0_eq() {
         let ctx = Context::new(0);
-        let instrs = super::terminal(
+        let (instrs, _) = super::terminal(
             ctx,
             instruction::Instruction::B(instruction::B::new(1024, None, None, opcode::Cmp::Eq)),
             4,
@@ -500,7 +492,7 @@ mod test {
     #[test]
     fn branch_0_x1_eq() {
         let ctx = Context::new(0);
-        let instrs = super::terminal(
+        let (instrs, _) = super::terminal(
             ctx,
             instruction::Instruction::B(instruction::B::new(
                 1024,
@@ -528,7 +520,7 @@ mod test {
             4,
         );
 
-        let instrs = super::terminal(
+        let (instrs, _) = super::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,
@@ -573,7 +565,7 @@ mod test {
             4,
         );
 
-        let instrs = super::terminal(
+        let (instrs, _) = super::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,
@@ -596,7 +588,7 @@ mod test {
             4,
         );
 
-        let instrs = super::terminal(
+        let (instrs, _) = super::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,
