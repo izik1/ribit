@@ -1,5 +1,6 @@
+use crate::ssa;
 use crate::ssa::analysis::{Lifetime, Lifetimes};
-use crate::ssa::{analysis, Arg, Id, Instruction};
+use crate::ssa::{analysis, Arg, Id, IdAllocator, Instruction};
 use rasen::params::Register;
 use std::collections::HashMap;
 use std::fmt;
@@ -99,7 +100,7 @@ impl RegisterAllocator {
                 Instruction::Arg { dest, src } => {
                     let reg = arg_register(*src);
                     // shouldn't ever happen, but better to check anyway.
-                    assert_eq!(self.currently_allocated & (reg as u16), 0);
+                    assert_eq!(self.currently_allocated & (1 << reg as u16), 0);
                     self.currently_allocated |= 1 << (reg as u16);
 
                     self.allocations.insert(*dest, reg);
@@ -156,6 +157,52 @@ pub fn allocate_registers(graph: &[Instruction]) -> Result<HashMap<Id, Register>
     Ok(allocator.allocations)
 }
 
+pub fn spill(graph: &mut Vec<Instruction>, id_allocator: &mut IdAllocator, spill: RegisterSpill) {
+    let spill = spill.0;
+    let surrounds = analysis::surrounding_usages(&*graph, spill);
+
+    let (id, lt) = surrounds
+        .into_iter()
+        .filter(|(_, lt)| !lt.is_empty())
+        .max_by_key(|(_, lt)| lt.end - lt.start)
+        .expect("Impossible to solve spill");
+
+    // todo: try to do more optimal spills based on instr
+    //  for instance, if it's a register read, we should avoid stack ops and instead just re-read it
+    let instr = graph
+        .iter()
+        .find(|it| it.id() == Some(id))
+        .cloned()
+        .unwrap();
+
+    let end_id = id_allocator.allocate();
+
+    let (start, end) = match instr {
+        _ => {
+            let stack_index = analysis::min_stack(lt, &analysis::stack_lifetimes(graph));
+
+            let start = Instruction::WriteStack {
+                src: id,
+                dest: stack_index,
+            };
+
+            let end = Instruction::ReadStack {
+                src: stack_index,
+                dest: end_id,
+            };
+
+            (Some(start), end)
+        }
+    };
+
+    if let Some(start) = start {
+        graph.insert(lt.start + 1, start);
+    }
+
+    graph.insert(lt.end, end);
+    ssa::update_references(&mut graph[lt.end..], id, end_id);
+}
+
 struct FmtRegister(Register);
 
 impl fmt::Display for FmtRegister {
@@ -208,13 +255,19 @@ mod test {
 
     #[test]
     fn alloc_max() {
-        let (mut instrs, _) = crate::ssa::max_fn();
+        let (mut instrs, mut id_alloc) = crate::ssa::max_fn();
 
         opt::fold_and_prop_consts(&mut instrs);
         let instrs = opt::dead_instruction_elimination(&instrs);
-        let instrs = opt::register_writeback_shrinking(&instrs);
+        let mut instrs = opt::register_writeback_shrinking(&instrs);
 
-        let allocs = super::allocate_registers(&instrs).unwrap();
+        let allocs = loop {
+            match super::allocate_registers(&instrs) {
+                Ok(allocs) => break allocs,
+                Err(spill) => super::spill(&mut instrs, &mut id_alloc, spill),
+            }
+        };
+
         let lifetimes = analysis::lifetimes(&instrs);
         let mut lifetimes = format!("{}", analysis::ShowLifetimes::new(&lifetimes, &instrs));
         for (id, register) in &allocs {

@@ -1,5 +1,6 @@
 use crate::ssa::{Id, Instruction, Source, StackIndex};
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::{fmt, mem};
 
 fn lifetime_instruction<F: FnMut(&mut Lifetimes, Source, usize)>(
@@ -120,7 +121,39 @@ pub fn lifetimes(instrs: &[Instruction]) -> Lifetimes {
     lifetimes
 }
 
-// todo: replace this with a Vec<...> rather than the hashmap,
+pub fn surrounding_usages(instrs: &[Instruction], needle: usize) -> Lifetimes {
+    let mut lifetimes = HashMap::new();
+
+    for (idx, instr) in instrs.iter().enumerate().take(needle) {
+        lifetime_instruction(instr, idx, &mut lifetimes, |lifetimes, src, idx| {
+            if let Some(id) = src.id() {
+                lifetimes.insert(
+                    id,
+                    Lifetime {
+                        start: idx,
+                        end: idx,
+                    },
+                );
+            }
+        })
+    }
+
+    for (idx, instr) in instrs.iter().enumerate().skip(needle) {
+        lifetime_instruction(instr, idx, &mut lifetimes, |lifetimes, src, idx| {
+            if let Some(id) = src.id() {
+                lifetimes.entry(id).and_modify(|it| {
+                    if it.is_empty() {
+                        it.end = idx
+                    }
+                });
+            }
+        })
+    }
+
+    lifetimes
+}
+
+// todo: replace this with a Vec<...> `rather` than the hashmap,
 //  this is because StackIndexes should always be _used_ linearly.
 pub fn stack_lifetimes(graph: &[Instruction]) -> HashMap<StackIndex, Vec<(usize, usize)>> {
     let mut lifetimes = HashMap::new();
@@ -138,6 +171,24 @@ pub fn stack_lifetimes(graph: &[Instruction]) -> HashMap<StackIndex, Vec<(usize,
     }
 
     lifetimes
+}
+
+pub fn min_stack(
+    lifetime: Lifetime,
+    stack_lts: &HashMap<StackIndex, Vec<(usize, usize)>>,
+) -> StackIndex {
+    stack_lts
+        .iter()
+        .filter_map(|(idx, stack_lts)| {
+            (stack_lts
+                .iter()
+                .all(|stack_lt| stack_lt.1 < lifetime.start || stack_lt.0 > lifetime.end))
+            .then_some(*idx)
+        })
+        .min()
+        .unwrap_or(StackIndex(
+            u8::try_from(stack_lts.len()).expect("Ran out of stack indexes"),
+        ))
 }
 
 pub struct ShowLifetimes<'a, 'b> {

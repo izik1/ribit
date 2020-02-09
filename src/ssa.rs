@@ -13,9 +13,7 @@ pub struct IdAllocator {
 
 impl IdAllocator {
     pub fn new() -> Self {
-        Self {
-            next_id: Id(0),
-        }
+        Self { next_id: Id(0) }
     }
 
     pub fn allocate(&mut self) -> Id {
@@ -320,10 +318,16 @@ pub fn update_references(graph: &mut [Instruction], old: Id, new: Id) {
             | Instruction::ReadStack { .. } => {}
 
             Instruction::BinOp {
-                dest: _, src1, src2, ..
+                dest: _,
+                src1,
+                src2,
+                ..
             }
             | Instruction::Cmp {
-                dest: _, src1, src2, ..
+                dest: _,
+                src1,
+                src2,
+                ..
             } => {
                 update_reference(src1, old, new);
                 update_reference(src2, old, new);
