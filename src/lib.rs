@@ -18,6 +18,57 @@ pub mod opcode;
 pub mod register;
 pub mod ssa;
 
+#[cfg(test)]
+pub(crate) mod test {
+    use rasen::params::Register;
+    use std::collections::HashMap;
+    use std::fmt;
+
+    pub struct ShowAllocs<'a> {
+        pub allocs: &'a HashMap<crate::ssa::Id, Register>,
+    }
+
+    impl fmt::Display for ShowAllocs<'_> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            let mut allocs: Vec<_> = self.allocs.iter().collect();
+            allocs.sort_by_key(|(id, _)| *id);
+
+            for (id, reg) in allocs {
+                id.fmt(f)?;
+                f.write_str(" => ")?;
+                writeln!(f, "{}", FmtRegister(*reg))?;
+            }
+
+            Ok(())
+        }
+    }
+
+    pub struct FmtRegister(pub Register);
+
+    impl fmt::Display for FmtRegister {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self.0 {
+                Register::Zax => write!(f, "zax"),
+                Register::Zcx => write!(f, "zcx"),
+                Register::Zdx => write!(f, "zdx"),
+                Register::Zbx => write!(f, "zbx"),
+                Register::Zsp => write!(f, "zsp"),
+                Register::Zbp => write!(f, "zbp"),
+                Register::Zsi => write!(f, "zsi"),
+                Register::Zdi => write!(f, "zdi"),
+                Register::R8 => write!(f, "r8"),
+                Register::R9 => write!(f, "r9"),
+                Register::R10 => write!(f, "r10"),
+                Register::R11 => write!(f, "r11"),
+                Register::R12 => write!(f, "r12"),
+                Register::R13 => write!(f, "r13"),
+                Register::R14 => write!(f, "r14"),
+                Register::R15 => write!(f, "r15"),
+            }
+        }
+    }
+}
+
 // note: RISC-V would have these be: B, H(W), W
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 #[cfg_attr(test, derive(serde::Serialize))]

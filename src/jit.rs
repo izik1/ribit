@@ -3,9 +3,10 @@
 #[allow(dead_code)]
 mod alloc;
 mod generator;
-pub mod register_alloc;
 
 pub mod context;
+pub mod legalise;
+pub mod register_alloc;
 
 type Assembler<'a, 'b> = rasen::Assembler<'a, std::io::Cursor<&'b mut [u8]>>;
 
