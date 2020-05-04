@@ -1,6 +1,6 @@
 ---
 source: src/jit/register_alloc.rs
-expression: "super::ShowAllocs{allocs: &allocs,}"
+expression: "crate::test::ShowAllocs{allocs: &allocs, clobbers: &clobbers,}"
 ---
 %0 => zdi
 %2 => zax
@@ -11,4 +11,6 @@ expression: "super::ShowAllocs{allocs: &allocs,}"
 %7 => zax
 %8 => zax
 %9 => zax
+---------
+12 => [zax, zcx]
 

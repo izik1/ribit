@@ -116,8 +116,19 @@ impl fmt::Display for Width {
 enum ReturnCode {
     #[allow(dead_code)]
     Normal = 0,
-    EBreak,
-    ECall,
+    EBreak = 1,
+    ECall = 2,
+}
+
+impl ReturnCode {
+    fn new(code: u32) -> Option<Self> {
+        match code {
+            0 => Some(Self::Normal),
+            1 => Some(Self::EBreak),
+            2 => Some(Self::ECall),
+            _ => None,
+        }
+    }
 }
 
 const XLEN: usize = 32;

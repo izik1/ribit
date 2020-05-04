@@ -42,7 +42,6 @@ pub fn instruction(instruction: u32) -> Result<Instruction, DecodeError> {
     let funct7 = ((instruction >> 25) & 0b0111_1111) as u8;
     let opcode = (instruction & 0b0111_1111) as u8;
     let instruction = match (opcode, funct3, funct7) {
-        // todo: sign extend imm
         (0b110_1111, _, _) => Instruction::J(instruction::J::from_instruction(
             instruction,
             opcode::J::JAL,
@@ -53,7 +52,6 @@ pub fn instruction(instruction: u32) -> Result<Instruction, DecodeError> {
             opcode::U::AUIPC,
         )),
 
-        // todo: sign extend & set lsb to 0
         (0b110_0111, 0b000, _) => Instruction::IJump(instruction::IJump::from_instruction(
             instruction,
             opcode::IJump::JALR,

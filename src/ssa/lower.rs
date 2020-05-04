@@ -39,6 +39,10 @@ impl Context {
         self.pc
     }
 
+    pub fn override_pc(&mut self, src: Source) {
+        self.pc = src;
+    }
+
     fn instruction<F: FnOnce(Id) -> Instruction>(&mut self, f: F) -> Source {
         let id = self.id_allocator.allocate();
         self.instructions.push(f(id));
@@ -367,19 +371,23 @@ pub fn terminal(
 
             // load pc + len into rd (the link register)
             if let Some(rd) = rd {
-                // we specifically need to avoid modifying `pc`, since we need the
-                // old value for adding the immediate.
-                let next_pc = ctx.add(ctx.pc, Source::Val(len));
+                let next_pc = ctx.add_pc(Source::Val(len));
 
                 ctx.write_register(rd, next_pc);
             }
 
-            ctx.add_pc(Source::Val(imm));
-
             // adding 0 is the same as not adding, so don't bother with a match here.
             if let Some(src) = rs1 {
-                let src = ctx.read_register(src);
-                ctx.add_pc(src);
+                let mut src = ctx.read_register(src);
+
+                if imm != 0 {
+                    src = ctx.add(src, Source::Val(imm));
+                }
+
+                src = ctx.and(src, Source::Val(!1));
+                ctx.override_pc(src);
+            } else {
+                ctx.override_pc(Source::Val(imm & !1));
             }
 
             ctx.ret()
@@ -429,6 +437,41 @@ mod test {
 
     use insta::assert_display_snapshot;
 
+    #[test]
+    fn jalr_bit() {
+        let ctx = Context::new(48);
+
+        let (instrs, _) = super::terminal(
+            ctx,
+            instruction::Instruction::IJump(instruction::IJump {
+                imm: 2047,
+                rd: Some(register::RiscV::X4),
+                rs1: Some(register::RiscV::X1),
+                opcode: opcode::IJump::JALR,
+            }),
+            4,
+        );
+
+        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+    }
+
+    #[test]
+    fn jalr_pc() {
+        let ctx = Context::new(48);
+
+        let (instrs, _) = super::terminal(
+            ctx,
+            instruction::Instruction::IJump(instruction::IJump {
+                imm: 2046,
+                rd: Some(register::RiscV::X4),
+                rs1: Some(register::RiscV::X1),
+                opcode: opcode::IJump::JALR,
+            }),
+            4,
+        );
+
+        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+    }
     #[test]
     fn jal_basic() {
         let ctx = Context::new(0);

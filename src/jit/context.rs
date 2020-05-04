@@ -1,10 +1,14 @@
+use rasen::params::Register;
 use std::ops::Range;
 
-use super::{generator::BlockBuilder, ReturnCode};
+use super::{generator::BlockBuilder, legalise, register_alloc, ReturnCode};
 use crate::instruction;
-use crate::jit::BasicBlock;
+use crate::{
+    jit::BasicBlock,
+    ssa::{self, opt},
+};
 use std::io::Cursor;
-use std::mem;
+use std::{borrow::Cow, collections::HashMap, mem};
 
 mod sbi {
     #[repr(u32)]
@@ -171,8 +175,9 @@ impl Runtime {
 
     fn make_fn(
         &mut self,
-        block_instrs: Vec<instruction::Info>,
-        branch: instruction::Info,
+        instrs: &[ssa::Instruction],
+        allocs: &HashMap<ssa::Id, Register>,
+        clobbers: &HashMap<usize, Vec<Register>>,
     ) -> BasicBlock {
         let buffer = self.buffer.take().expect("Failed to take buffer");
         let mut buffer = buffer.make_mut().unwrap();
@@ -185,11 +190,19 @@ impl Runtime {
 
         let mut build_context = BlockBuilder::start(stream, check_ranges);
 
-        for instruction in block_instrs {
-            build_context.make_instruction(instruction)
-        }
+        build_context
+            .make_block(&instrs[..(instrs.len() - 1)], &allocs, &clobbers)
+            .expect("todo: handle block creation error");
 
-        build_context.complete(branch);
+        let final_clobbers = {
+            clobbers
+                .get(&(instrs.len() - 1))
+                .map_or_else(|| Cow::Owned(Vec::new()), Cow::Borrowed)
+        };
+
+        build_context
+            .complete(&instrs[instrs.len() - 1], &allocs, &*final_clobbers)
+            .expect("todo: handle block creation error");
 
         let start = mem::replace(&mut self.buffer_write_offset, writer.position());
         let instrs = &buffer[(start as usize)..(self.buffer_write_offset as usize)];
@@ -228,7 +241,29 @@ impl Runtime {
 
         let end_pc = branch.end_address();
 
-        let funct = self.make_fn(block_instrs, branch);
+        let mut lower_context = ssa::lower::Context::new(start_pc);
+
+        for instr in block_instrs {
+            ssa::lower::non_terminal(&mut lower_context, instr.instruction, instr.len);
+        }
+
+        let (mut instrs, mut id_alloc) =
+            ssa::lower::terminal(lower_context, branch.instruction, branch.len);
+
+        opt::fold_and_prop_consts(&mut instrs);
+        let instrs = opt::dead_instruction_elimination(&instrs);
+        let mut instrs = opt::register_writeback_shrinking(&instrs);
+
+        let (allocs, clobbers) = loop {
+            match register_alloc::allocate_registers(&instrs) {
+                Ok(allocs) => break allocs,
+                Err(spill) => register_alloc::spill(&mut instrs, &mut id_alloc, spill),
+            }
+        };
+
+        legalise::legalise(&mut instrs, &allocs);
+
+        let funct = self.make_fn(&instrs, &allocs, &clobbers);
 
         let insert_idx = self
             .ranges

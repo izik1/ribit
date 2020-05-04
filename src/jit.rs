@@ -1,4 +1,4 @@
-use crate::ssa;
+use crate::{ssa, ReturnCode};
 use rasen::params::Register;
 use std::collections::HashMap;
 
@@ -71,14 +71,6 @@ impl BlockReturn {
     }
 }
 
-#[repr(u32)]
-enum ReturnCode {
-    #[allow(dead_code)]
-    Normal = 0,
-    EBreak,
-    ECall,
-}
-
 #[cfg(test)]
 mod test {
     use super::context;
@@ -121,9 +113,9 @@ mod test {
 
         for idx in 1..regs.len() {
             match idx {
-                0 => assert_eq!(regs[idx], 0),
-                4 => assert_eq!(regs[idx], 4),
-                _ => assert_eq!(regs[idx], 0xaaaaaaaa),
+                0 => assert_eq!(regs[idx], 0, "reg-num: {}", idx),
+                4 => assert_eq!(regs[idx], 4, "reg-num: {}", idx),
+                _ => assert_eq!(regs[idx], 0xaaaaaaaa, "reg-num: {}", idx),
             }
         }
     }
@@ -136,12 +128,12 @@ mod test {
             vec![],
             instruction::Info::new(
                 Instruction::IJump(instruction::IJump {
-                    imm: 4096,
+                    imm: 2047,
                     rd: Some(register::RiscV::X4),
                     rs1: Some(register::RiscV::X1),
                     opcode: opcode::IJump::JALR,
                 }),
-                4,
+                48,
                 4,
             ),
         );
@@ -149,18 +141,18 @@ mod test {
         let (mut regs, mut memory) = init();
 
         regs[1] = 1024;
-        let mut pc = 4;
+        let mut pc = 48;
 
         ctx.execute_basic_block(&mut pc, &mut regs, &mut memory);
 
-        assert_eq!(pc, 4096 + 1024);
+        assert_eq!(pc, 2046 + 1024);
 
         for idx in 0..regs.len() {
             match idx {
-                0 => assert_eq!(regs[idx], 0),
-                1 => assert_eq!(regs[idx], 1024),
-                4 => assert_eq!(regs[idx], 8),
-                _ => assert_eq!(regs[idx], 0xaaaaaaaa),
+                0 => assert_eq!(regs[idx], 0, "regnum={}", idx),
+                1 => assert_eq!(regs[idx], 1024, "regnum={}", idx),
+                4 => assert_eq!(regs[idx], 52, "regnum={}", idx),
+                _ => assert_eq!(regs[idx], 0xaaaaaaaa, "regnum={}", idx),
             }
         }
     }

@@ -56,6 +56,7 @@ fn arg_register(arg: Arg) -> Register {
 #[derive(Debug)]
 struct RegisterAllocator {
     currently_allocated: u16,
+    currently_clobbered: u16,
     allocations: HashMap<Id, Register>,
     clobbers: HashMap<usize, Vec<Register>>,
 }
@@ -64,13 +65,14 @@ impl RegisterAllocator {
     fn new() -> Self {
         Self {
             currently_allocated: system_v_abi_saved() | (1 << Register::Zsp as u16),
+            currently_clobbered: 0,
             allocations: HashMap::new(),
             clobbers: HashMap::new(),
         }
     }
 
     fn first_unallocated(&self) -> Option<Register> {
-        match (!self.currently_allocated).trailing_zeros() {
+        match (!(self.currently_allocated | self.currently_clobbered)).trailing_zeros() {
             it if it < 16 => Some(register_from_index(it as u8)),
             // this should only ever be _equal_ to 16, due to the contract of `trailing zeros`
             _ => None,
@@ -84,6 +86,7 @@ impl RegisterAllocator {
     }
 
     fn allocate_clobber(&mut self, idx: usize, reg: Register) {
+        self.currently_clobbered |= 1 << (reg as u16);
         self.clobbers
             .entry(idx)
             .or_insert_with(|| Vec::with_capacity(1))
@@ -101,6 +104,10 @@ impl RegisterAllocator {
             assert_eq!(!self.currently_allocated & (1 << reg as u16), 0);
             self.currently_allocated &= !(1 << reg as u16)
         }
+    }
+
+    fn clear_clobbers(&mut self) {
+        self.currently_clobbered = 0;
     }
 
     fn allocate_args(&mut self, graph: &[Instruction]) -> Option<usize> {
@@ -154,6 +161,7 @@ pub fn allocate_registers(
         let idx = idx + start;
 
         allocator.deallocate_unused(&lifetimes, idx);
+        allocator.clear_clobbers();
 
         if let Some(id) = instr.id() {
             match allocator.first_unallocated() {

@@ -16,7 +16,6 @@ pub fn count_clobbers_for(instr: &Instruction, allocs: &HashMap<Id, Register>) -
         | Instruction::WriteReg { .. }
         | Instruction::ReadMem { .. }
         | Instruction::WriteMem { .. }
-        | Instruction::Ret { .. }
         | Instruction::LoadConst { .. }
         | Instruction::Fence
         | Instruction::BinOp {.. } |
@@ -44,6 +43,21 @@ pub fn count_clobbers_for(instr: &Instruction, allocs: &HashMap<Id, Register>) -
                 (Some(_), Some(_)) => 0,
             }
         }
+
+        Instruction::Ret { addr, code } => {
+            // this instruction "needs" at least two registers- unless addr and cond are both `val`, in which case, just one- one of which must be Zax.
+
+            let register_count = (addr.id().is_some() as usize) + (code.id().is_some() as usize);
+
+            let zax_used = addr.id().or_else(|| code.id()).map_or(false, |id| allocs[&id] == Register::Zax);
+
+            if register_count == 1 && zax_used {
+                2
+            } else {
+                0
+            }
+        }
+
     }
 }
 
