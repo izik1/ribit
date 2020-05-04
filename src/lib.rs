@@ -26,6 +26,7 @@ pub(crate) mod test {
 
     pub struct ShowAllocs<'a> {
         pub allocs: &'a HashMap<crate::ssa::Id, Register>,
+        pub clobbers: &'a HashMap<usize, Vec<Register>>,
     }
 
     impl fmt::Display for ShowAllocs<'_> {
@@ -33,10 +34,33 @@ pub(crate) mod test {
             let mut allocs: Vec<_> = self.allocs.iter().collect();
             allocs.sort_by_key(|(id, _)| *id);
 
+            let mut clobbers: Vec<_> = self.clobbers.iter().collect();
+            clobbers.sort_by_key(|(idx, _)| *idx);
+            
+            let needs_seperator = !allocs.is_empty() && !clobbers.is_empty();
+
             for (id, reg) in allocs {
                 id.fmt(f)?;
                 f.write_str(" => ")?;
                 writeln!(f, "{}", FmtRegister(*reg))?;
+            }
+
+            if needs_seperator {
+                writeln!(f, "---------")?;
+            }
+
+            for (idx, regs) in clobbers {
+                write!(f, "{} => [", idx)?;
+
+                let reg_count = regs.len();
+                for (offset, reg) in regs.iter().enumerate() {
+                    FmtRegister(*reg).fmt(f)?;
+                    if offset < reg_count - 1 {
+                        f.write_str(", ")?;
+                    } else {
+                        writeln!(f, "]")?;
+                    }
+                }
             }
 
             Ok(())

@@ -1,9 +1,9 @@
+use super::legalise;
 use crate::ssa;
 use crate::ssa::analysis::{Lifetime, Lifetimes};
 use crate::ssa::{analysis, Arg, Id, IdAllocator, Instruction};
 use rasen::params::Register;
 use std::collections::HashMap;
-use std::fmt;
 
 const fn system_v_abi_saved() -> u16 {
     (1 << Register::Zbx as u16)
@@ -57,6 +57,7 @@ fn arg_register(arg: Arg) -> Register {
 struct RegisterAllocator {
     currently_allocated: u16,
     allocations: HashMap<Id, Register>,
+    clobbers: HashMap<usize, Vec<Register>>,
 }
 
 impl RegisterAllocator {
@@ -64,6 +65,7 @@ impl RegisterAllocator {
         Self {
             currently_allocated: system_v_abi_saved() | (1 << Register::Zsp as u16),
             allocations: HashMap::new(),
+            clobbers: HashMap::new(),
         }
     }
 
@@ -79,6 +81,13 @@ impl RegisterAllocator {
         self.currently_allocated |= 1 << (reg as u16);
         self.allocations.insert(id, reg);
         Ok(())
+    }
+
+    fn allocate_clobber(&mut self, idx: usize, reg: Register) {
+        self.clobbers
+            .entry(idx)
+            .or_insert_with(|| Vec::with_capacity(1))
+            .push(reg);
     }
 
     // todo: this doesn't handle instructions with a lifetime of 1 (dies the same instruction it's created)
@@ -123,12 +132,14 @@ impl Default for RegisterAllocator {
 #[derive(Debug)]
 pub struct RegisterSpill(pub usize);
 
-pub fn allocate_registers(graph: &[Instruction]) -> Result<HashMap<Id, Register>, RegisterSpill> {
+pub fn allocate_registers(
+    graph: &[Instruction],
+) -> Result<(HashMap<Id, Register>, HashMap<usize, Vec<Register>>), RegisterSpill> {
     let mut allocator = RegisterAllocator::new();
 
     let start = match allocator.allocate_args(graph) {
         Some(idx) => idx,
-        None => return Ok(allocator.allocations),
+        None => return Ok((allocator.allocations, allocator.clobbers)),
     };
 
     // todo: find an efficient way of pre-checking lifetimes to avoid unneeded work on spills.
@@ -145,16 +156,24 @@ pub fn allocate_registers(graph: &[Instruction]) -> Result<HashMap<Id, Register>
         allocator.deallocate_unused(&lifetimes, idx);
 
         if let Some(id) = instr.id() {
-            // todo: create and return a RegisterSpill
-
             match allocator.first_unallocated() {
                 Some(reg) => allocator.allocate(id, reg)?,
                 None => return Err(RegisterSpill(idx)),
             }
         }
+
+        // make sure we allocate clobber registers
+        let clobbers = legalise::count_clobbers_for(&instr, &allocator.allocations);
+
+        for _ in 0..clobbers {
+            match allocator.first_unallocated() {
+                Some(reg) => allocator.allocate_clobber(idx, reg),
+                None => return Err(RegisterSpill(idx)),
+            }
+        }
     }
 
-    Ok(allocator.allocations)
+    Ok((allocator.allocations, allocator.clobbers))
 }
 
 pub fn spill(graph: &mut Vec<Instruction>, id_allocator: &mut IdAllocator, spill: RegisterSpill) {
@@ -217,7 +236,7 @@ mod test {
         let instrs = opt::dead_instruction_elimination(&instrs);
         let mut instrs = opt::register_writeback_shrinking(&instrs);
 
-        let allocs = loop {
+        let (allocs, clobbers) = loop {
             match super::allocate_registers(&instrs) {
                 Ok(allocs) => break allocs,
                 Err(spill) => super::spill(&mut instrs, &mut id_alloc, spill),
@@ -235,6 +254,6 @@ mod test {
 
         // the main snapshot (long form, allows human readability)
         assert_snapshot!(lifetimes);
-        assert_display_snapshot!(crate::test::ShowAllocs { allocs: &allocs });
+        assert_display_snapshot!(crate::test::ShowAllocs { allocs: &allocs, clobbers: &clobbers });
     }
 }
