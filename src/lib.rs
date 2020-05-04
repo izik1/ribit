@@ -36,7 +36,7 @@ pub(crate) mod test {
 
             let mut clobbers: Vec<_> = self.clobbers.iter().collect();
             clobbers.sort_by_key(|(idx, _)| *idx);
-            
+
             let needs_seperator = !allocs.is_empty() && !clobbers.is_empty();
 
             for (id, reg) in allocs {

@@ -1,3 +1,7 @@
+use crate::ssa;
+use rasen::params::Register;
+use std::collections::HashMap;
+
 // going to delete all of this once the ssa can handle it,
 // so don't worry about the dead code.
 #[allow(dead_code)]
@@ -21,6 +25,35 @@ type CheckRanges = extern "sysv64" fn(pc: u32, ctx: &mut context::Runtime, addre
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 pub struct BlockReturn(u64);
+
+#[derive(Copy, Clone, Debug)]
+pub enum Source {
+    Val(u32),
+    Register(Register),
+}
+
+impl Source {
+    pub fn from_ssa_src(src: ssa::Source, map: &HashMap<ssa::Id, Register>) -> Option<Self> {
+        match src {
+            ssa::Source::Val(v) => Some(Self::Val(v)),
+            ssa::Source::Id(id) => map.get(&id).copied().map(Self::Register),
+        }
+    }
+
+    pub fn val(self) -> Option<u32> {
+        match self {
+            Self::Val(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn reg(self) -> Option<Register> {
+        match self {
+            Self::Register(reg) => Some(reg),
+            _ => None,
+        }
+    }
+}
 
 impl BlockReturn {
     fn into_parts(self) -> (u32, ReturnCode) {

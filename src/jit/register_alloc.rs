@@ -254,6 +254,9 @@ mod test {
 
         // the main snapshot (long form, allows human readability)
         assert_snapshot!(lifetimes);
-        assert_display_snapshot!(crate::test::ShowAllocs { allocs: &allocs, clobbers: &clobbers });
+        assert_display_snapshot!(crate::test::ShowAllocs {
+            allocs: &allocs,
+            clobbers: &clobbers
+        });
     }
 }

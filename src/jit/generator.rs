@@ -7,17 +7,21 @@ mod cmp;
 mod math;
 mod memory;
 
-use crate::jit::Assembler;
+use crate::jit::{self, Assembler};
 use crate::{
     instruction::{self, Instruction},
-    opcode, register,
+    opcode, register, ssa, Width,
 };
+use rasen::params::imm::{Imm16, Imm8};
+use rasen::params::reg::{Reg16, Reg8};
 use rasen::params::{
     imm::Imm32,
     mem::{Mem, Mem32},
     reg::Reg32,
     Register,
 };
+use std::collections::HashMap;
+use std::io;
 
 pub struct BlockBuilder<'a, 'b: 'a> {
     stream: Assembler<'a, 'b>,
@@ -39,6 +43,186 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
             register_manager: RegisterManager::new(),
             check_ranges,
         }
+    }
+
+    fn mov_reg_src(&mut self, dest: Register, src: jit::Source) -> io::Result<()> {
+        match src {
+            // Don't need to move because src and dest are the same.
+            jit::Source::Register(src) if src == dest => Ok(()),
+
+            jit::Source::Register(src) => self.stream.mov_reg_reg(Reg32(dest), Reg32(src)),
+            jit::Source::Val(val) => {
+                // todo: make the following function return a result instead of Ok wrapping an unwrap.
+                self.mov_r32_imm32(dest, val);
+                Ok(())
+            }
+        }
+    }
+
+    #[allow(unused)]
+    pub fn make_block(
+        &mut self,
+        instructions: &[ssa::Instruction],
+        allocs: &HashMap<ssa::Id, Register>,
+        clobbers: &HashMap<usize, Vec<Register>>,
+    ) -> io::Result<()> {
+        for (idx, instruction) in instructions.iter().enumerate() {
+            match instruction {
+                &ssa::Instruction::LoadConst { dest, src } => {
+                    // todo: make the following function return a result instead of Ok wrapping an unwrap.
+                    self.mov_r32_imm32(*allocs.get(&dest).expect("dest not allocated!?"), src);
+                    Ok(())
+                }
+
+                &ssa::Instruction::BinOp {
+                    dest,
+                    src1,
+                    src2,
+                    op,
+                } => {
+                    let dest = *allocs.get(&dest).expect("dest not allocated!?");
+                    let src1 =
+                        jit::Source::from_ssa_src(src1, allocs).expect("src1 not allocated!?");
+                    let src2 =
+                        jit::Source::from_ssa_src(src2, allocs).expect("src2 not allocated!?");
+
+                    math::binop(self, dest, src1, src2, op)
+                }
+
+                &ssa::Instruction::ReadReg { dest, base, src } => {
+                    let base =
+                        jit::Source::from_ssa_src(base, allocs).expect("base not allocated!?");
+
+                    let mem = Mem32(memory::src_rv_reg(base, src));
+                    let dest = *allocs.get(&dest).expect("dest not allocated!?");
+                    self.stream.mov_reg_mem(dest, mem)
+                }
+
+                &ssa::Instruction::ReadMem {
+                    dest,
+                    src,
+                    base,
+                    sign_extend,
+                    width,
+                } => {
+                    let base =
+                        jit::Source::from_ssa_src(base, allocs).expect("base not allocated!?");
+
+                    let src = jit::Source::from_ssa_src(src, allocs).expect("src not allocated!?");
+
+                    let mem = memory::src_src(base, src);
+
+                    let dest = Reg32(*allocs.get(&dest).expect("dest not allocated!?"));
+
+                    match (width, sign_extend) {
+                        (Width::Byte, true) => self.stream.movsx_reg_mem8(dest, mem),
+                        (Width::Byte, false) => self.stream.movzx_reg_mem8(dest, mem),
+                        (Width::Word, true) => self.stream.movsx_reg_mem16(dest, mem),
+                        (Width::Word, false) => self.stream.movzx_reg_mem16(dest, mem),
+                        (Width::DWord, _) => self.stream.mov_reg_mem(dest, mem),
+                    }
+                }
+
+                &ssa::Instruction::WriteReg { dest, base, src } => {
+                    let base =
+                        jit::Source::from_ssa_src(base, allocs).expect("base not allocated!?");
+
+                    let mem = Mem32(memory::src_rv_reg(base, dest));
+
+                    let src = jit::Source::from_ssa_src(src, allocs).expect("src not allocated!?");
+
+                    match src {
+                        jit::Source::Val(src) => self.stream.mov_mem_imm(mem, Imm32(src)),
+                        jit::Source::Register(src) => self.stream.mov_mem_reg(mem, src),
+                    }
+                }
+
+                &ssa::Instruction::WriteMem {
+                    src,
+                    base,
+                    addr,
+                    width,
+                } => {
+                    let base =
+                        jit::Source::from_ssa_src(base, allocs).expect("base not allocated!?");
+                    let src = jit::Source::from_ssa_src(src, allocs).expect("src not allocated!?");
+                    let addr =
+                        jit::Source::from_ssa_src(addr, allocs).expect("addr not allocated!?");
+
+                    let mem = memory::src_src(base, addr);
+
+                    match (src, width) {
+                        (jit::Source::Val(v), Width::Byte) => {
+                            self.stream.mov_mem_imm(mem, Imm8(v as u8))
+                        }
+                        (jit::Source::Val(v), Width::Word) => {
+                            self.stream.mov_mem_imm(mem, Imm16(v as u16))
+                        }
+                        (jit::Source::Val(v), Width::DWord) => {
+                            self.stream.mov_mem_imm(mem, Imm32(v))
+                        }
+                        (jit::Source::Register(r), Width::Byte) => {
+                            self.stream.mov_mem_reg(mem, Reg8(r))
+                        }
+                        (jit::Source::Register(r), Width::Word) => {
+                            self.stream.mov_mem_reg(mem, Reg16(r))
+                        }
+                        (jit::Source::Register(r), Width::DWord) => {
+                            self.stream.mov_mem_reg(mem, Reg32(r))
+                        }
+                    }
+                }
+
+                &ssa::Instruction::Cmp {
+                    dest,
+                    src1,
+                    src2,
+                    kind,
+                } => {
+                    let dest = *allocs.get(&dest).expect("dest not allocated!?");
+                    let src1 =
+                        jit::Source::from_ssa_src(src1, allocs).expect("src1 not allocated!?");
+                    let src2 =
+                        jit::Source::from_ssa_src(src2, allocs).expect("src2 not allocated!?");
+
+                    todo!("Measure kind and use that")
+                }
+
+                // todo(perf): split into `dest = if cond { if_true } else { <undefined> }; dest = if !cond { if_false } else { dest }
+                //  iff: `is_true` & `is_false` are both `Source::Val` and `cond` is not.
+                &ssa::Instruction::Select {
+                    dest,
+                    cond,
+                    if_true,
+                    if_false,
+                } => {
+                    let dest = *allocs.get(&dest).expect("dest not allocated!?");
+
+                    let if_true = jit::Source::from_ssa_src(if_true, allocs)
+                        .expect("if_true not allocated!?");
+
+                    let if_false = jit::Source::from_ssa_src(if_false, allocs)
+                        .expect("if_false not allocated!?");
+
+                    let cond =
+                        jit::Source::from_ssa_src(cond, allocs).expect("cond not allocated!?");
+
+                    // fixme: handle cond being const. It's actually quite trivial
+                    let cond = cond.reg().expect("cond should be a register!");
+
+                    let clobber_reg = clobbers.get(&idx).and_then(|regs| regs.get(0)).copied();
+                    cmp::select(self, dest, cond, if_true, if_false, clobber_reg)
+                }
+
+                ssa::Instruction::Arg { .. } => continue, // todo: force something to be done with this?
+                ssa::Instruction::Fence => todo!(),
+                ssa::Instruction::ReadStack { .. } => todo!(),
+                ssa::Instruction::WriteStack { .. } => todo!(),
+                ssa::Instruction::Ret { .. } => todo!("Enforce non branch instruction?"),
+            }?;
+        }
+
+        Ok(())
     }
 
     pub fn make_instruction(&mut self, instruction: instruction::Info) {
