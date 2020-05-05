@@ -233,14 +233,9 @@ impl Runtime {
         &mut self,
         block_instrs: Vec<instruction::Info>,
         branch: instruction::Info,
+        start_pc: u32,
+        end_pc: u32,
     ) {
-        let start_pc = block_instrs
-            .first()
-            .unwrap_or_else(|| &branch)
-            .start_address;
-
-        let end_pc = branch.end_address();
-
         let mut lower_context = ssa::lower::Context::new(start_pc);
 
         for instr in block_instrs {

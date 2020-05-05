@@ -7,25 +7,16 @@ use crate::{opcode, Width};
 
 pub struct Info {
     pub instruction: Instruction,
-    pub start_address: u32,
     pub len: u32,
 }
 
 impl Info {
     #[must_use]
-    pub fn end_address(&self) -> u32 {
-        self.start_address.wrapping_add(self.len)
-    }
-
-    #[must_use]
-    pub fn new(instruction: Instruction, start_address: u32, len: u32) -> Self {
-        Self {
-            instruction,
-            start_address,
-            len,
-        }
+    pub fn new(instruction: Instruction, len: u32) -> Self {
+        Self { instruction, len }
     }
 }
+
 pub enum Instruction {
     R(R),
     I(I),

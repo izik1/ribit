@@ -99,9 +99,10 @@ mod test {
                     rd: Some(register::RiscV::X4),
                     opcode: opcode::J::JAL,
                 }),
-                0,
                 4,
             ),
+            0,
+            4,
         );
 
         let (mut regs, mut memory) = init();
@@ -133,9 +134,10 @@ mod test {
                     rs1: Some(register::RiscV::X1),
                     opcode: opcode::IJump::JALR,
                 }),
-                48,
                 4,
             ),
+            48,
+            52,
         );
 
         let (mut regs, mut memory) = init();
@@ -169,9 +171,10 @@ mod test {
                     rd: None,
                     opcode: opcode::J::JAL,
                 }),
-                0,
                 4,
             ),
+            0,
+            4,
         );
 
         let (mut regs, mut memory) = init();

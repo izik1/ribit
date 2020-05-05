@@ -236,7 +236,7 @@ impl Cpu {
         );
 
         let instr = decode::compressed::decode_instruction(instr)?;
-        let info = instruction::Info::new(instr, self.pc, 2);
+        let info = instruction::Info::new(instr, 2);
         self.pc += 2;
         Ok(info)
     }
@@ -256,7 +256,7 @@ impl Cpu {
 
         if instr & 0b11 == 0b11 {
             let instr = decode::instruction(instr)?;
-            let info = instruction::Info::new(instr, self.pc, 4);
+            let info = instruction::Info::new(instr, 4);
             self.pc += 4;
             Ok(info)
         } else {
@@ -281,7 +281,8 @@ impl Cpu {
         }
 
         self.pc = pc;
-        self.jit.generate_basic_block(block_instrs, terminator);
+        self.jit
+            .generate_basic_block(block_instrs, terminator, pc, self.pc);
 
         Ok(())
     }
