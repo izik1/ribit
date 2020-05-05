@@ -164,15 +164,17 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                     dest,
                     src1,
                     src2,
-                    kind: _kind,
+                    kind,
                 } => {
-                    let _dest = *allocs.get(&dest).expect("dest not allocated!?");
-                    let _src1 =
+                    let dest = *allocs.get(&dest).expect("dest not allocated!?");
+
+                    let src1 =
                         jit::Source::from_ssa_src(src1, allocs).expect("src1 not allocated!?");
-                    let _src2 =
+
+                    let src2 =
                         jit::Source::from_ssa_src(src2, allocs).expect("src2 not allocated!?");
 
-                    todo!("Measure kind and use that")
+                    cmp::set_bool_conditional(self, dest, src1, src2, kind)
                 }
 
                 // todo(perf): split into `dest = if cond { if_true } else { <undefined> }; dest = if !cond { if_false } else { dest }

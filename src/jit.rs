@@ -26,7 +26,7 @@ type CheckRanges = extern "sysv64" fn(pc: u32, ctx: &mut context::Runtime, addre
 #[derive(Copy, Clone)]
 pub struct BlockReturn(u64);
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Source {
     Val(u32),
     Register(Register),
@@ -52,6 +52,16 @@ impl Source {
             Self::Register(reg) => Some(reg),
             _ => None,
         }
+    }
+
+    #[inline]
+    pub fn is_reg(self) -> bool {
+        self.reg().is_some()
+    }
+
+    #[inline]
+    pub fn is_val(self) -> bool {
+        self.val().is_some()
     }
 }
 
