@@ -44,6 +44,16 @@ impl fmt::Display for StackIndex {
     }
 }
 
+impl StackIndex {
+    pub fn offset(self, redzone: bool) -> i32 {
+        if redzone {
+            (self.0 as i32 + 1) * -4
+        } else {
+            self.0 as i32 * 4
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub enum CmpKind {

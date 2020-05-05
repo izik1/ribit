@@ -1,6 +1,7 @@
+use crate::ssa::StackIndex;
 use crate::{jit, register};
 
-use rasen::params::mem::Mem;
+use rasen::params::{mem::Mem, Register};
 
 pub fn src_rv_reg(base: jit::Source, reg: register::RiscV) -> Mem {
     match base {
@@ -22,4 +23,8 @@ pub fn src_src(src1: jit::Source, src2: jit::Source) -> Mem {
             Mem::base_index(base, index).unwrap()
         }
     }
+}
+
+pub fn stack(idx: StackIndex, redzone: bool) -> Mem {
+    Mem::base_displacement(Register::Zsp, idx.offset(redzone))
 }

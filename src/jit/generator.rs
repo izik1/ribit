@@ -1,4 +1,5 @@
 use super::CheckRanges;
+use crate::ssa::StackIndex;
 
 mod cmp;
 mod math;
@@ -55,6 +56,12 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
         allocs: &HashMap<ssa::Id, Register>,
         clobbers: &HashMap<usize, Vec<Register>>,
     ) -> io::Result<()> {
+        let max_stack = ssa::analysis::max_stack(instructions);
+
+        // ensure that we remain in the redzone for now
+        // todo: support actually modifying the stack as a fallback.
+        assert!(max_stack.unwrap_or(StackIndex(0)).offset(true) >= -128);
+
         for (idx, instruction) in instructions.iter().enumerate() {
             match instruction {
                 &ssa::Instruction::LoadConst { dest, src } => {
@@ -205,8 +212,20 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
 
                 ssa::Instruction::Arg { .. } => continue, // todo: force something to be done with this?
                 ssa::Instruction::Fence => todo!(),
-                ssa::Instruction::ReadStack { .. } => todo!(),
-                ssa::Instruction::WriteStack { .. } => todo!(),
+
+                ssa::Instruction::ReadStack { dest, src } => {
+                    let dest = *allocs.get(&dest).expect("dest not allocated!?");
+
+                    self.stream
+                        .mov_reg_mem(Reg32(dest), Mem32(memory::stack(*src, true)))
+                }
+
+                ssa::Instruction::WriteStack { dest, src } => {
+                    let src = *allocs.get(&src).expect("src not allocated!?");
+
+                    self.stream
+                        .mov_mem_reg(Mem32(memory::stack(*dest, true)), Reg32(src))
+                }
                 ssa::Instruction::Ret { .. } => panic!("Enforce non branch instruction?"),
             }?;
         }

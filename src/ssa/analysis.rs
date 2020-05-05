@@ -173,6 +173,30 @@ pub fn stack_lifetimes(graph: &[Instruction]) -> HashMap<StackIndex, Vec<(usize,
     lifetimes
 }
 
+/// Get the highest used StackIndex for a given graph.
+pub fn max_stack(graph: &[Instruction]) -> Option<StackIndex> {
+    let mut max: Option<StackIndex> = None;
+
+    for instr in graph {
+        match instr {
+            Instruction::WriteStack {
+                dest: stack_idx,
+                src: _,
+            }
+            | Instruction::ReadStack {
+                dest: _,
+                src: stack_idx,
+            } => {
+                max = std::cmp::max(max, Some(*stack_idx));
+            }
+
+            _ => {}
+        }
+    }
+
+    max
+}
+
 pub fn min_stack(
     lifetime: Lifetime,
     stack_lts: &HashMap<StackIndex, Vec<(usize, usize)>>,
