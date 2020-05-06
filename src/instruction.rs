@@ -17,6 +17,7 @@ impl Info {
     }
 }
 
+#[derive(Debug)]
 pub enum Instruction {
     R(R),
     I(I),
@@ -86,6 +87,7 @@ impl R {
     }
 }
 
+#[derive(Debug)]
 pub struct I {
     pub(crate) imm: u16,
     pub(crate) rs1: Option<RiscVRegister>,
@@ -121,6 +123,7 @@ impl I {
     }
 }
 
+#[derive(Debug)]
 pub struct IJump {
     pub(crate) imm: u16,
     pub(crate) rs1: Option<RiscVRegister>,
@@ -156,6 +159,7 @@ impl IJump {
     }
 }
 
+#[derive(Debug)]
 pub struct IMem {
     pub(crate) imm: u16,
     pub(crate) rs1: Option<RiscVRegister>,
@@ -191,6 +195,7 @@ impl IMem {
     }
 }
 
+#[derive(Debug)]
 pub struct S {
     pub(crate) imm: u16,
     pub(crate) rs1: Option<RiscVRegister>,
@@ -230,6 +235,7 @@ impl S {
     }
 }
 
+#[derive(Debug)]
 pub struct B {
     pub(crate) rs1: Option<RiscVRegister>,
     pub(crate) rs2: Option<RiscVRegister>,
@@ -253,6 +259,7 @@ impl B {
     }
 }
 
+#[derive(Debug)]
 pub struct U {
     pub(crate) imm: u32,
     pub(crate) rd: Option<RiscVRegister>,
@@ -273,6 +280,7 @@ impl U {
     }
 }
 
+#[derive(Debug)]
 pub struct J {
     pub(crate) imm: u32,
     pub(crate) rd: Option<RiscVRegister>,

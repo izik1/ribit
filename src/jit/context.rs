@@ -12,7 +12,7 @@ use std::{borrow::Cow, collections::HashMap, mem};
 
 mod sbi {
     #[repr(u32)]
-    #[derive(Copy, Clone)]
+    #[derive(Copy, Clone, Debug)]
     enum StatusCode {
         Success = 0_u32,
         #[allow(dead_code)]
@@ -103,6 +103,9 @@ mod sbi {
             Err(_) => StatusCode::ErrFailure,
         };
 
+        log::debug!("{}", buf[0] as u32);
+        log::debug!("{:?}", code);
+
         (code, buf[0] as u32)
     }
 
@@ -130,6 +133,8 @@ impl Runtime {
         // assert memory size for now
         assert_eq!(memory.len(), crate::MEMORY_SIZE as usize);
 
+        dbg!(regs[10]);
+    
         if let Some(block_num) = self.ranges.iter().position(|range| range.start == *pc) {
             let block = &self.blocks[block_num];
 
@@ -179,6 +184,8 @@ impl Runtime {
         allocs: &HashMap<ssa::Id, Register>,
         clobbers: &HashMap<usize, Vec<Register>>,
     ) -> BasicBlock {
+        log::debug!("{}", crate::DisplayDeferSlice(instrs));
+
         let buffer = self.buffer.take().expect("Failed to take buffer");
         let mut buffer = buffer.make_mut().unwrap();
         let funct_ptr = unsafe { buffer.as_mut_ptr().add(self.buffer_write_offset as usize) };
@@ -318,3 +325,17 @@ extern "sysv64" fn check_ranges(pc: u32, ctx: &mut Runtime, address: u32) -> boo
 
     early_exit
 }
+
+
+
+/* 
+todo: regression test for:
+%0 = args[0]
+%2 = x(%0)10
+%3 = cmp NE %2, 0
+%4 = select %3, 65932, 65964
+ret 0, %4
+->
+ [8b, 47, 28, 85, c0, c7, c0, 00, 00, 00, 00, 0f, 95, c0, 85, c0, c7, c0, ac, 01, 01, 00, c7, c1, 8c, 01, 01, 00, 0f, 45, c1, 0b, c0, c3]
+*/
+

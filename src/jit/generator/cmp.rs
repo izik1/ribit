@@ -27,7 +27,7 @@ pub fn select(
             let clobber_reg =
                 clobber_reg.expect("todo: handle clobber not existing here (via branches)");
             builder.stream.mov_reg_imm(clobber_reg, Imm32(a))?;
-            (clobber_reg, true)
+            (clobber_reg, false)
         }
 
         // clobber case
