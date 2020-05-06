@@ -223,6 +223,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
 
                 let src = ctx.load_register(rs1);
                 let offset = ctx.add(src, Source::Val(imm));
+                let offset = ctx.and(offset, Source::Val(crate::MEMORY_SIZE - 1));
 
                 let mem = ctx.read_memory(offset, width, true);
 
@@ -236,6 +237,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
 
                 let src = ctx.load_register(rs1);
                 let offset = ctx.add(src, Source::Val(imm));
+                let offset = ctx.and(offset, Source::Val(crate::MEMORY_SIZE - 1));
 
                 let mem = ctx.read_memory(offset, width, false);
 
@@ -313,6 +315,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
 
             let src1 = ctx.load_register(rs1);
             let addr = ctx.add(src1, Source::Val(imm));
+            let addr = ctx.and(addr, Source::Val(crate::MEMORY_SIZE - 1));
 
             let src2 = ctx.load_register(rs2);
             ctx.write_memory(addr, src2, width);

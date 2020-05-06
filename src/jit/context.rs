@@ -133,13 +133,11 @@ impl Runtime {
         // assert memory size for now
         assert_eq!(memory.len(), crate::MEMORY_SIZE as usize);
 
-        dbg!(regs[10]);
-    
         if let Some(block_num) = self.ranges.iter().position(|range| range.start == *pc) {
             let block = &self.blocks[block_num];
 
             let (address, return_code) =
-                unsafe { block(regs.as_mut_ptr(), self, memory.as_mut_ptr()) }.into_parts();
+                unsafe { block(regs.as_mut_ptr(), memory.as_mut_ptr(), self) }.into_parts();
 
             *pc = address;
 
@@ -166,7 +164,6 @@ impl Runtime {
             buffer: Some(
                 memmap::MmapOptions::new()
                     .len(4096 * 16)
-                    .stack()
                     .map_anon()
                     .unwrap()
                     .make_exec()
@@ -187,7 +184,7 @@ impl Runtime {
         log::debug!("{}", crate::DisplayDeferSlice(instrs));
 
         let buffer = self.buffer.take().expect("Failed to take buffer");
-        let mut buffer = buffer.make_mut().unwrap();
+        let mut buffer = buffer.make_mut().expect("Failed to make buffer mutable");
         let funct_ptr = unsafe { buffer.as_mut_ptr().add(self.buffer_write_offset as usize) };
 
         let mut writer = Cursor::new(buffer.as_mut());

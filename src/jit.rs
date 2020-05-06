@@ -16,8 +16,8 @@ type Assembler<'a, 'b> = rasen::Assembler<'a, std::io::Cursor<&'b mut [u8]>>;
 
 type BasicBlock = unsafe extern "sysv64" fn(
     regs: *mut u32,
-    ctx: &mut context::Runtime,
     memory: *mut u8,
+    ctx: &mut context::Runtime,
 ) -> BlockReturn;
 
 type CheckRanges = extern "sysv64" fn(pc: u32, ctx: &mut context::Runtime, address: u32) -> bool;
