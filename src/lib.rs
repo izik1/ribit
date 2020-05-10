@@ -12,6 +12,7 @@ extern crate static_assertions;
 use std::fmt;
 
 pub mod decode;
+pub mod disassemble;
 pub mod instruction;
 pub mod jit;
 pub mod opcode;
@@ -272,6 +273,9 @@ impl Cpu {
         loop {
             log::debug!("PC: ${:04x}", self.pc);
             let inst_info = self.parse_instruction()?;
+
+            log::debug!("instr: {}", crate::disassemble::FmtInstruction::from_info(&inst_info));
+
             if inst_info.instruction.is_terminator() {
                 terminator = inst_info;
                 break;

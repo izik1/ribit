@@ -270,10 +270,10 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                     }
 
                     (Source::Val(0), Source::Register(Register::Zax)) => {
-                        // clear the upper 32 bits of Rax 
+                        // clear the upper 32 bits of Rax
                         // todo: use `mov <clobber>, eax` to do this instead
-                        self.stream.or_reg_reg(Reg32(Register::Zax), Reg32(Register::Zax))?;
-
+                        self.stream
+                            .or_reg_reg(Reg32(Register::Zax), Reg32(Register::Zax))?;
                     }
 
                     (Source::Val(code), Source::Register(Register::Zax)) => {
@@ -282,10 +282,10 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                             .get(1)
                             .expect("Expected 2 clobbers (first being Zax)");
 
-                        // clear the upper 32 bits of Rax 
+                        // clear the upper 32 bits of Rax
                         // todo: use `mov <clobber>, eax` to do this instead
-                        self.stream.or_reg_reg(Reg32::ZAX, Reg32::ZAX)?;                        
-                        
+                        self.stream.or_reg_reg(Reg32::ZAX, Reg32::ZAX)?;
+
                         self.mov_r32_imm32(clobber_reg, code)?;
                         self.stream.shl_reg_imm8(Reg64(clobber_reg), 32)?;
 
@@ -302,9 +302,9 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                         self.mov_r32_imm32(Register::Zax, code)?;
                         self.stream.shl_reg_imm8(Reg64::ZAX, 32)?;
 
-                        // clear the upper 32 bits of addr 
+                        // clear the upper 32 bits of addr
                         // todo: use `mov <clobber>, addr` to do this instead
-                        self.stream.or_reg_reg(Reg32(addr), Reg32(addr))?;                        
+                        self.stream.or_reg_reg(Reg32(addr), Reg32(addr))?;
 
                         self.stream.or_reg_reg(Reg64::ZAX, Reg64(addr))?;
                     }
@@ -314,15 +314,15 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                         if code == Register::Zax {
                             self.stream.or_reg_reg(Reg64::ZAX, Reg64(addr))?;
                         } else if addr == Register::Zax {
-                            // clear the upper 32 bits of Rax 
+                            // clear the upper 32 bits of Rax
                             // todo: use `mov <clobber>, eax` to do this instead
-                            self.stream.or_reg_reg(Reg32::ZAX, Reg32::ZAX)?;                        
-                        
+                            self.stream.or_reg_reg(Reg32::ZAX, Reg32::ZAX)?;
+
                             self.stream.or_reg_reg(Reg64::ZAX, Reg64(code))?;
                         } else {
-                            // clear the upper 32 bits of addr 
+                            // clear the upper 32 bits of addr
                             // todo: use `mov <clobber>, addr` to do this instead
-                            self.stream.or_reg_reg(Reg32(addr), Reg32(addr))?;                        
+                            self.stream.or_reg_reg(Reg32(addr), Reg32(addr))?;
 
                             self.stream.or_reg_reg(Reg64(code), Reg64(addr))?;
                             self.stream.mov_reg_reg(Reg64::ZAX, Reg64(code))?;

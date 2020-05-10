@@ -209,8 +209,6 @@ pub fn instruction(instruction: u32) -> Result<Instruction, DecodeError> {
         _ => return Err(DecodeError::InvalidInstruction(instruction)),
     };
 
-    log::debug!("{:?}", instruction);
-
     Ok(instruction)
 }
 

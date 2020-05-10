@@ -323,9 +323,7 @@ extern "sysv64" fn check_ranges(pc: u32, ctx: &mut Runtime, address: u32) -> boo
     early_exit
 }
 
-
-
-/* 
+/*
 todo: regression test for:
 %0 = args[0]
 %2 = x(%0)10
@@ -335,4 +333,3 @@ ret 0, %4
 ->
  [8b, 47, 28, 85, c0, c7, c0, 00, 00, 00, 00, 0f, 95, c0, 85, c0, c7, c0, ac, 01, 01, 00, c7, c1, 8c, 01, 01, 00, 0f, 45, c1, 0b, c0, c3]
 */
-

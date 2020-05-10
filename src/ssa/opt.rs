@@ -20,6 +20,8 @@ fn const_prop(consts: &HashMap<Id, u32>, src: &mut Source) -> Option<u32> {
     }
 }
 
+// todo: `pub fn fold_identities(graph: &mut [Instruction])`
+
 pub fn fold_and_prop_consts(graph: &mut [Instruction]) {
     let mut consts = HashMap::new();
     for instruction in graph.iter_mut() {

@@ -1,5 +1,6 @@
 [package]
-name = "rv32i-mc-interpreter"
+name = "ribit"
+description = "A Risc-V 32i-mc JIT"
 version = "0.1.0"
 authors = ["Skyler Ross <orangesnowfox@gmail.com>"]
 edition = "2018"

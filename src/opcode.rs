@@ -2,6 +2,7 @@
 #![allow(clippy::pub_enum_variant_names)]
 
 use crate::Width;
+use std::fmt;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum R {
@@ -24,10 +25,60 @@ pub enum R {
     REMU,
 }
 
+impl R {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            R::ADD => "ADD",
+            R::SUB => "SUB",
+            R::SLL => "SLL",
+            R::XOR => "XOR",
+            R::SRL => "SRL",
+            R::SRA => "SRA",
+            R::OR => "OR",
+            R::AND => "AND",
+            R::MUL => "MUL",
+            R::MULH => "MULH",
+            R::MULHSU => "MULHSU",
+            R::MULHU => "MULHU",
+            R::DIV => "DIV",
+            R::DIVU => "DIVU",
+            R::REM => "REM",
+            R::REMU => "REMU",
+            R::SCond(Cmp::Lt) => "SLT",
+            R::SCond(Cmp::Ltu) => "SLTU",
+            R::SCond(Cmp::Eq) => panic!("invalid instruction: SEQ"),
+            R::SCond(Cmp::Ne) => panic!("invalid instruction: SNE"),
+            R::SCond(Cmp::Ge) => panic!("invalid instruction: SGE"),
+            R::SCond(Cmp::Geu) => panic!("invalid instruction: SGEU"),
+        }
+    }
+}
+
+impl fmt::Display for R {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.write_str(self.as_str())
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum RSys {
     ECALL,
     EBREAK,
+}
+
+impl RSys {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RSys::ECALL => "ECALL",
+            RSys::EBREAK => "EBREAK",
+        }
+    }
+}
+
+impl fmt::Display for RSys {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.write_str(self.as_str())
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -52,6 +103,32 @@ pub enum I {
     SRAI,
 }
 
+impl I {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            I::ADDI => "ADDI",
+            I::XORI => "XORI",
+            I::ORI => "ORI",
+            I::ANDI => "ANDI",
+            I::SLLI => "SLLI",
+            I::SRLI => "SRLI",
+            I::SRAI => "SRAI",
+            I::SICond(Cmp::Lt) => "SLTI",
+            I::SICond(Cmp::Ltu) => "SLTIU",
+            I::SICond(Cmp::Eq) => panic!("invalid instruction: SEQI"),
+            I::SICond(Cmp::Ne) => panic!("invalid instruction: SNEI"),
+            I::SICond(Cmp::Ge) => panic!("invalid instruction: SGEI"),
+            I::SICond(Cmp::Geu) => panic!("invalid instruction: SGEIU"),
+        }
+    }
+}
+
+impl fmt::Display for I {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.write_str(self.as_str())
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum IMem {
     FENCE,
@@ -60,9 +137,43 @@ pub enum IMem {
     LDU(Width),
 }
 
+impl IMem {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            IMem::FENCE => "FENCE",
+            IMem::LD(Width::Byte) => "LB",
+            IMem::LD(Width::Word) => "LH",
+            IMem::LD(Width::DWord) => "LW",
+            IMem::LDU(Width::Byte) => "LBU",
+            IMem::LDU(Width::Word) => "LHU",
+            IMem::LDU(Width::DWord) => panic!("Invalid instruction LWU"),
+        }
+    }
+}
+
+impl fmt::Display for IMem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.write_str(self.as_str())
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum IJump {
     JALR,
+}
+
+impl IJump {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            IJump::JALR => "JALR",
+        }
+    }
+}
+
+impl fmt::Display for IJump {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.write_str(self.as_str())
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -71,7 +182,36 @@ pub enum U {
     AUIPC,
 }
 
+impl U {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            U::LUI => "LUI",
+            U::AUIPC => "AUIPC",
+        }
+    }
+}
+
+impl fmt::Display for U {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.write_str(self.as_str())
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum J {
     JAL,
+}
+
+impl J {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            J::JAL => "JAL",
+        }
+    }
+}
+
+impl fmt::Display for J {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.write_str(self.as_str())
+    }
 }

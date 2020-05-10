@@ -1,4 +1,4 @@
-use rv32i_mc_interpreter::{CompressedDecodeError, DecodeError};
+use ribit::{CompressedDecodeError, DecodeError};
 use std::io::Read;
 
 fn main() {
@@ -8,7 +8,7 @@ fn main() {
         .unwrap()
         .read_to_end(&mut buf)
         .unwrap();
-    let mut cpu = rv32i_mc_interpreter::Cpu::new(&buf);
+    let mut cpu = ribit::Cpu::new(&buf);
     loop {
         if let Err(e) = cpu.run() {
             match e {
