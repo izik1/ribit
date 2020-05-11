@@ -274,7 +274,10 @@ impl Cpu {
             log::debug!("PC: ${:04x}", self.pc);
             let inst_info = self.parse_instruction()?;
 
-            log::debug!("instr: {}", crate::disassemble::FmtInstruction::from_info(&inst_info));
+            log::debug!(
+                "instr: {}",
+                crate::disassemble::FmtInstruction::from_info(&inst_info)
+            );
 
             if inst_info.instruction.is_terminator() {
                 terminator = inst_info;
