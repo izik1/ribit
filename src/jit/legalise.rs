@@ -7,6 +7,7 @@ use std::mem;
 /// Counts the clobbers required to execute the instruction (optimally)
 ///
 /// In some cases, an instruction can require writing to more than just the output register, such as when  
+#[must_use]
 pub fn count_clobbers_for(instr: &Instruction, allocs: &HashMap<Id, Register>) -> usize {
     match instr {
         Instruction::Arg { .. }
@@ -61,6 +62,7 @@ pub fn count_clobbers_for(instr: &Instruction, allocs: &HashMap<Id, Register>) -
     }
 }
 
+#[allow(clippy::match_same_arms)]
 pub fn legalise(graph: &mut [Instruction], allocs: &HashMap<Id, Register>) {
     for instruction in graph.iter_mut() {
         match instruction {

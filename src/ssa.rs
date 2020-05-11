@@ -12,6 +12,7 @@ pub struct IdAllocator {
 }
 
 impl IdAllocator {
+    #[must_use]
     pub fn new() -> Self {
         Self { next_id: Id(0) }
     }
@@ -45,6 +46,7 @@ impl fmt::Display for StackIndex {
 }
 
 impl StackIndex {
+    #[must_use]
     pub fn offset(self, redzone: bool) -> i32 {
         if redzone {
             (self.0 as i32 + 1) * -4

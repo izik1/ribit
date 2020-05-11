@@ -26,6 +26,7 @@ pub enum R {
 }
 
 impl R {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             R::ADD => "ADD",
@@ -67,6 +68,7 @@ pub enum RSys {
 }
 
 impl RSys {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             RSys::ECALL => "ECALL",
@@ -104,6 +106,7 @@ pub enum I {
 }
 
 impl I {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             I::ADDI => "ADDI",
@@ -138,6 +141,7 @@ pub enum IMem {
 }
 
 impl IMem {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             IMem::FENCE => "FENCE",
@@ -163,6 +167,7 @@ pub enum IJump {
 }
 
 impl IJump {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             IJump::JALR => "JALR",
@@ -183,6 +188,7 @@ pub enum U {
 }
 
 impl U {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             U::LUI => "LUI",
@@ -203,6 +209,7 @@ pub enum J {
 }
 
 impl J {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             J::JAL => "JAL",

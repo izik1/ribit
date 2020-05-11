@@ -136,7 +136,7 @@ impl Default for RegisterAllocator {
 }
 
 // todo: fill this out
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct RegisterSpill(pub usize);
 
 pub fn allocate_registers(
@@ -194,37 +194,25 @@ pub fn spill(graph: &mut Vec<Instruction>, id_allocator: &mut IdAllocator, spill
         .max_by_key(|(_, lt)| lt.end - lt.start)
         .expect("Impossible to solve spill");
 
-    // todo: try to do more optimal spills based on instr
-    //  for instance, if it's a register read, we should avoid stack ops and instead just re-read it
-    let instr = graph
-        .iter()
-        .find(|it| it.id() == Some(id))
-        .cloned()
-        .unwrap();
+    // todo: try to do more optimal spills
+    //  for instance, if it's a register read (before a new value gets written back),
+    // we should avoid stack ops and instead just re-read it
 
     let end_id = id_allocator.allocate();
 
-    let (start, end) = match instr {
-        _ => {
-            let stack_index = analysis::min_stack(lt, &analysis::stack_lifetimes(graph));
+    let stack_index = analysis::min_stack(lt, &analysis::stack_lifetimes(graph));
 
-            let start = Instruction::WriteStack {
-                src: id,
-                dest: stack_index,
-            };
-
-            let end = Instruction::ReadStack {
-                src: stack_index,
-                dest: end_id,
-            };
-
-            (Some(start), end)
-        }
+    let start = Instruction::WriteStack {
+        src: id,
+        dest: stack_index,
     };
 
-    if let Some(start) = start {
-        graph.insert(lt.start + 1, start);
-    }
+    let end = Instruction::ReadStack {
+        src: stack_index,
+        dest: end_id,
+    };
+
+    graph.insert(lt.start + 1, start);
 
     graph.insert(lt.end, end);
     ssa::update_references(&mut graph[lt.end..], id, end_id);

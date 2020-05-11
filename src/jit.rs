@@ -33,6 +33,7 @@ pub enum Source {
 }
 
 impl Source {
+    #[must_use]
     pub fn from_ssa_src(src: ssa::Source, map: &HashMap<ssa::Id, Register>) -> Option<Self> {
         match src {
             ssa::Source::Val(v) => Some(Self::Val(v)),
@@ -40,6 +41,7 @@ impl Source {
         }
     }
 
+    #[must_use]
     pub fn val(self) -> Option<u32> {
         match self {
             Self::Val(v) => Some(v),
@@ -47,6 +49,7 @@ impl Source {
         }
     }
 
+    #[must_use]
     pub fn reg(self) -> Option<Register> {
         match self {
             Self::Register(reg) => Some(reg),
@@ -55,11 +58,13 @@ impl Source {
     }
 
     #[inline]
+    #[must_use]
     pub fn is_reg(self) -> bool {
         self.reg().is_some()
     }
 
     #[inline]
+    #[must_use]
     pub fn is_val(self) -> bool {
         self.val().is_some()
     }

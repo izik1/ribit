@@ -11,10 +11,10 @@ edition = "2018"
 static_assertions = "1.1.0"
 raw-cpuid = "7.0.3"
 log = "0.4.8"
-rasen = { git = "https://github.com/izik1/rasen", rev = "7a51b7e63aee73383a0507888256852ef3962e62" }
+rasen = { git = "https://github.com/izik1/rasen", rev = "1ad94d82305cf89f1f004a5e74a1334123306288" }
 memmap = "0.7.0"
 env_logger = "0.7.1"
 
 [dev-dependencies]
-insta = { version = "0.12.0", features = ["ron"] }
+insta = { version = "0.16.0", features = ["ron"] }
 serde = "1.0.104"

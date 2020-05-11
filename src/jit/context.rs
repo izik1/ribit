@@ -209,11 +209,11 @@ impl Runtime {
             .expect("todo: handle block creation error");
 
         let start = mem::replace(&mut self.buffer_write_offset, writer.position());
-        let instrs = &buffer[(start as usize)..(self.buffer_write_offset as usize)];
+        let native_buffer = &buffer[(start as usize)..(self.buffer_write_offset as usize)];
 
         let mut byte_str = String::new();
         {
-            let mut bytes = instrs.iter();
+            let mut bytes = native_buffer.iter();
 
             if let Some(byte) = bytes.next() {
                 byte_str.push_str(&format!("{:02x}", byte));

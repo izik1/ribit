@@ -1,0 +1,16 @@
+---
+source: src/ssa/opt.rs
+expression: DisplayDeferSlice(&instrs)
+---
+%0 = args[0]
+%1 = args[1]
+%2 = x(%0)1
+%3 = add %2, 0
+%4 = and %3, 16777215
+%5 = signed dword m(%1)%4
+%6 = add %5, 100
+x(%0)2 = %6
+%7 = add %6, 50
+%8 = and %7, 16777215
+m(%1)%8 = dword %2
+ret 1, 16

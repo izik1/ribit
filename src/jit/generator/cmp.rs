@@ -74,7 +74,7 @@ fn bool_cmp(
     mode: CmpKind,
 ) -> CmpValue {
     match (src1, src2) {
-        (rs1, rs2) if rs1 == rs2 => CmpValue::Const(cmp_same_val(false_value, true_value, mode)),
+        (rs1, rs2) if rs1 == rs2 => CmpValue::Const(same_val(false_value, true_value, mode)),
 
         (Source::Val(a), Source::Val(b)) => {
             CmpValue::Const(eval::select(eval::cmp(a, b, mode), true_value, false_value))
@@ -87,7 +87,7 @@ fn bool_cmp(
                 false => (false_value, true_value),
             };
 
-            match cmp_0(false_value, true_value, mode) {
+            match zero(false_value, true_value, mode) {
                 Some(const_value) => CmpValue::Const(const_value),
                 None => CmpValue::Test(src),
             }
@@ -102,7 +102,7 @@ fn bool_cmp(
     }
 }
 
-pub fn cmp_same_val<T>(false_val: T, true_val: T, cmp_mode: CmpKind) -> T {
+pub fn same_val<T>(false_val: T, true_val: T, cmp_mode: CmpKind) -> T {
     match cmp_mode {
         CmpKind::Eq | CmpKind::Sge | CmpKind::Uge => true_val,
         CmpKind::Ne | CmpKind::Sl | CmpKind::Ul => false_val,
@@ -110,8 +110,7 @@ pub fn cmp_same_val<T>(false_val: T, true_val: T, cmp_mode: CmpKind) -> T {
 }
 
 // returns one of the input Ts if the branch becomes unconditional
-pub fn cmp_0<T>(false_val: T, true_val: T, cmp_mode: CmpKind) -> Option<T> {
-    // there's some low hanging register contention fruit, cmp can optionally take a mem argument.
+pub fn zero<T>(false_val: T, true_val: T, cmp_mode: CmpKind) -> Option<T> {
     match cmp_mode {
         CmpKind::Uge => Some(true_val),
         CmpKind::Ul => Some(false_val),

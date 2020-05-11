@@ -3,7 +3,8 @@
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,
     clippy::cast_sign_loss,
-    clippy::cast_lossless
+    clippy::cast_lossless,
+    clippy::match_bool
 )]
 
 #[macro_use]
@@ -134,7 +135,7 @@ impl ReturnCode {
 
 const XLEN: usize = 32;
 
-const MEMORY_SIZE: u32 = (1024 * 1024 * 16);
+const MEMORY_SIZE: u32 = 1024 * 1024 * 16;
 
 // ensure that memory size is a power of two.
 const_assert_eq!(MEMORY_SIZE.count_ones(), 1);

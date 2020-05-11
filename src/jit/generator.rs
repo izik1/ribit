@@ -239,8 +239,8 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
         allocs: &HashMap<ssa::Id, Register>,
         clobbers: &[Register],
     ) -> io::Result<()> {
-        match instruction {
-            &ssa::Instruction::Ret { code, addr } => {
+        match *instruction {
+            ssa::Instruction::Ret { code, addr } => {
                 // note: addr is in the low dword, code is high dword
 
                 let addr = jit::Source::from_ssa_src(addr, allocs).expect("addr not allocated!?");

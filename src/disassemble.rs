@@ -29,6 +29,7 @@ pub struct FmtInstruction<'a> {
 }
 
 impl<'a> FmtInstruction<'a> {
+    #[must_use]
     pub fn from_info(info: &'a instruction::Info) -> Self {
         let width = match info.len {
             2 => InstructionWidth::Compressed,
@@ -84,7 +85,7 @@ impl<'a> fmt::Display for FmtInstruction<'a> {
             }) => {
                 let rs1 = WrapRegister(*rs1);
                 let rd = WrapRegister(*rd);
-                write!(f, "{} {}, {}, {}", opcode, rd, rs1, imm)
+                write!(f, "{} {}, {}({})", opcode, rd, imm, rs1)
             }
 
             Instruction::IMem(instruction::IMem {
@@ -95,7 +96,7 @@ impl<'a> fmt::Display for FmtInstruction<'a> {
             }) => {
                 let rs1 = WrapRegister(*rs1);
                 let rd = WrapRegister(*rd);
-                write!(f, "{} {}, {}, {}", opcode, rd, rs1, imm)
+                write!(f, "{} {}, {}({})", opcode, rd, imm, rs1)
             }
 
             Instruction::S(instruction::S {
@@ -108,9 +109,9 @@ impl<'a> fmt::Display for FmtInstruction<'a> {
                 let rs2 = WrapRegister(*rs2);
 
                 match width {
-                    Width::Byte => write!(f, "SB {}, {}, {}", rs1, rs2, imm),
-                    Width::Word => write!(f, "SH {}, {}, {}", rs1, rs2, imm),
-                    Width::DWord => write!(f, "SW {}, {}, {}", rs1, rs2, imm),
+                    Width::Byte => write!(f, "SB {}, {}({})", rs1, imm, rs2),
+                    Width::Word => write!(f, "SH {}, {}({})", rs1, imm, rs2),
+                    Width::DWord => write!(f, "SW {}, {}({})", rs1, imm, rs2),
                 }
             }
             Instruction::B(instruction::B {
@@ -123,12 +124,12 @@ impl<'a> fmt::Display for FmtInstruction<'a> {
                 let rs2 = WrapRegister(*rs2);
 
                 match *cmp_mode {
-                    Cmp::Eq => write!(f, "BEQ {}, {}, {}", rs1, rs2, imm),
-                    Cmp::Ne => write!(f, "BNE {}, {}, {}", rs1, rs2, imm),
-                    Cmp::Lt => write!(f, "BLT {}, {}, {}", rs1, rs2, imm),
-                    Cmp::Ltu => write!(f, "BLTU {}, {}, {}", rs1, rs2, imm),
-                    Cmp::Ge => write!(f, "BGE {}, {}, {}", rs1, rs2, imm),
-                    Cmp::Geu => write!(f, "BGEU {}, {}, {}", rs1, rs2, imm),
+                    Cmp::Eq => write!(f, "BEQ {}, {}({})", rs1, imm, rs2),
+                    Cmp::Ne => write!(f, "BNE {}, {}({})", rs1, imm, rs2),
+                    Cmp::Lt => write!(f, "BLT {}, {}({})", rs1, imm, rs2),
+                    Cmp::Ltu => write!(f, "BLTU {}, {}({})", rs1, imm, rs2),
+                    Cmp::Ge => write!(f, "BGE {}, {}({})", rs1, imm, rs2),
+                    Cmp::Geu => write!(f, "BGEU {}, {}({})", rs1, imm, rs2),
                 }
             }
 

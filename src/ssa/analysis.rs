@@ -1,7 +1,7 @@
 use crate::ssa::{Id, Instruction, Source, StackIndex};
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::{fmt, mem};
+use std::fmt;
 
 fn lifetime_instruction<F: FnMut(&mut Lifetimes, Source, usize)>(
     instr: &Instruction,
@@ -85,10 +85,12 @@ pub struct Lifetime {
 }
 
 impl Lifetime {
+    #[must_use]
     pub fn is_alive_after(self, idx: usize) -> bool {
         idx >= self.start && idx <= self.end
     }
 
+    #[must_use]
     pub fn is_empty(self) -> bool {
         self.start == self.end
     }
@@ -98,19 +100,17 @@ pub type Lifetimes = HashMap<Id, Lifetime>;
 
 fn update_lifetime(lifetimes: &mut Lifetimes, src: Source, idx: usize) {
     if let Some(id) = src.id() {
-        mem::replace(
-            &mut lifetimes
-                .entry(id)
-                .or_insert(Lifetime {
-                    start: idx,
-                    end: idx,
-                })
-                .end,
-            idx,
-        );
+        lifetimes
+            .entry(id)
+            .and_modify(|it| it.end = idx)
+            .or_insert(Lifetime {
+                start: idx,
+                end: idx,
+            });
     }
 }
 
+#[must_use]
 pub fn lifetimes(instrs: &[Instruction]) -> Lifetimes {
     let mut lifetimes = HashMap::with_capacity(instrs.len());
 
@@ -121,6 +121,7 @@ pub fn lifetimes(instrs: &[Instruction]) -> Lifetimes {
     lifetimes
 }
 
+#[must_use]
 pub fn surrounding_usages(instrs: &[Instruction], needle: usize) -> Lifetimes {
     let mut lifetimes = HashMap::new();
 
@@ -155,6 +156,7 @@ pub fn surrounding_usages(instrs: &[Instruction], needle: usize) -> Lifetimes {
 
 // todo: replace this with a Vec<...> `rather` than the hashmap,
 //  this is because StackIndexes should always be _used_ linearly.
+#[must_use]
 pub fn stack_lifetimes(graph: &[Instruction]) -> HashMap<StackIndex, Vec<(usize, usize)>> {
     let mut lifetimes = HashMap::new();
     for (idx, instr) in graph.iter().enumerate() {
@@ -173,7 +175,8 @@ pub fn stack_lifetimes(graph: &[Instruction]) -> HashMap<StackIndex, Vec<(usize,
     lifetimes
 }
 
-/// Get the highest used StackIndex for a given graph.
+/// Get the highest used `StackIndex` for a given graph.
+#[must_use]
 pub fn max_stack(graph: &[Instruction]) -> Option<StackIndex> {
     let mut max: Option<StackIndex> = None;
 
@@ -197,6 +200,7 @@ pub fn max_stack(graph: &[Instruction]) -> Option<StackIndex> {
     max
 }
 
+#[must_use]
 pub fn min_stack(
     lifetime: Lifetime,
     stack_lts: &HashMap<StackIndex, Vec<(usize, usize)>>,
@@ -210,9 +214,9 @@ pub fn min_stack(
             .then_some(*idx)
         })
         .min()
-        .unwrap_or(StackIndex(
-            u8::try_from(stack_lts.len()).expect("Ran out of stack indexes"),
-        ))
+        .unwrap_or_else(|| {
+            StackIndex(u8::try_from(stack_lts.len()).expect("Ran out of stack indexes"))
+        })
 }
 
 pub struct ShowLifetimes<'a, 'b> {
@@ -226,6 +230,15 @@ impl<'a, 'b> ShowLifetimes<'a, 'b> {
     }
 }
 
+fn show_lifetime(f: &mut fmt::Formatter, lifetime: &Lifetime, idx: usize) -> fmt::Result {
+    let width = (lifetime.end - lifetime.start) / 10 + 1;
+    if lifetime.is_alive_after(idx) {
+        write!(f, "{:1$}", lifetime.end - idx, width)
+    } else {
+        f.write_str(&"-".repeat(width))
+    }
+}
+
 impl fmt::Display for ShowLifetimes<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (idx, instr) in self.instrs.iter().enumerate() {
@@ -234,19 +247,6 @@ impl fmt::Display for ShowLifetimes<'_, '_> {
             let mut lifetimes = lifetimes.iter();
 
             write!(f, "[")?;
-
-            fn show_lifetime(
-                f: &mut fmt::Formatter,
-                lifetime: &Lifetime,
-                idx: usize,
-            ) -> fmt::Result {
-                let width = (lifetime.end - lifetime.start) / 10 + 1;
-                if lifetime.is_alive_after(idx) {
-                    write!(f, "{:1$}", lifetime.end - idx, width)
-                } else {
-                    f.write_str(&"-".repeat(width))
-                }
-            };
 
             if let Some(lifetime) = lifetimes.next() {
                 show_lifetime(f, lifetime, idx)?;

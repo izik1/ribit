@@ -20,7 +20,7 @@ fn const_prop(consts: &HashMap<Id, u32>, src: &mut Source) -> Option<u32> {
     }
 }
 
-// todo: `pub fn fold_identities(graph: &mut [Instruction])`
+// todo: `pub fn complex_const_prop(graph: &mut [Instruction])`
 
 pub fn fold_and_prop_consts(graph: &mut [Instruction]) {
     let mut consts = HashMap::new();
@@ -354,6 +354,61 @@ mod test {
         super::fold_and_prop_consts(&mut instrs);
         let instrs = super::dead_instruction_elimination(&instrs);
         let instrs = super::register_writeback_shrinking(&instrs);
+
+        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+    }
+
+    #[test]
+    fn max_opt_bf_bb_1() {
+        let mut ctx = lower::Context::new(0x1001c);
+        lower::non_terminal(
+            &mut ctx,
+            instruction::Instruction::S(instruction::S::new(
+                0,
+                Some(register::RiscV::X2),
+                Some(register::RiscV::X11),
+                Width::Byte,
+            )),
+            4,
+        );
+
+        lower::non_terminal(
+            &mut ctx,
+            instruction::Instruction::I(instruction::I::new(
+                0,
+                Some(register::RiscV::X12),
+                Some(register::RiscV::X2),
+                opcode::I::ADDI,
+            )),
+            4,
+        );
+
+        lower::non_terminal(
+            &mut ctx,
+            instruction::Instruction::U(instruction::U::new(
+                0,
+                Some(register::RiscV::X6),
+                opcode::U::AUIPC,
+            )),
+            4,
+        );
+
+        let (mut instrs, _) = lower::terminal(
+            ctx,
+            instruction::Instruction::IJump(instruction::IJump::new(
+                364,
+                Some(register::RiscV::X6),
+                Some(register::RiscV::X1),
+                opcode::IJump::JALR,
+            )),
+            4,
+        );
+
+        super::fold_and_prop_consts(&mut instrs);
+        let instrs = super::dead_instruction_elimination(&instrs);
+        let instrs = super::register_writeback_shrinking(&instrs);
+
+        // todo: C-constprop (add %n, 0) instructions
 
         assert_display_snapshot!(DisplayDeferSlice(&instrs));
     }

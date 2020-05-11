@@ -281,6 +281,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
             let src1 = ctx.load_register(rs1);
             let src2 = ctx.load_register(rs2);
 
+            #[allow(clippy::match_same_arms)]
             let res = match opcode {
                 opcode::R::ADD => ctx.add(src1, src2),
                 opcode::R::SUB => ctx.sub(src1, src2),
