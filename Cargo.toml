@@ -9,7 +9,7 @@ edition = "2018"
 
 [dependencies]
 static_assertions = "1.1.0"
-raw-cpuid = "7.0.3"
+raw-cpuid = "8.0.0"
 log = "0.4.8"
 rasen = { git = "https://github.com/izik1/rasen", rev = "1ad94d82305cf89f1f004a5e74a1334123306288" }
 memmap = "0.7.0"
