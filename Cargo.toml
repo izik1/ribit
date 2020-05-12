@@ -16,5 +16,5 @@ memmap = "0.7.0"
 env_logger = "0.7.1"
 
 [dev-dependencies]
-insta = { version = "0.16.0", features = ["ron"] }
+insta = { version = "0.16.0" }
 serde = "1.0.104"
