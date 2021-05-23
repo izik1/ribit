@@ -2,10 +2,6 @@ use crate::{ssa, ReturnCode};
 use rasen::params::Register;
 use std::collections::HashMap;
 
-// going to delete all of this once the ssa can handle it,
-// so don't worry about the dead code.
-#[allow(dead_code)]
-mod alloc;
 mod generator;
 
 pub mod context;
