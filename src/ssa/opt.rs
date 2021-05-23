@@ -2,11 +2,7 @@ use crate::ssa::{eval, Id, Instruction, Source};
 use std::collections::HashMap;
 
 fn const_id_lookup(consts: &HashMap<Id, u32>, src: Source) -> Option<u32> {
-    match src {
-        Source::Id(id) => Some(id),
-        Source::Val(_) => None,
-    }
-    .and_then(|it| consts.get(&it).copied())
+    src.id().and_then(|it| consts.get(&it).copied())
 }
 
 fn const_prop(consts: &HashMap<Id, u32>, src: &mut Source) -> Option<u32> {

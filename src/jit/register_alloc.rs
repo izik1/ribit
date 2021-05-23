@@ -98,7 +98,7 @@ impl RegisterAllocator {
         for reg in self
             .allocations
             .iter()
-            .filter_map(|(id, reg)| (lifetimes[id].end == idx).then_some(*reg))
+            .filter_map(|(id, reg)| (lifetimes[id].end == idx).then(|| *reg))
         {
             // ensure that there is indeed a register allocated there.
             assert_eq!(!self.currently_allocated & (1 << reg as u16), 0);

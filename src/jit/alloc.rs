@@ -169,9 +169,12 @@ impl RegisterManager {
         stream: &mut Assembler,
     ) {
         // todo: proper error handling?
-        self.free_registers
-            .remove_item(&native_reg)
-            .expect("Can't reserve a register that's in use!");
+        let idx = self
+            .free_registers
+            .iter()
+            .position(|it| it == &native_reg)
+            .expect("Can't reserve a register that's already in use!");
+        self.free_registers.remove(idx);
 
         // todo: current setup can't handle the same register being in multiple places at once.
         if self.find_native_register(rv_reg).is_some() {

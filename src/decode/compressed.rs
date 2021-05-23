@@ -131,7 +131,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
 
             let imm = sign_extend_32(imm, 12);
 
-            let link_reg = (funct3 == 0b101).then_some(RiscVRegister::X1);
+            let link_reg = (funct3 == 0b101).then(|| RiscVRegister::X1);
 
             Instruction::J(instruction::J::new(imm, link_reg, opcode::J::JAL))
         }

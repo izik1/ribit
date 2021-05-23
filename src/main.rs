@@ -4,7 +4,7 @@ use std::io::Read;
 fn main() {
     env_logger::init();
     let mut buf = vec![];
-    std::fs::File::open("/home/zg/git/rv32imc-test-programs/bf.bin")
+    std::fs::File::open("/home/cr/git/rv32imc-test-programs/bf.bin")
         .unwrap()
         .read_to_end(&mut buf)
         .unwrap();

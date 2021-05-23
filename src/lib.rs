@@ -1,4 +1,3 @@
-#![feature(vec_remove_item, bool_to_option)]
 #![allow(
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,

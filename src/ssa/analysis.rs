@@ -211,7 +211,7 @@ pub fn min_stack(
             (stack_lts
                 .iter()
                 .all(|stack_lt| stack_lt.1 < lifetime.start || stack_lt.0 > lifetime.end))
-            .then_some(*idx)
+            .then(|| *idx)
         })
         .min()
         .unwrap_or_else(|| {
