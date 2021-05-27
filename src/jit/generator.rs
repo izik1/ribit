@@ -211,7 +211,9 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 }
 
                 ssa::Instruction::Arg { .. } => continue, // todo: force something to be done with this?
-                ssa::Instruction::Fence => todo!(),
+
+                // fixme: don't ignore fences
+                ssa::Instruction::Fence => continue,
 
                 ssa::Instruction::ReadStack { dest, src } => {
                     let dest = *allocs.get(&dest).expect("dest not allocated!?");

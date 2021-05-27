@@ -111,7 +111,7 @@ impl I {
     }
 
     pub(crate) fn from_instruction(instruction: u32, opcode: opcode::I) -> Self {
-        let imm = ((instruction >> 20) & 0x0fff) as u16;
+        let imm = sign_extend((instruction >> 20) as u16 & 0x0fff, 12);
         let rs1 = decode_rs(instruction).0;
         let rd = decode_rd(instruction);
         Self {
@@ -221,7 +221,7 @@ impl S {
     pub(crate) fn from_instruction(instruction: u32, width: Width) -> Self {
         let (rs1, rs2) = decode_rs(instruction);
 
-        let imm = (((instruction >> 19) & 0b0000_1111_1110_0000)
+        let imm = (((instruction >> 20) & 0b0000_1111_1110_0000)
             | ((instruction >> 7) & 0b0000_0000_0001_1111)) as u16;
 
         let imm = sign_extend(imm, 12);

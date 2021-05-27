@@ -52,6 +52,11 @@ pub fn instruction(instruction: u32) -> Result<Instruction, DecodeError> {
             opcode::U::AUIPC,
         )),
 
+        (0b0011_0111, _, _) => Instruction::U(instruction::U::from_instruction(
+            instruction,
+            opcode::U::LUI,
+        )),
+
         (0b110_0111, 0b000, _) => Instruction::IJump(instruction::IJump::from_instruction(
             instruction,
             opcode::IJump::JALR,
@@ -214,9 +219,9 @@ pub fn instruction(instruction: u32) -> Result<Instruction, DecodeError> {
 
 fn decode_branch(instruction: u32) -> Result<instruction::B, DecodeError> {
     let imm = (((instruction >> 19) & 0b0001_0000_0000_0000)
+        | ((instruction >> 20) & 0b0000_0111_1110_0000)
         | ((instruction << 4) & 0b0000_1000_0000_0000)
-        | ((instruction >> 20) & 0b0000_0111_1100_0000)
-        | ((instruction >> 7) & 0b0000_0000_0011_1110)) as u16;
+        | ((instruction >> 7) & 0b0000_0000_0001_1110)) as u16;
     let imm = sign_extend(imm, 13);
 
     let (rs1, rs2) = decode_rs(instruction);

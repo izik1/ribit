@@ -109,9 +109,9 @@ impl<'a> fmt::Display for FmtInstruction<'a> {
                 let rs2 = WrapRegister(*rs2);
 
                 match width {
-                    Width::Byte => write!(f, "SB {}, {}({})", rs1, imm, rs2),
-                    Width::Word => write!(f, "SH {}, {}({})", rs1, imm, rs2),
-                    Width::DWord => write!(f, "SW {}, {}({})", rs1, imm, rs2),
+                    Width::Byte => write!(f, "SB {}, {}({})", rs2, rs1, imm),
+                    Width::Word => write!(f, "SH {}, {}({})", rs2, rs1, imm),
+                    Width::DWord => write!(f, "SW {}, {}({})", rs2, rs1, imm),
                 }
             }
             Instruction::B(instruction::B {

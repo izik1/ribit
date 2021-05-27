@@ -1,0 +1,9 @@
+---
+source: src/ssa/lower.rs
+expression: DisplayDeferSlice(&instrs)
+
+---
+%0 = args[0]
+%1 = args[1]
+x(%0)17 = 65848
+ret 0, 65864

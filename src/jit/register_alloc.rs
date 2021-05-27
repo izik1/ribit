@@ -224,6 +224,7 @@ mod test {
     use insta::assert_display_snapshot;
     use insta::assert_snapshot;
 
+
     #[test]
     fn alloc_max() {
         let (mut instrs, mut id_alloc) = crate::ssa::max_fn();

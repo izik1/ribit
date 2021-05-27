@@ -373,6 +373,9 @@ pub fn terminal(
         }) => {
             let imm = imm as i16 as u32;
 
+            // read the source before writing to the link register since they can be the same.
+            let src = rs1.map(|it| ctx.read_register(it));
+
             // load pc + len into rd (the link register)
             if let Some(rd) = rd {
                 let next_pc = ctx.add_pc(Source::Val(len));
@@ -381,9 +384,7 @@ pub fn terminal(
             }
 
             // adding 0 is the same as not adding, so don't bother with a match here.
-            if let Some(src) = rs1 {
-                let mut src = ctx.read_register(src);
-
+            if let Some(mut src) = src {
                 if imm != 0 {
                     src = ctx.add(src, Source::Val(imm));
                 }
@@ -440,6 +441,47 @@ mod test {
     use crate::{DisplayDeferSlice, Width};
 
     use insta::assert_display_snapshot;
+
+    #[test]
+    fn jalr_link_eq_src() {
+        let mut ctx = Context::new(0x1012c);
+
+        super::non_terminal(
+            &mut ctx,
+            instruction::Instruction::U(instruction::U::new(
+                0,
+                Some(register::RiscV::X17),
+                opcode::U::AUIPC,
+            )),
+            4,
+        );
+
+        super::non_terminal(
+            &mut ctx,
+            instruction::Instruction::I(instruction::I::new(
+                285,
+                Some(register::RiscV::X17),
+                Some(register::RiscV::X17),
+                opcode::I::ADDI,
+            )),
+            4,
+        );
+
+        let (instrs, _) = super::terminal(
+            ctx,
+            instruction::Instruction::IJump(instruction::IJump::new(
+                65279,
+                Some(register::RiscV::X17),
+                Some(register::RiscV::X17),
+                opcode::IJump::JALR,
+            )),
+            4,
+        );
+
+        // super::fold_and_prop_consts(&mut instrs);
+
+        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+    }
 
     #[test]
     fn jalr_bit() {

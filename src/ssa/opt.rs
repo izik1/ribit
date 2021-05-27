@@ -134,9 +134,8 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
             Instruction::Fence => live_instruction_count += 1,
 
             Instruction::ReadReg { src: _, dest, base } => {
-                mark_live(&mut live_ids, *base);
-
                 if live_ids[dest.0 as usize] {
+                    mark_live(&mut live_ids, *base);
                     live_instruction_count += 1;
                 }
             }
@@ -152,15 +151,19 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
             Instruction::ReadMem {
                 src,
                 base,
-                dest: _,
+                dest,
                 sign_extend: _,
                 width: _,
             } => {
+                // todo: revist this. Current EE *does* allow removing dead reads. Future ones may not.
                 // hack: I'm not sure when it's safe to remove unused memory reads,
                 // so assume we never can.
-                live_instruction_count += 1;
-                mark_live(&mut live_ids, *src);
-                mark_live(&mut live_ids, *base);
+
+                if live_ids[dest.0 as usize] {
+                    live_instruction_count += 1;
+                    mark_live(&mut live_ids, *src);
+                    mark_live(&mut live_ids, *base);
+                }
             }
 
             Instruction::WriteReg { src, dest: _, base } => {

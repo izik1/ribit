@@ -163,7 +163,7 @@ impl Runtime {
         Self {
             buffer: Some(
                 memmap::MmapOptions::new()
-                    .len(4096 * 16)
+                    .len(4096 * 32)
                     .map_anon()
                     .unwrap()
                     .make_exec()

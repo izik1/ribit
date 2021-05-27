@@ -22,6 +22,8 @@ fn decode_full_register(instruction: u16) -> Option<RiscVRegister> {
 
 #[allow(clippy::too_many_lines)]
 pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDecodeError> {
+    log::debug!("instruction: {:016b}", instruction);
+
     let opcode = (instruction & 0b11) as u8;
     let funct3 = ((instruction >> 13) & 0b111) as u8;
 
@@ -127,11 +129,11 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
                 | ((instruction >> 1) & 0b0000_0100_0000)
                 | ((instruction << 1) & 0b0000_1000_0000)
                 | ((instruction >> 2) & 0b0000_0000_1110)
-                | ((instruction << 2) & 0b0000_0010_0000)) as u32;
+                | ((instruction << 3) & 0b0000_0010_0000)) as u32;
 
             let imm = sign_extend_32(imm, 12);
 
-            let link_reg = (funct3 == 0b101).then(|| RiscVRegister::X1);
+            let link_reg = (funct3 == 0b001).then(|| RiscVRegister::X1);
 
             Instruction::J(instruction::J::new(imm, link_reg, opcode::J::JAL))
         }
@@ -212,11 +214,12 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
 
         (0b01, 0b110) | (0b01, 0b111) => {
             let rs1 = decode_register(instruction >> 7);
+
             // 000a_bbxx_xccd_de00 -> 0b000a_cceb_bdd0
             let imm = ((instruction >> 4) & 0b0001_0000_0000)
                 | ((instruction >> 7) & 0b0000_0001_1000)
                 | ((instruction << 1) & 0b0000_1100_0000)
-                | ((instruction >> 1) & 0b0000_0000_1100)
+                | ((instruction >> 2) & 0b0000_0000_0110)
                 | ((instruction << 3) & 0b0000_0010_0000);
 
             let imm = sign_extend(imm, 9);
