@@ -5,5 +5,5 @@ expression: DisplayDeferSlice(&instrs)
 ---
 %0 = args[0]
 %1 = args[1]
-x(%0)17 = 65848
-ret 0, 65864
+x(%0)17 = 00010138
+ret 00000000, 00010148

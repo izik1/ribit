@@ -186,12 +186,11 @@ pub struct DisplayDeferSlice<'a, T: std::fmt::Display>(&'a [T]);
 
 impl<'a, T: std::fmt::Display> std::fmt::Display for DisplayDeferSlice<'a, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if let Some(item) = self.0.first() {
-            write!(f, "{}", item)?;
-        }
-
-        for item in self.0.iter().skip(1) {
-            write!(f, "\n{}", item)?;
+        if let Some((first, rest)) = self.0.split_first() {
+            write!(f, "{}", first)?;
+            for item in rest {
+                write!(f, "\n{}", item)?;
+            }
         }
 
         Ok(())

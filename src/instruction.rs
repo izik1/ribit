@@ -183,7 +183,7 @@ impl IMem {
     }
 
     pub(crate) fn from_instruction(instruction: u32, opcode: opcode::IMem) -> Self {
-        let imm = ((instruction >> 20) & 0x0fff) as u16;
+        let imm = sign_extend(((instruction >> 20) & 0x0fff) as u16, 12);
         let rs1 = decode_rs(instruction).0;
         let rd = decode_rd(instruction);
         Self {

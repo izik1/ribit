@@ -23,7 +23,7 @@ pub fn binop(src1: u32, src2: u32, op: BinOp) -> u32 {
         BinOp::Or => src1 | src2,
         BinOp::Sll => src1 << (src2 & 0x1f),
         BinOp::Srl => src1 >> (src2 & 0x1f),
-        BinOp::Sra => ((src1 as i32) << (src2 & 0x1f)) as u32,
+        BinOp::Sra => ((src1 as i32) >> (src2 & 0x1f)) as u32,
         BinOp::Sub => src1.wrapping_sub(src2),
         BinOp::Xor => src1 ^ src2,
     }
@@ -50,4 +50,15 @@ pub fn partial_select(cond: u32, if_true: Option<u32>, if_false: Option<u32>) ->
 #[must_use]
 pub fn try_select(cond: Option<u32>, if_true: Option<u32>, if_false: Option<u32>) -> Option<u32> {
     cond.and_then(|cond| partial_select(cond, if_true, if_false))
+}
+
+#[cfg(test)]
+mod test {
+    use crate::ssa::BinOp;
+
+    #[test]
+    fn sra_1() {
+        let res = super::binop(0x80000 << 12, 0x8, BinOp::Sra);
+        assert_eq!(0xff800000, res);
+    }
 }

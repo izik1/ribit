@@ -8,10 +8,10 @@ use crate::register::RiscV as RiscVRegister;
 use super::{sign_extend, sign_extend_32};
 
 fn decode_register(instruction: u16) -> RiscVRegister {
-    // safety: rnum ors in 0b1_1000 which prevents it from ever being 0
+    // safety: rnum ors in 0b1000 which prevents it from ever being 0
     // safety: rnum ands out any bits that might cause it to be more than 31 (0b1_1111)
     unsafe {
-        let rnum = ((instruction | 0b1_1000) & 0b1_1111) as u8;
+        let rnum = ((instruction | 0b1000) & 0b1111) as u8;
         RiscVRegister::new_unchecked(rnum)
     }
 }
@@ -110,7 +110,6 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
 
             let r = decode_full_register(instruction >> 7);
 
-            // FIXME: need to sign extend imm
             if funct3 == 0b000 {
                 // addi/noop
                 Instruction::I(instruction::I::new(imm, r, r, opcode::I::ADDI))
@@ -150,11 +149,12 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
 
             match r {
                 Some(r) if r.get() == 2 => {
+                    // 0001_0000_0001_1100
                     // 000a_0000_0bcd_de00 -> 0000_00ad_dceb_0000
-                    let imm = ((imm >> 4) & 0b0001_0000_0000)
+                    let imm = ((imm >> 3) & 0b0010_0000_0000)
                         | ((imm >> 2) & 0b0000_0001_0000)
                         | ((imm << 1) & 0b0000_0100_0000)
-                        | ((imm << 4) & 0b0000_0001_1000)
+                        | ((imm << 4) & 0b0001_1000_0000)
                         | ((imm << 3) & 0b0000_0010_0000);
 
                     let imm = sign_extend(imm, 10);
@@ -200,7 +200,12 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
                     r,
                     opcode::I::SRAI,
                 )),
-                0b10 => Instruction::I(instruction::I::new(imm, r, r, opcode::I::ANDI)),
+                0b10 => Instruction::I(instruction::I::new(
+                    sign_extend(imm, 6),
+                    r,
+                    r,
+                    opcode::I::ANDI,
+                )),
                 0b11 if imm5 == 0 => match (instruction >> 5) & 0b11 {
                     0b00 => Instruction::R(instruction::R::new(r, rs2, r, opcode::R::SUB)),
                     0b01 => Instruction::R(instruction::R::new(r, rs2, r, opcode::R::XOR)),
@@ -272,7 +277,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
 
             Instruction::IMem(instruction::IMem::new(
                 imm,
-                Some(r),
+                Some(RiscVRegister::X2),
                 Some(r),
                 opcode::IMem::LD(Width::DWord),
             ))

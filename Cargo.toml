@@ -11,9 +11,10 @@ edition = "2018"
 static_assertions = "1.1.0"
 raw-cpuid = "9.0.0"
 log = "0.4.8"
-rasen = { git = "https://github.com/izik1/rasen", rev = "1ad94d82305cf89f1f004a5e74a1334123306288" }
+rasen = { git = "https://github.com/izik1/rasen", rev = "f043eaf960703c671b9523b15a727cab8033d783" }
 memmap = "0.7.0"
 env_logger = "0.8.3"
+goblin = "0.4.0"
 
 [dev-dependencies]
 insta = { version = "1.7.0" }

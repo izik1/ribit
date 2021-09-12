@@ -1,9 +1,10 @@
 ---
 source: src/ssa/lower.rs
 expression: DisplayDeferSlice(&instrs)
+
 ---
 %0 = args[0]
 %1 = args[1]
 %2 = x(%0)1
-%3 = add %2, 50
-ret 1, 8
+%3 = add %2, 00000032
+ret 00000001, 00000008

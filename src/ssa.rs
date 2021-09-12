@@ -121,7 +121,7 @@ impl Source {
 impl fmt::Display for Source {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Val(v) => v.fmt(f),
+            Self::Val(v) => write!(f, "{:08x}", v),
             Self::Id(id) => id.fmt(f),
         }
     }
@@ -280,7 +280,7 @@ impl fmt::Display for Instruction {
 
             Self::WriteStack { dest, src } => write!(f, "{} = {}", dest, src),
 
-            Self::LoadConst { dest, src } => write!(f, "{} = {}", dest, src),
+            Self::LoadConst { dest, src } => write!(f, "{} = {:08x}", dest, src),
             Self::Arg { dest, src } => write!(f, "{} = args[{}]", dest, *src as u8),
             Self::BinOp {
                 dest,

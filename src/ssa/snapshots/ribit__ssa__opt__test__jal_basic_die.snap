@@ -1,7 +1,8 @@
 ---
 source: src/ssa/opt.rs
 expression: DisplayDeferSlice(&instrs)
+
 ---
 %0 = args[0]
-x(%0)4 = 4
-ret 0, 4096
+x(%0)4 = 00000004
+ret 00000000, 00001000

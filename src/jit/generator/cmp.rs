@@ -87,9 +87,12 @@ fn bool_cmp(
                 false => (false_value, true_value),
             };
 
+            let inversable = matches!(mode, CmpKind::Eq | CmpKind::Ne);
+
             match zero(false_value, true_value, mode) {
                 Some(const_value) => CmpValue::Const(const_value),
-                None => CmpValue::Test(src),
+                
+                None => CmpValue::Test(src, src2.is_reg() && !inversable),
             }
         }
 
@@ -121,7 +124,14 @@ pub fn zero<T>(false_val: T, true_val: T, cmp_mode: CmpKind) -> Option<T> {
 #[derive(Copy, Clone)]
 enum CmpValue {
     Const(u32),
-    Test(Register),
+    /// A register to `test` with itself, and if the result should be flipped.
+    // Equivielent to `and register, 0`.
+    /// Which means flip is equivilent to `and 0, register`- an invalid instruction,
+    /// so the arguments get flipped. When the arguments *aren't* eq/ne,
+    /// this means that the comparision gets flipped as well,
+    /// so we need to invert the test at the end.
+    /// However, eq/ne *don't* flip in that situation.
+    Test(Register, bool),
     CmpReg(Register, Register),
     /// A register to compare, an immediate to compare it to, and whether or not the result
     /// of this comparision should be flipped.
@@ -158,7 +168,7 @@ pub fn set_bool_conditional(
     let cmp = bool_cmp(src1, src2, 0, 1, mode);
     let xor = match cmp {
         CmpValue::Const(_) => false,
-        CmpValue::Test(r) => r != dest,
+        CmpValue::Test(r, _) => r != dest,
         CmpValue::CmpImm(r, _, _) => r != dest,
         CmpValue::CmpReg(r1, r2) => r1 != dest && r2 != dest,
     };
@@ -173,9 +183,9 @@ pub fn set_bool_conditional(
             return Ok(());
         }
 
-        CmpValue::Test(r) => {
+        CmpValue::Test(r, flip) => {
             builder.stream.test_reg_reg(Reg32(r), Reg32(r))?;
-            false
+            flip
         }
 
         CmpValue::CmpImm(src, val, flip) => {

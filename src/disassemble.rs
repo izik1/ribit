@@ -74,7 +74,7 @@ impl<'a> fmt::Display for FmtInstruction<'a> {
             }) => {
                 let rs1 = WrapRegister(*rs1);
                 let rd = WrapRegister(*rd);
-                write!(f, "{} {}, {}, {}", opcode, rd, rs1, imm)
+                write!(f, "{} {}, {}, {:04x}", opcode, rd, rs1, imm)
             }
 
             Instruction::IJump(instruction::IJump {
@@ -85,7 +85,7 @@ impl<'a> fmt::Display for FmtInstruction<'a> {
             }) => {
                 let rs1 = WrapRegister(*rs1);
                 let rd = WrapRegister(*rd);
-                write!(f, "{} {}, {}({})", opcode, rd, imm, rs1)
+                write!(f, "{} {}, {:04x}({})", opcode, rd, imm, rs1)
             }
 
             Instruction::IMem(instruction::IMem {
@@ -96,7 +96,7 @@ impl<'a> fmt::Display for FmtInstruction<'a> {
             }) => {
                 let rs1 = WrapRegister(*rs1);
                 let rd = WrapRegister(*rd);
-                write!(f, "{} {}, {}({})", opcode, rd, imm, rs1)
+                write!(f, "{} {}, {:04x}({})", opcode, rd, imm, rs1)
             }
 
             Instruction::S(instruction::S {
@@ -109,9 +109,9 @@ impl<'a> fmt::Display for FmtInstruction<'a> {
                 let rs2 = WrapRegister(*rs2);
 
                 match width {
-                    Width::Byte => write!(f, "SB {}, {}({})", rs2, rs1, imm),
-                    Width::Word => write!(f, "SH {}, {}({})", rs2, rs1, imm),
-                    Width::DWord => write!(f, "SW {}, {}({})", rs2, rs1, imm),
+                    Width::Byte => write!(f, "SB {}, {}({:04x})", rs2, rs1, imm),
+                    Width::Word => write!(f, "SH {}, {}({:04x})", rs2, rs1, imm),
+                    Width::DWord => write!(f, "SW {}, {}({:04x})", rs2, rs1, imm),
                 }
             }
             Instruction::B(instruction::B {
@@ -124,23 +124,23 @@ impl<'a> fmt::Display for FmtInstruction<'a> {
                 let rs2 = WrapRegister(*rs2);
 
                 match *cmp_mode {
-                    Cmp::Eq => write!(f, "BEQ {}, {}({})", rs1, imm, rs2),
-                    Cmp::Ne => write!(f, "BNE {}, {}({})", rs1, imm, rs2),
-                    Cmp::Lt => write!(f, "BLT {}, {}({})", rs1, imm, rs2),
-                    Cmp::Ltu => write!(f, "BLTU {}, {}({})", rs1, imm, rs2),
-                    Cmp::Ge => write!(f, "BGE {}, {}({})", rs1, imm, rs2),
-                    Cmp::Geu => write!(f, "BGEU {}, {}({})", rs1, imm, rs2),
+                    Cmp::Eq => write!(f, "BEQ {}, {:04x}({})", rs1, imm, rs2),
+                    Cmp::Ne => write!(f, "BNE {}, {:04x}({})", rs1, imm, rs2),
+                    Cmp::Lt => write!(f, "BLT {}, {:04x}({})", rs1, imm, rs2),
+                    Cmp::Ltu => write!(f, "BLTU {}, {:04x}({})", rs1, imm, rs2),
+                    Cmp::Ge => write!(f, "BGE {}, {:04x}({})", rs1, imm, rs2),
+                    Cmp::Geu => write!(f, "BGEU {}, {:04x}({})", rs1, imm, rs2),
                 }
             }
 
             Instruction::U(instruction::U { imm, rd, opcode }) => {
                 let rd = WrapRegister(*rd);
-                write!(f, "{} {}, {}", opcode, rd, imm)
+                write!(f, "{} {}, {:05x}", opcode, rd, imm >> 12)
             }
 
             Instruction::J(instruction::J { imm, rd, opcode }) => {
                 let rd = WrapRegister(*rd);
-                write!(f, "{} {}, {}", opcode, rd, imm)
+                write!(f, "{} {}, {:08x}", opcode, rd, imm)
             }
 
             Instruction::Sys(instruction::Sys { opcode }) => opcode.fmt(f),
