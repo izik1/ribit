@@ -1,6 +1,6 @@
 use super::legalise;
 use crate::ssa;
-use crate::ssa::analysis::{Lifetime, Lifetimes};
+use crate::ssa::analysis::Lifetimes;
 use crate::ssa::{analysis, Arg, Id, IdAllocator, Instruction};
 use rasen::params::Register;
 use std::collections::HashMap;
@@ -57,6 +57,7 @@ fn arg_register(arg: Arg) -> Register {
 struct RegisterAllocator {
     currently_allocated: u16,
     currently_clobbered: u16,
+    current_ids: Vec<Id>,
     allocations: HashMap<Id, Register>,
     clobbers: HashMap<usize, Vec<Register>>,
 }
@@ -68,6 +69,7 @@ impl RegisterAllocator {
             currently_clobbered: 0,
             allocations: HashMap::new(),
             clobbers: HashMap::new(),
+            current_ids: Vec::new(),
         }
     }
 
@@ -82,6 +84,7 @@ impl RegisterAllocator {
     fn allocate(&mut self, id: Id, reg: Register) -> Result<(), RegisterSpill> {
         self.currently_allocated |= 1 << (reg as u16);
         self.allocations.insert(id, reg);
+        self.current_ids.push(id);
         Ok(())
     }
 
@@ -93,16 +96,20 @@ impl RegisterAllocator {
             .push(reg);
     }
 
-    // todo: this doesn't handle instructions with a lifetime of 1 (dies the same instruction it's created)
     fn deallocate_unused(&mut self, lifetimes: &Lifetimes, idx: usize) {
-        for reg in self
-            .allocations
-            .iter()
-            .filter_map(|(id, reg)| (lifetimes[id].end == idx).then(|| *reg))
-        {
-            // ensure that there is indeed a register allocated there.
-            assert_eq!(!self.currently_allocated & (1 << reg as u16), 0);
-            self.currently_allocated &= !(1 << reg as u16)
+        let mut removed = Vec::new();
+        for (offset, id) in self.current_ids.iter().copied().enumerate() {
+            if lifetimes[&id].end <= idx {
+                let reg = self.allocations[&id];
+
+                // ensure that there is indeed a register allocated there.
+                assert_eq!(!self.currently_allocated & (1 << reg as u16), 0);
+                self.currently_allocated &= !(1 << reg as u16);
+                removed.push(offset);
+            }
+        }
+        for idx in removed.into_iter().rev() {
+            self.current_ids.swap_remove(idx);
         }
     }
 
@@ -152,11 +159,6 @@ pub fn allocate_registers(
     // todo: find an efficient way of pre-checking lifetimes to avoid unneeded work on spills.
     let lifetimes = analysis::lifetimes(&graph);
 
-    // avoid any ids where it dies right when it's created.
-    // this prevents allocating instructions where a register would be leaked.
-    // todo: handle the actual problem rather than this bandaid.
-    assert!(!lifetimes.values().copied().any(Lifetime::is_empty));
-
     for (idx, instr) in graph[start..].iter().enumerate() {
         let idx = idx + start;
 
@@ -195,7 +197,7 @@ pub fn spill(graph: &mut Vec<Instruction>, id_allocator: &mut IdAllocator, spill
         .expect("Impossible to solve spill");
 
     // todo: try to do more optimal spills
-    //  for instance, if it's a register read (before a new value gets written back),
+    //  for instance, if it's a register read (of the latest value),
     // we should avoid stack ops and instead just re-read it
 
     let end_id = id_allocator.allocate();
@@ -223,7 +225,6 @@ mod test {
     use crate::ssa::{analysis, opt};
     use insta::assert_display_snapshot;
     use insta::assert_snapshot;
-
 
     #[test]
     fn alloc_max() {
