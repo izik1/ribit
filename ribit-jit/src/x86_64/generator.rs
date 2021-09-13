@@ -11,8 +11,7 @@ use ribit_core::{ReturnCode, Width};
 use ribit_ssa as ssa;
 use ribit_ssa::StackIndex;
 
-use super::CheckRanges;
-use crate::Assembler;
+use crate::x86_64::Assembler;
 
 mod cmp;
 mod math;
@@ -20,11 +19,10 @@ mod memory;
 
 pub struct BlockBuilder<'a, 'b: 'a> {
     stream: Assembler<'a, 'b>,
-    _check_ranges: CheckRanges,
 }
 
 impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
-    pub(super) fn start(stream: Assembler<'a, 'b>, check_ranges: CheckRanges) -> Self {
+    pub(super) fn start(stream: Assembler<'a, 'b>) -> Self {
         if !raw_cpuid::CpuId::new()
             .get_extended_feature_info()
             .map_or(false, |feats| feats.has_bmi2())
@@ -32,7 +30,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
             panic!("Make the crate author support code gen on x86 without bmi2");
         }
 
-        Self { stream, _check_ranges: check_ranges }
+        Self { stream }
     }
 
     fn mov_reg_src(&mut self, dest: Register, src: crate::Source) -> io::Result<()> {
@@ -221,7 +219,9 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 match (code, addr) {
                     (Source::Val(code), Source::Val(addr)) => {
                         let code = ReturnCode::new(code).expect("code must be a valid ReturnCode");
-                        self.mov_zax_imm64(crate::BlockReturn::from_parts(addr, code).as_u64())?;
+                        self.mov_zax_imm64(
+                            crate::x86_64::BlockReturn::from_parts(addr, code).as_u64(),
+                        )?;
                     }
 
                     (Source::Register(code @ Register::Zax), Source::Val(0)) => {

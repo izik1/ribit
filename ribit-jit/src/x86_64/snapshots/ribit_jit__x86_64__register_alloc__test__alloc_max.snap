@@ -1,5 +1,5 @@
 ---
-source: ribit-jit/src/register_alloc.rs
+source: ribit-jit/src/x86_64/register_alloc.rs
 expression: lifetimes
 
 ---

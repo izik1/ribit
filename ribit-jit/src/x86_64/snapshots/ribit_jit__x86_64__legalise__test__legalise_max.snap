@@ -1,5 +1,5 @@
 ---
-source: ribit-jit/src/legalise.rs
+source: ribit-jit/src/x86_64/legalise.rs
 expression: lifetimes
 
 ---

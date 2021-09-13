@@ -68,7 +68,7 @@ pub struct ExecutionEngine {
     xregs: [u32; ribit_jit::XLEN],
     pc: u32,
     memory: Box<[u8]>,
-    jit: ribit_jit::context::Runtime,
+    jit: ribit_jit::AMD64Runtime,
     test_ctx: Option<TestAddrs>,
 }
 
@@ -86,7 +86,7 @@ impl ExecutionEngine {
 
         let xregs = [0; ribit_jit::XLEN];
         let pc = 0x10000;
-        let jit = ribit_jit::context::Runtime::new();
+        let jit = ribit_jit::AMD64Runtime::new();
 
         Self { xregs, pc, memory, jit, test_ctx: None }
     }
@@ -113,7 +113,7 @@ impl ExecutionEngine {
 
         let xregs = [0; ribit_jit::XLEN];
         let pc = 0x10000;
-        let jit = ribit_jit::context::Runtime::new();
+        let jit = ribit_jit::AMD64Runtime::new();
 
         Self { xregs, pc, memory, jit, test_ctx: TestAddrs::from_syms(&elf.syms, &elf.strtab) }
     }

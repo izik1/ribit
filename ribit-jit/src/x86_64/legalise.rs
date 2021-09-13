@@ -104,8 +104,8 @@ mod test {
     use insta::assert_snapshot;
     use ribit_ssa::{analysis, opt};
 
-    use crate::register_alloc;
     use crate::test::max_fn;
+    use crate::x86_64::register_alloc;
 
     #[test]
     fn legalise_max() {
