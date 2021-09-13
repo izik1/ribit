@@ -400,9 +400,8 @@ mod test {
     use insta::assert_display_snapshot;
     use ribit_core::{instruction, opcode, register, DisplayDeferSlice, Width};
 
-    use crate::test::MEM_SIZE;
-
     use super::Context;
+    use crate::test::MEM_SIZE;
 
     #[test]
     fn jalr_link_eq_src() {

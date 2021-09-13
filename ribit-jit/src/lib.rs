@@ -5,12 +5,11 @@ mod rt;
 mod sbi;
 pub mod x86_64;
 
-pub use rt::{Block, Runtime, Target};
-
 use std::collections::HashMap;
 
 use rasen::params::Register;
 use ribit_ssa as ssa;
+pub use rt::{Block, Runtime, Target};
 
 /// Runtime for X86-64 hosts.
 pub type AMD64Runtime = rt::Runtime<x86_64::rt::X86_64>;

@@ -233,7 +233,7 @@ mod test {
     use ribit_core::{instruction, opcode, register, DisplayDeferSlice, Width};
 
     use crate::lower;
-    use crate::test::{MEM_SIZE, max_fn};
+    use crate::test::{max_fn, MEM_SIZE};
 
     #[test]
     fn jal_basic_const_prop() {

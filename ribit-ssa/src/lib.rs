@@ -48,11 +48,7 @@ impl fmt::Display for StackIndex {
 impl StackIndex {
     #[must_use]
     pub fn offset(self, redzone: bool) -> i32 {
-        if redzone {
-            (self.0 as i32 + 1) * -4
-        } else {
-            self.0 as i32 * 4
-        }
+        if redzone { (self.0 as i32 + 1) * -4 } else { self.0 as i32 * 4 }
     }
 }
 
@@ -303,9 +299,9 @@ pub fn update_references(graph: &mut [Instruction], old: Id, new: Id) {
 
 #[cfg(test)]
 mod test {
-    use crate::{lower, Id, Instruction, Source};
-    use crate::{Arg, IdAllocator};
     use ribit_core::{opcode, register};
+
+    use crate::{lower, Arg, Id, IdAllocator, Instruction, Source};
 
     pub const MEM_SIZE: u32 = 0x1000000;
 

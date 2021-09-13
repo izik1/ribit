@@ -32,10 +32,10 @@ impl BlockReturn {
 
 #[cfg(test)]
 mod test {
-    use crate::AMD64Runtime;
-
     use ribit_core::instruction::Instruction;
     use ribit_core::{instruction, opcode, register};
+
+    use crate::AMD64Runtime;
 
     fn init() -> ([u32; 32], Vec<u8>) {
         let mut regs = [0xaaaaaaaa; 32];

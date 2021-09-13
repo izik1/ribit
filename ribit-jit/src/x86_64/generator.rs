@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::io;
 
-use crate::Source;
 use rasen::params::imm::{Imm16, Imm32, Imm8};
 use rasen::params::mem::Mem32;
 use rasen::params::reg::{Reg16, Reg32, Reg64, Reg8};
@@ -12,6 +11,7 @@ use ribit_ssa as ssa;
 use ribit_ssa::StackIndex;
 
 use crate::x86_64::Assembler;
+use crate::Source;
 
 mod cmp;
 mod math;
