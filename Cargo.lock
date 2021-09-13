@@ -24,9 +24,9 @@ dependencies = [
 
 [[package]]
 name = "bitflags"
-version = "1.2.1"
+version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
+checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "cfg-if"
@@ -193,9 +193,9 @@ source = "git+https://github.com/izik1/rasen?rev=f043eaf960703c671b9523b15a727ca
 
 [[package]]
 name = "raw-cpuid"
-version = "9.0.0"
+version = "9.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c27cb5785b85bd05d4eb171556c9a1a514552e26123aeae6bb7d811353148026"
+checksum = "1733f6f80c9c24268736a501cd00d41a9849b4faa7a9f9334c096e5d10553206"
 dependencies = [
  "bitflags",
 ]
@@ -225,11 +225,44 @@ dependencies = [
  "goblin",
  "insta",
  "log",
+ "ribit-core",
+ "ribit-jit",
+ "ribit-ssa",
+ "serde",
+]
+
+[[package]]
+name = "ribit-core"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "log",
+ "serde",
+]
+
+[[package]]
+name = "ribit-jit"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "log",
  "memmap",
  "rasen",
  "raw-cpuid",
+ "ribit-core",
+ "ribit-ssa",
  "serde",
  "static_assertions",
+]
+
+[[package]]
+name = "ribit-ssa"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "log",
+ "ribit-core",
+ "serde",
 ]
 
 [[package]]

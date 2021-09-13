@@ -1,0 +1,9 @@
+---
+source: ribit-ssa/src/opt.rs
+expression: DisplayDeferSlice(&instrs)
+
+---
+%0 = args[0]
+%1 = args[1]
+x(%0)4 = 00000004
+ret 00000000, 00001000

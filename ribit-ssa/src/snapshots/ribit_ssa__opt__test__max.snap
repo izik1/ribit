@@ -1,0 +1,18 @@
+---
+source: ribit-ssa/src/opt.rs
+expression: DisplayDeferSlice(&instrs)
+
+---
+%0 = args[0]
+%2 = x(%0)10
+%3 = x(%0)11
+%4 = add %2, %3
+%5 = srl %4, 0000001f
+x(%0)12 = %5
+%6 = and %4, %5
+x(%0)11 = %6
+%7 = add %2, %6
+x(%0)10 = %7
+%8 = x(%0)1
+%9 = and %8, fffffffe
+ret 00000000, %9
