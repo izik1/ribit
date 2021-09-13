@@ -1,3 +1,9 @@
+// unsafe code is only *denied* instead of forbidden.
+// This is due to some of the core types requiring unsafe code.
+// When unsafe code is used, it *must* be documented with a `safety`
+//   comment explaining how it follows the safety contract
+#![deny(unsafe_code)]
+
 use std::fmt;
 
 pub mod decode;

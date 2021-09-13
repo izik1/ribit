@@ -37,7 +37,6 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
         match src {
             // Don't need to move because src and dest are the same.
             crate::Source::Register(src) if src == dest => Ok(()),
-
             crate::Source::Register(src) => self.stream.mov_reg_reg(Reg32(dest), Reg32(src)),
             crate::Source::Val(val) => self.mov_r32_imm32(dest, val),
         }
@@ -219,9 +218,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 match (code, addr) {
                     (Source::Val(code), Source::Val(addr)) => {
                         let code = ReturnCode::new(code).expect("code must be a valid ReturnCode");
-                        self.mov_zax_imm64(
-                            crate::x86_64::BlockReturn::from_parts(addr, code).as_u64(),
-                        )?;
+                        self.mov_zax_imm64(super::BlockReturn::from_parts(addr, code).as_u64())?;
                     }
 
                     (Source::Register(code @ Register::Zax), Source::Val(0)) => {

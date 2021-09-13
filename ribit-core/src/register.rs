@@ -6,6 +6,7 @@ pub struct RiscV(NonZeroU8);
 
 // all of these functions are super trivial and should *always* be inlined.
 #[allow(clippy::inline_always)]
+#[allow(unsafe_code)]
 impl RiscV {
     #[inline(always)]
     #[must_use]

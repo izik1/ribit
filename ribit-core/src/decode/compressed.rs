@@ -6,6 +6,7 @@ use crate::{opcode, CompressedDecodeError, Extension, Width};
 fn decode_register(instruction: u16) -> RiscVRegister {
     // safety: rnum ors in 0b1000 which prevents it from ever being 0
     // safety: rnum ands out any bits that might cause it to be more than 31 (0b1_1111)
+    #[allow(unsafe_code)]
     unsafe {
         let rnum = ((instruction | 0b1000) & 0b1111) as u8;
         RiscVRegister::new_unchecked(rnum)
