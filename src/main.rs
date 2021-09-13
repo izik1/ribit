@@ -3,7 +3,7 @@ use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
 
-use ribit_core::{CompressedDecodeError, DecodeError};
+use ribit_decode::{CompressedDecodeError, DecodeError};
 
 fn main() {
     env_logger::init();

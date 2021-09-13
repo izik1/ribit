@@ -1,5 +1,5 @@
 [package]
-name = "ribit-ssa"
+name = "ribit-decode"
 version = "0.1.0"
 edition = "2018"
 
@@ -14,6 +14,3 @@ path = "../ribit-core"
 [dev-dependencies]
 insta = { version = "1.7.0" }
 serde = "1.0.104"
-
-[dev-dependencies.ribit-decode]
-path = "../ribit-decode"

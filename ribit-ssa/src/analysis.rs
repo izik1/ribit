@@ -420,7 +420,7 @@ mod test {
                 BinaryInstruction::Big(it) => {
                     crate::lower::non_terminal(
                         &mut ctx,
-                        ribit_core::decode::instruction(*it).unwrap(),
+                        ribit_decode::instruction(*it).unwrap(),
                         4,
                     );
                 }
@@ -428,7 +428,7 @@ mod test {
                 BinaryInstruction::Small(it) => {
                     crate::lower::non_terminal(
                         &mut ctx,
-                        ribit_core::decode::compressed::decode_instruction(*it).unwrap(),
+                        ribit_decode::compressed::decode_instruction(*it).unwrap(),
                         2,
                     );
                 }
@@ -437,12 +437,12 @@ mod test {
 
         let (mut instrs, _) = match last {
             BinaryInstruction::Big(it) => {
-                crate::lower::terminal(ctx, ribit_core::decode::instruction(*it).unwrap(), 4)
+                crate::lower::terminal(ctx, ribit_decode::instruction(*it).unwrap(), 4)
             }
 
             BinaryInstruction::Small(it) => crate::lower::terminal(
                 ctx,
-                ribit_core::decode::compressed::decode_instruction(*it).unwrap(),
+                ribit_decode::compressed::decode_instruction(*it).unwrap(),
                 2,
             ),
         };

@@ -23,6 +23,9 @@ path = "ribit-ssa"
 [dependencies.ribit-jit]
 path = "ribit-jit"
 
+[dependencies.ribit-decode]
+path = "ribit-decode"
+
 [dev-dependencies]
 insta = { version = "1.7.0" }
 serde = "1.0.104"

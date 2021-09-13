@@ -121,9 +121,9 @@ impl ExecutionEngine {
 
     fn parse_compressed(
         &mut self,
-    ) -> Result<ribit_core::instruction::Info, ribit_core::DecodeError> {
+    ) -> Result<ribit_core::instruction::Info, ribit_decode::DecodeError> {
         if self.pc as usize + 1 >= self.memory.len() {
-            return Err(ribit_core::DecodeError::Other);
+            return Err(ribit_decode::DecodeError::Other);
         }
 
         let instr = u16::from_le_bytes(
@@ -132,7 +132,7 @@ impl ExecutionEngine {
                 .expect("bad slice size expected 2???"),
         );
 
-        let instr = ribit_core::decode::compressed::decode_instruction(instr)?;
+        let instr = ribit_decode::compressed::decode_instruction(instr)?;
         let info = ribit_core::instruction::Info::new(instr, 2);
         self.pc += 2;
         Ok(info)
@@ -140,9 +140,9 @@ impl ExecutionEngine {
 
     fn parse_instruction(
         &mut self,
-    ) -> Result<ribit_core::instruction::Info, ribit_core::DecodeError> {
+    ) -> Result<ribit_core::instruction::Info, ribit_decode::DecodeError> {
         if self.pc as usize + 3 >= self.memory.len() {
-            return Err(ribit_core::DecodeError::Other);
+            return Err(ribit_decode::DecodeError::Other);
         }
 
         let instr = u32::from_le_bytes(
@@ -154,7 +154,7 @@ impl ExecutionEngine {
         // log::debug!("instruction bytes: {:08x}", instr.to_le());
 
         if instr & 0b11 == 0b11 {
-            let instr = ribit_core::decode::instruction(instr)?;
+            let instr = ribit_decode::instruction(instr)?;
             let info = ribit_core::instruction::Info::new(instr, 4);
             self.pc += 4;
             Ok(info)
@@ -163,7 +163,7 @@ impl ExecutionEngine {
         }
     }
 
-    fn create_block(&mut self) -> Result<(), ribit_core::DecodeError> {
+    fn create_block(&mut self) -> Result<(), ribit_decode::DecodeError> {
         let pc = self.pc;
         let mut block_instrs = Vec::new();
 
@@ -191,7 +191,7 @@ impl ExecutionEngine {
         Ok(())
     }
 
-    pub fn run(&mut self) -> Result<(), ribit_core::DecodeError> {
+    pub fn run(&mut self) -> Result<(), ribit_decode::DecodeError> {
         if !self.jit.lookup_block(self.pc) {
             self.create_block()?;
         }

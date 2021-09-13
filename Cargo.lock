@@ -226,6 +226,7 @@ dependencies = [
  "insta",
  "log",
  "ribit-core",
+ "ribit-decode",
  "ribit-jit",
  "ribit-ssa",
  "serde",
@@ -237,6 +238,16 @@ version = "0.1.0"
 dependencies = [
  "insta",
  "log",
+ "serde",
+]
+
+[[package]]
+name = "ribit-decode"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "log",
+ "ribit-core",
  "serde",
 ]
 
@@ -262,6 +273,7 @@ dependencies = [
  "insta",
  "log",
  "ribit-core",
+ "ribit-decode",
  "serde",
 ]
 
