@@ -1,11 +1,14 @@
 use std::ops::Range;
 
 use ribit_core::{instruction, ReturnCode};
+use ribit_ssa::opt;
+use ribit_ssa::opt::pass_manager::ReplacePass;
 
 pub struct Runtime<Rt: Target> {
     buffer: Rt::Buffer,
     blocks: Vec<Rt::Block>,
     ranges: Vec<Range<u32>>,
+    opt_pass_manager: opt::PassManager,
 }
 
 /// # Safety:
@@ -54,7 +57,12 @@ impl<Rt: Target> Runtime<Rt> {
 
     #[must_use]
     pub fn new() -> Self {
-        Self { buffer: Rt::Buffer::default(), blocks: vec![], ranges: vec![] }
+        Self {
+            buffer: Rt::Buffer::default(),
+            blocks: vec![],
+            ranges: vec![],
+            opt_pass_manager: opt::PassManager::optimized(),
+        }
     }
 
     #[must_use]
@@ -75,12 +83,10 @@ impl<Rt: Target> Runtime<Rt> {
             ribit_ssa::lower::non_terminal(&mut lower_context, instr.instruction, instr.len);
         }
 
-        let (mut instrs, id_alloc) =
+        let (instrs, id_alloc) =
             ribit_ssa::lower::terminal(lower_context, branch.instruction, branch.len);
 
-        ribit_ssa::opt::fold_and_prop_consts(&mut instrs);
-        let instrs = ribit_ssa::opt::dead_instruction_elimination(&instrs);
-        let instrs = ribit_ssa::opt::register_writeback_shrinking(&instrs);
+        let instrs = self.opt_pass_manager.run(&instrs);
 
         let block = Rt::generate_block(&mut self.buffer, instrs, id_alloc);
 

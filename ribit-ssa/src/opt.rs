@@ -2,6 +2,10 @@ use std::collections::HashMap;
 
 use crate::{eval, Id, Instruction, Source};
 
+pub mod pass_manager;
+
+pub use pass_manager::PassManager;
+
 fn const_id_lookup(consts: &HashMap<Id, u32>, src: Source) -> Option<u32> {
     src.id().and_then(|it| consts.get(&it).copied())
 }
