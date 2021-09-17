@@ -103,7 +103,7 @@ impl crate::rt::Block for Block {
 }
 
 pub struct Buffer {
-    raw: Option<memmap::Mmap>,
+    raw: Option<memmap2::Mmap>,
     write_offset: u64,
 }
 
@@ -111,7 +111,7 @@ impl Default for Buffer {
     fn default() -> Self {
         Self {
             raw: Some(
-                memmap::MmapOptions::new().len(4096 * 32).map_anon().unwrap().make_exec().unwrap(),
+                memmap2::MmapOptions::new().len(4096 * 32).map_anon().unwrap().make_exec().unwrap(),
             ),
             write_offset: 0,
         }
