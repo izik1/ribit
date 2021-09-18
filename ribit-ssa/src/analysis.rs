@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 
-use crate::{Id, Instruction, Source, StackIndex};
+use crate::{Block, Id, Instruction, Source, StackIndex, Terminator};
 
 fn lifetime_instruction<F: FnMut(&mut Lifetimes, Source, usize)>(
     instr: &Instruction,
@@ -57,8 +57,17 @@ fn lifetime_instruction<F: FnMut(&mut Lifetimes, Source, usize)>(
             update(lifetimes, *if_true, idx);
             update(lifetimes, *if_false, idx);
         }
+    }
+}
 
-        Instruction::Ret { addr, code } => {
+fn lifetime_terminator<F: FnMut(&mut Lifetimes, Source, usize)>(
+    term: &Terminator,
+    idx: usize,
+    lifetimes: &mut Lifetimes,
+    mut update: F,
+) {
+    match term {
+        Terminator::Ret { addr, code } => {
             update(lifetimes, *addr, idx);
             update(lifetimes, *code, idx);
         }
@@ -95,21 +104,28 @@ fn update_lifetime(lifetimes: &mut Lifetimes, src: Source, idx: usize) {
 }
 
 #[must_use]
-pub fn lifetimes(instrs: &[Instruction]) -> Lifetimes {
-    let mut lifetimes = HashMap::with_capacity(instrs.len());
+pub fn lifetimes(block: &Block) -> Lifetimes {
+    let mut lifetimes = HashMap::with_capacity(block.instructions.len());
 
-    for (idx, instr) in instrs.iter().enumerate() {
+    for (idx, instr) in block.instructions.iter().enumerate() {
         lifetime_instruction(instr, idx, &mut lifetimes, update_lifetime);
     }
+
+    lifetime_terminator(
+        &block.terminator,
+        block.instructions.len(),
+        &mut lifetimes,
+        update_lifetime,
+    );
 
     lifetimes
 }
 
 #[must_use]
-pub fn surrounding_usages(instrs: &[Instruction], needle: usize) -> Lifetimes {
+pub fn surrounding_usages(block: &Block, needle: usize) -> Lifetimes {
     let mut lifetimes = HashMap::new();
 
-    for (idx, instr) in instrs.iter().enumerate().take(needle) {
+    for (idx, instr) in block.instructions.iter().enumerate().take(needle) {
         lifetime_instruction(instr, idx, &mut lifetimes, |lifetimes, src, idx| {
             if let Some(id) = src.id() {
                 lifetimes.insert(id, Lifetime { start: idx, end: idx });
@@ -117,17 +133,26 @@ pub fn surrounding_usages(instrs: &[Instruction], needle: usize) -> Lifetimes {
         })
     }
 
-    for (idx, instr) in instrs.iter().enumerate().skip(needle) {
-        lifetime_instruction(instr, idx, &mut lifetimes, |lifetimes, src, idx| {
-            if let Some(id) = src.id() {
-                lifetimes.entry(id).and_modify(|it| {
-                    if it.is_empty() {
-                        it.end = idx
-                    }
-                });
-            }
-        })
+    fn update_post_needle(lifetimes: &mut HashMap<Id, Lifetime>, src: Source, idx: usize) {
+        if let Some(id) = src.id() {
+            lifetimes.entry(id).and_modify(|it| {
+                if it.is_empty() {
+                    it.end = idx
+                }
+            });
+        }
     }
+
+    for (idx, instr) in block.instructions.iter().enumerate().skip(needle) {
+        lifetime_instruction(instr, idx, &mut lifetimes, update_post_needle)
+    }
+
+    lifetime_terminator(
+        &block.terminator,
+        block.instructions.len(),
+        &mut lifetimes,
+        update_post_needle,
+    );
 
     lifetimes
 }
@@ -135,9 +160,9 @@ pub fn surrounding_usages(instrs: &[Instruction], needle: usize) -> Lifetimes {
 // todo: replace this with a Vec<...> `rather` than the hashmap,
 //  this is because StackIndexes should always be _used_ linearly.
 #[must_use]
-pub fn stack_lifetimes(graph: &[Instruction]) -> HashMap<StackIndex, Vec<(usize, usize)>> {
+pub fn stack_lifetimes(block: &Block) -> HashMap<StackIndex, Vec<(usize, usize)>> {
     let mut lifetimes = HashMap::new();
-    for (idx, instr) in graph.iter().enumerate() {
+    for (idx, instr) in block.instructions.iter().enumerate() {
         match instr {
             Instruction::WriteStack { dest, src: _ } => {
                 lifetimes.entry(*dest).or_insert_with(Vec::new).push((idx, idx))
@@ -154,10 +179,10 @@ pub fn stack_lifetimes(graph: &[Instruction]) -> HashMap<StackIndex, Vec<(usize,
 
 /// Get the highest used `StackIndex` for a given graph.
 #[must_use]
-pub fn max_stack(graph: &[Instruction]) -> Option<StackIndex> {
+pub fn max_stack(instructions: &[Instruction]) -> Option<StackIndex> {
     let mut max: Option<StackIndex> = None;
 
-    for instr in graph {
+    for instr in instructions {
         match instr {
             Instruction::WriteStack { dest: stack_idx, src: _ }
             | Instruction::ReadStack { dest: _, src: stack_idx } => {
@@ -179,10 +204,10 @@ pub fn min_stack(
     stack_lts
         .iter()
         .filter_map(|(idx, stack_lts)| {
-            (stack_lts
+            stack_lts
                 .iter()
-                .all(|stack_lt| stack_lt.1 < lifetime.start || stack_lt.0 > lifetime.end))
-            .then(|| *idx)
+                .all(|stack_lt| stack_lt.1 < lifetime.start || stack_lt.0 > lifetime.end)
+                .then(|| *idx)
         })
         .min()
         .unwrap_or_else(|| {
@@ -193,11 +218,16 @@ pub fn min_stack(
 pub struct ShowLifetimes<'a, 'b> {
     lifetimes: &'a Lifetimes,
     instrs: &'b [Instruction],
+    terminator: &'b Terminator,
 }
 
 impl<'a, 'b> ShowLifetimes<'a, 'b> {
-    pub fn new(lifetimes: &'a Lifetimes, instrs: &'b [Instruction]) -> Self {
-        Self { lifetimes, instrs }
+    pub fn new(
+        lifetimes: &'a Lifetimes,
+        instrs: &'b [Instruction],
+        terminator: &'b Terminator,
+    ) -> Self {
+        Self { lifetimes, instrs, terminator }
     }
 }
 
@@ -212,9 +242,15 @@ fn show_lifetime(f: &mut fmt::Formatter, lifetime: &Lifetime, idx: usize) -> fmt
 
 impl fmt::Display for ShowLifetimes<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (idx, instr) in self.instrs.iter().enumerate() {
-            let mut lifetimes: Vec<Lifetime> = self.lifetimes.values().cloned().collect();
-            lifetimes.sort_by(|a, b| a.start.cmp(&b.start));
+        let mut lifetimes: Vec<Lifetime> = self.lifetimes.values().cloned().collect();
+        lifetimes.sort_by(|a, b| a.start.cmp(&b.start));
+        for (idx, instr) in self
+            .instrs
+            .iter()
+            .map(|it| it as &dyn fmt::Display)
+            .chain(std::iter::once(self.terminator as &dyn fmt::Display))
+            .enumerate()
+        {
             let mut lifetimes = lifetimes.iter();
 
             write!(f, "[")?;
@@ -435,25 +471,32 @@ mod test {
             }
         }
 
-        let (mut instrs, _) = match last {
+        let mut block;
+        match last {
             BinaryInstruction::Big(it) => {
-                crate::lower::terminal(ctx, ribit_decode::instruction(*it).unwrap(), 4)
+                block = crate::lower::terminal(ctx, ribit_decode::instruction(*it).unwrap(), 4);
             }
 
-            BinaryInstruction::Small(it) => crate::lower::terminal(
-                ctx,
-                ribit_decode::compressed::decode_instruction(*it).unwrap(),
-                2,
-            ),
+            BinaryInstruction::Small(it) => {
+                block = crate::lower::terminal(
+                    ctx,
+                    ribit_decode::compressed::decode_instruction(*it).unwrap(),
+                    2,
+                );
+            }
         };
 
-        opt::fold_and_prop_consts(&mut instrs);
-        let instrs = opt::dead_instruction_elimination(&instrs);
-        let instrs = opt::register_writeback_shrinking(&instrs);
+        opt::fold_and_prop_consts(&mut block);
+        opt::dead_instruction_elimination(&mut block);
+        opt::register_writeback_shrinking(&mut block);
 
-        let lifetimes = super::lifetimes(&instrs);
+        let lifetimes = super::lifetimes(&mut block);
 
-        assert_display_snapshot!(ShowLifetimes::new(&lifetimes, &instrs));
+        assert_display_snapshot!(ShowLifetimes::new(
+            &lifetimes,
+            &block.instructions,
+            &block.terminator
+        ));
 
         // code block:
         // LUI x1, 4276994048
@@ -613,14 +656,18 @@ mod test {
 
     #[test]
     fn max_lifetimes() {
-        let (mut instrs, _) = max_fn();
+        let mut block = max_fn();
 
-        opt::fold_and_prop_consts(&mut instrs);
-        let instrs = opt::dead_instruction_elimination(&instrs);
-        let instrs = opt::register_writeback_shrinking(&instrs);
+        opt::fold_and_prop_consts(&mut block);
+        opt::dead_instruction_elimination(&mut block);
+        opt::register_writeback_shrinking(&mut block);
 
-        let lifetimes = super::lifetimes(&instrs);
+        let lifetimes = super::lifetimes(&mut block);
 
-        assert_display_snapshot!(ShowLifetimes::new(&lifetimes, &instrs));
+        assert_display_snapshot!(ShowLifetimes::new(
+            &lifetimes,
+            &block.instructions,
+            &block.terminator
+        ));
     }
 }

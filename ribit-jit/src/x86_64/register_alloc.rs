@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use rasen::params::Register;
 use ribit_ssa as ssa;
 use ribit_ssa::analysis::Lifetimes;
-use ribit_ssa::{analysis, Arg, Id, IdAllocator, Instruction};
+use ribit_ssa::{analysis, Arg, Id, Instruction};
 
 use super::legalise;
 
@@ -146,19 +146,19 @@ impl Default for RegisterAllocator {
 pub struct RegisterSpill(pub usize);
 
 pub fn allocate_registers(
-    graph: &[Instruction],
+    block: &ribit_ssa::Block,
 ) -> Result<(HashMap<Id, Register>, HashMap<usize, Vec<Register>>), RegisterSpill> {
     let mut allocator = RegisterAllocator::new();
 
-    let start = match allocator.allocate_args(graph) {
+    let start = match allocator.allocate_args(&block.instructions) {
         Some(idx) => idx,
         None => return Ok((allocator.allocations, allocator.clobbers)),
     };
 
     // todo: find an efficient way of pre-checking lifetimes to avoid unneeded work on spills.
-    let lifetimes = analysis::lifetimes(&graph);
+    let lifetimes = analysis::lifetimes(&block);
 
-    for (idx, instr) in graph[start..].iter().enumerate() {
+    for (idx, instr) in block.instructions[start..].iter().enumerate() {
         let idx = idx + start;
 
         allocator.deallocate_unused(&lifetimes, idx);
@@ -182,12 +182,29 @@ pub fn allocate_registers(
         }
     }
 
+    {
+        let idx = block.instructions.len();
+
+        allocator.deallocate_unused(&lifetimes, idx);
+        allocator.clear_clobbers();
+
+        let clobbers =
+            legalise::count_clobbers_for_terminal(&block.terminator, &allocator.allocations);
+
+        for _ in 0..clobbers {
+            match allocator.first_unallocated() {
+                Some(reg) => allocator.allocate_clobber(idx, reg),
+                None => return Err(RegisterSpill(idx)),
+            }
+        }
+    }
+
     Ok((allocator.allocations, allocator.clobbers))
 }
 
-pub fn spill(graph: &mut Vec<Instruction>, id_allocator: &mut IdAllocator, spill: RegisterSpill) {
+pub fn spill(block: &mut ribit_ssa::Block, spill: RegisterSpill) {
     let spill = spill.0;
-    let surrounds = analysis::surrounding_usages(&*graph, spill);
+    let surrounds = analysis::surrounding_usages(&block, spill);
 
     let (id, lt) = surrounds
         .into_iter()
@@ -199,18 +216,20 @@ pub fn spill(graph: &mut Vec<Instruction>, id_allocator: &mut IdAllocator, spill
     //  for instance, if it's a register read (of the latest value),
     // we should avoid stack ops and instead just re-read it
 
-    let end_id = id_allocator.allocate();
+    let end_id = block.allocator.allocate();
 
-    let stack_index = analysis::min_stack(lt, &analysis::stack_lifetimes(graph));
+    let stack_index = analysis::min_stack(lt, &analysis::stack_lifetimes(&block));
 
     let start = Instruction::WriteStack { src: id, dest: stack_index };
 
     let end = Instruction::ReadStack { src: stack_index, dest: end_id };
 
-    graph.insert(lt.start + 1, start);
+    block.instructions.insert(lt.start + 1, start);
 
-    graph.insert(lt.end, end);
-    ssa::update_references(&mut graph[lt.end..], id, end_id);
+    block.instructions.insert(lt.end, end);
+
+    // fixme: avoid rechecking more than needed (see previous code)
+    ssa::update_references(block, id, end_id);
 }
 
 #[cfg(test)]
@@ -222,21 +241,25 @@ mod test {
 
     #[test]
     fn alloc_max() {
-        let (mut instrs, mut id_alloc) = max_fn();
+        let mut block = max_fn();
 
-        opt::fold_and_prop_consts(&mut instrs);
-        let instrs = opt::dead_instruction_elimination(&instrs);
-        let mut instrs = opt::register_writeback_shrinking(&instrs);
+        opt::fold_and_prop_consts(&mut block);
+        opt::dead_instruction_elimination(&mut block);
+        opt::register_writeback_shrinking(&mut block);
 
         let (allocs, clobbers) = loop {
-            match super::allocate_registers(&instrs) {
+            match super::allocate_registers(&block) {
                 Ok(allocs) => break allocs,
-                Err(spill) => super::spill(&mut instrs, &mut id_alloc, spill),
+                Err(spill) => super::spill(&mut block, spill),
             }
         };
 
-        let lifetimes = analysis::lifetimes(&instrs);
-        let mut lifetimes = format!("{}", analysis::ShowLifetimes::new(&lifetimes, &instrs));
+        let lifetimes = analysis::lifetimes(&mut block);
+        let mut lifetimes = format!(
+            "{}",
+            analysis::ShowLifetimes::new(&lifetimes, &block.instructions, &block.terminator)
+        );
+
         for (id, register) in &allocs {
             lifetimes = lifetimes
                 .replace(&id.to_string(), &crate::test::FmtRegister(*register).to_string());

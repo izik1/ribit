@@ -14,11 +14,11 @@ pub struct X86_64;
 impl X86_64 {
     fn make_fn(
         buffer: &mut Buffer,
-        instrs: &[ribit_ssa::Instruction],
+        block: &ribit_ssa::Block,
         allocs: &HashMap<ribit_ssa::Id, Register>,
         clobbers: &HashMap<usize, Vec<Register>>,
     ) -> BasicBlock {
-        log::debug!("{}", ribit_core::DisplayDeferSlice(instrs));
+        log::debug!("{}", block.display_instructions());
 
         let raw_buffer = buffer.raw.take().expect("Failed to take buffer");
         let mut raw_buffer = raw_buffer.make_mut().expect("Failed to make buffer mutable");
@@ -32,15 +32,17 @@ impl X86_64 {
         let mut build_context = BlockBuilder::start(stream);
 
         build_context
-            .make_block(&instrs[..(instrs.len() - 1)], &allocs, &clobbers)
+            .make_block(&block.instructions, &allocs, &clobbers)
             .expect("todo: handle block creation error");
 
         let final_clobbers = {
-            clobbers.get(&(instrs.len() - 1)).map_or_else(|| Cow::Owned(Vec::new()), Cow::Borrowed)
+            clobbers
+                .get(&(block.instructions.len()))
+                .map_or_else(|| Cow::Owned(Vec::new()), Cow::Borrowed)
         };
 
         build_context
-            .complete(&instrs[instrs.len() - 1], &allocs, &*final_clobbers)
+            .complete(&block.terminator, &allocs, &*final_clobbers)
             .expect("todo: handle block creation error");
 
         let start = mem::replace(&mut buffer.write_offset, writer.position());
@@ -74,21 +76,17 @@ unsafe impl crate::rt::Target for X86_64 {
 
     type Block = Block;
 
-    fn generate_block(
-        buffer: &mut Self::Buffer,
-        mut instructions: Vec<ribit_ssa::Instruction>,
-        mut id_allocator: ribit_ssa::IdAllocator,
-    ) -> Self::Block {
+    fn generate_block(buffer: &mut Self::Buffer, mut block: ribit_ssa::Block) -> Self::Block {
         let (allocs, clobbers) = loop {
-            match register_alloc::allocate_registers(&instructions) {
+            match register_alloc::allocate_registers(&block) {
                 Ok(allocs) => break allocs,
-                Err(spill) => register_alloc::spill(&mut instructions, &mut id_allocator, spill),
+                Err(spill) => register_alloc::spill(&mut block, spill),
             }
         };
 
-        legalise::legalise(&mut instructions, &allocs);
+        legalise::legalise(&mut block, &allocs);
 
-        let funct = Self::make_fn(buffer, &instructions, &allocs, &clobbers);
+        let funct = Self::make_fn(buffer, &block, &allocs, &clobbers);
         Block(funct)
     }
 }

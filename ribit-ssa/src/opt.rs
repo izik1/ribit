@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{eval, Id, Instruction, Source};
+use crate::{eval, Block, Id, Instruction, Source, Terminator};
 
 pub mod pass_manager;
 
@@ -23,9 +23,9 @@ fn const_prop(consts: &HashMap<Id, u32>, src: &mut Source) -> Option<u32> {
 
 // todo: `pub fn complex_const_prop(graph: &mut [Instruction])`
 
-pub fn fold_and_prop_consts(graph: &mut [Instruction]) {
+pub fn fold_and_prop_consts(block: &mut Block) {
     let mut consts = HashMap::new();
-    for instruction in graph.iter_mut() {
+    for instruction in block.instructions.iter_mut() {
         let (dest, val) = match instruction {
             Instruction::LoadConst { dest, src } => (*dest, *src),
 
@@ -86,18 +86,18 @@ pub fn fold_and_prop_consts(graph: &mut [Instruction]) {
                     continue;
                 }
             }
-
-            Instruction::Ret { addr, code } => {
-                const_prop(&consts, addr);
-                const_prop(&consts, code);
-
-                continue;
-            }
         };
 
         *instruction = Instruction::LoadConst { dest, src: val };
 
         consts.insert(dest, val);
+    }
+
+    match &mut block.terminator {
+        Terminator::Ret { addr, code } => {
+            const_prop(&consts, addr);
+            const_prop(&consts, code);
+        }
     }
 }
 
@@ -107,20 +107,20 @@ fn mark_live(live_instructions: &mut [bool; 0x1_0000], src: Source) {
     }
 }
 
-#[must_use]
-pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
+pub fn dead_instruction_elimination(block: &mut Block) {
     let mut live_ids = [false; 0x1_0000];
+
+    match &block.terminator {
+        Terminator::Ret { addr, code } => {
+            mark_live(&mut live_ids, *addr);
+            mark_live(&mut live_ids, *code);
+        }
+    }
+
     let mut live_instruction_count = 0;
 
-    for instruction in graph.iter().rev() {
+    for instruction in block.instructions.iter().rev() {
         match instruction {
-            Instruction::Ret { addr, code } => {
-                mark_live(&mut live_ids, *addr);
-                mark_live(&mut live_ids, *code);
-
-                live_instruction_count += 1;
-            }
-
             Instruction::Fence => live_instruction_count += 1,
 
             Instruction::ReadReg { src: _, dest, base } => {
@@ -190,22 +190,22 @@ pub fn dead_instruction_elimination(graph: &[Instruction]) -> Vec<Instruction> {
 
     let mut instructions = Vec::with_capacity(live_instruction_count);
 
-    for instr in graph.iter().filter(|it| match it.id() {
+    for instr in block.instructions.iter().filter(|it| match it.id() {
         Some(id) => live_ids[id.0 as usize],
         None => true,
     }) {
         instructions.push(instr.clone());
     }
 
-    instructions
+    block.instructions = instructions;
 }
 
 /// Moves register writes to be as close to their computations as possible.
-pub fn register_writeback_shrinking(graph: &[Instruction]) -> Vec<Instruction> {
+pub fn register_writeback_shrinking(block: &mut Block) {
     let mut stores = vec![];
-    let mut instrs = Vec::with_capacity(graph.len());
+    let mut instrs = Vec::with_capacity(block.instructions.len());
 
-    for instr in graph {
+    for instr in &block.instructions {
         match instr {
             Instruction::WriteReg { dest, src: Source::Id(id), base } => {
                 stores.push((*dest, *id, *base));
@@ -228,13 +228,13 @@ pub fn register_writeback_shrinking(graph: &[Instruction]) -> Vec<Instruction> {
         }
     }
 
-    instrs
+    block.instructions = instrs;
 }
 
 #[cfg(test)]
 mod test {
     use insta::assert_display_snapshot;
-    use ribit_core::{instruction, opcode, register, DisplayDeferSlice, Width};
+    use ribit_core::{instruction, opcode, register, Width};
 
     use crate::lower;
     use crate::test::{max_fn, MEM_SIZE};
@@ -243,7 +243,7 @@ mod test {
     fn jal_basic_const_prop() {
         let ctx = lower::Context::new(0, MEM_SIZE);
 
-        let (mut instrs, _) = lower::terminal(
+        let mut block = lower::terminal(
             ctx,
             instruction::Instruction::J(instruction::J {
                 imm: 4096,
@@ -253,9 +253,9 @@ mod test {
             4,
         );
 
-        super::fold_and_prop_consts(&mut instrs);
+        super::fold_and_prop_consts(&mut block);
 
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(block.display_instructions());
     }
 
     #[test]
@@ -294,28 +294,28 @@ mod test {
             4,
         );
 
-        let (mut instrs, _) = lower::terminal(
+        let mut block = lower::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,
         );
 
-        super::fold_and_prop_consts(&mut instrs);
-        let instrs = super::dead_instruction_elimination(&instrs);
-        let instrs = super::register_writeback_shrinking(&instrs);
+        super::fold_and_prop_consts(&mut block);
+        super::dead_instruction_elimination(&mut block);
+        super::register_writeback_shrinking(&mut block);
 
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(block.display_instructions());
     }
 
     #[test]
     fn max() {
-        let (mut instrs, _) = max_fn();
+        let mut block = max_fn();
 
-        super::fold_and_prop_consts(&mut instrs);
-        let instrs = super::dead_instruction_elimination(&instrs);
-        let instrs = super::register_writeback_shrinking(&instrs);
+        super::fold_and_prop_consts(&mut block);
+        super::dead_instruction_elimination(&mut block);
+        super::register_writeback_shrinking(&mut block);
 
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(block.display_instructions());
     }
 
     #[test]
@@ -353,7 +353,7 @@ mod test {
             4,
         );
 
-        let (mut instrs, _) = lower::terminal(
+        let mut block = lower::terminal(
             ctx,
             instruction::Instruction::IJump(instruction::IJump::new(
                 364,
@@ -363,21 +363,20 @@ mod test {
             )),
             4,
         );
-
-        super::fold_and_prop_consts(&mut instrs);
-        let instrs = super::dead_instruction_elimination(&instrs);
-        let instrs = super::register_writeback_shrinking(&instrs);
+        super::fold_and_prop_consts(&mut block);
+        super::dead_instruction_elimination(&mut block);
+        super::register_writeback_shrinking(&mut block);
 
         // todo: C-constprop (add %n, 0) instructions
 
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(block.display_instructions());
     }
 
     #[test]
     fn jal_basic_die() {
         let ctx = lower::Context::new(0, 0x10000);
 
-        let (mut instrs, _) = lower::terminal(
+        let mut block = lower::terminal(
             ctx,
             instruction::Instruction::J(instruction::J {
                 imm: 4096,
@@ -387,9 +386,9 @@ mod test {
             4,
         );
 
-        super::fold_and_prop_consts(&mut instrs);
-        let instrs = super::dead_instruction_elimination(&instrs);
+        super::fold_and_prop_consts(&mut block);
+        super::dead_instruction_elimination(&mut block);
 
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(block.display_instructions());
     }
 }

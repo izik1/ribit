@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use ribit_core::{instruction, ReturnCode};
 use ribit_ssa::opt;
-use ribit_ssa::opt::pass_manager::ReplacePass;
+use ribit_ssa::opt::pass_manager::InplacePass;
 
 pub struct Runtime<Rt: Target> {
     buffer: Rt::Buffer,
@@ -17,11 +17,7 @@ pub unsafe trait Target {
     type Buffer: Default;
     type Block: Block;
 
-    fn generate_block(
-        buffer: &mut Self::Buffer,
-        instructions: Vec<ribit_ssa::Instruction>,
-        id_allocator: ribit_ssa::IdAllocator,
-    ) -> Self::Block;
+    fn generate_block(buffer: &mut Self::Buffer, block: ribit_ssa::Block) -> Self::Block;
 }
 
 pub trait Block {
@@ -83,12 +79,11 @@ impl<Rt: Target> Runtime<Rt> {
             ribit_ssa::lower::non_terminal(&mut lower_context, instr.instruction, instr.len);
         }
 
-        let (instrs, id_alloc) =
-            ribit_ssa::lower::terminal(lower_context, branch.instruction, branch.len);
+        let mut block = ribit_ssa::lower::terminal(lower_context, branch.instruction, branch.len);
 
-        let instrs = self.opt_pass_manager.run(&instrs);
+        self.opt_pass_manager.run(&mut block);
 
-        let block = Rt::generate_block(&mut self.buffer, instrs, id_alloc);
+        let block = Rt::generate_block(&mut self.buffer, block);
 
         let insert_idx =
             self.ranges.binary_search_by_key(&start_pc, |range| range.start).unwrap_or_else(|e| e);

@@ -195,7 +195,6 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
 
                     self.stream.mov_mem_reg(Mem32(memory::stack(*dest, true)), Reg32(src))
                 }
-                ssa::Instruction::Ret { .. } => panic!("Enforce non branch instruction?"),
             }?;
         }
 
@@ -204,12 +203,12 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
 
     pub fn complete(
         mut self,
-        instruction: &ssa::Instruction,
+        terminator: &ssa::Terminator,
         allocs: &HashMap<ssa::Id, Register>,
         clobbers: &[Register],
     ) -> io::Result<()> {
-        match *instruction {
-            ssa::Instruction::Ret { code, addr } => {
+        match *terminator {
+            ssa::Terminator::Ret { code, addr } => {
                 // note: addr is in the low dword, code is high dword
 
                 let addr = crate::Source::from_ssa_src(addr, allocs).expect("addr not allocated!?");
@@ -298,8 +297,6 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
 
                 self.stream.ret()
             }
-
-            _ => panic!("Only branch instructions can be used to complete a block"),
         }
     }
 

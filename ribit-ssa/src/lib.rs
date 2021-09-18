@@ -12,6 +12,37 @@ pub mod opt;
 
 pub use id::{Id, IdAllocator};
 
+pub struct BlockDisplay<'a>(&'a [Instruction], &'a Terminator);
+
+impl<'a> std::fmt::Display for BlockDisplay<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if let Some((first, rest)) = self.0.split_first() {
+            write!(f, "{}", first)?;
+            for item in rest {
+                write!(f, "\n{}", item)?;
+            }
+
+            write!(f, "\n{}", self.1)?;
+        } else {
+            write!(f, "{}", self.1)?;
+        }
+
+        Ok(())
+    }
+}
+
+pub struct Block {
+    pub allocator: IdAllocator,
+    pub instructions: Vec<Instruction>,
+    pub terminator: Terminator,
+}
+
+impl Block {
+    pub fn display_instructions(&self) -> BlockDisplay<'_> {
+        BlockDisplay(&self.instructions, &self.terminator)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, PartialOrd, Ord)]
 pub struct StackIndex(pub u8);
 
@@ -138,6 +169,19 @@ pub enum Arg {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Terminator {
+    Ret { addr: Source, code: Source },
+}
+
+impl fmt::Display for Terminator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ret { addr, code } => write!(f, "ret {}, {}", code, addr),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Instruction {
     Arg { dest: Id, src: Arg },
     // A const should never be put on the stack.
@@ -152,7 +196,6 @@ pub enum Instruction {
     Cmp { dest: Id, src1: Source, src2: Source, kind: CmpKind },
     // todo: box this
     Select { dest: Id, cond: Source, if_true: Source, if_false: Source },
-    Ret { addr: Source, code: Source },
     Fence,
 }
 
@@ -172,7 +215,6 @@ impl Instruction {
             Self::WriteStack { .. }
             | Self::WriteReg { .. }
             | Self::WriteMem { .. }
-            | Self::Ret { .. }
             | Self::Fence => None,
         }
     }
@@ -216,7 +258,6 @@ impl fmt::Display for Instruction {
                 write!(f, "{} = select {}, {}, {}", dest, cond, if_true, if_false)
             }
             Self::Fence => write!(f, "fence"),
-            Self::Ret { addr, code } => write!(f, "ret {}, {}", code, addr),
         }
     }
 }
@@ -228,8 +269,8 @@ pub fn update_reference(src: &mut Source, old: Id, new: Id) {
     }
 }
 
-pub fn update_references(graph: &mut [Instruction], old: Id, new: Id) {
-    for instr in graph {
+pub fn update_references(graph: &mut Block, old: Id, new: Id) {
+    for instr in &mut graph.instructions {
         match instr {
             Instruction::Fence
             | Instruction::Arg { .. }
@@ -268,8 +309,10 @@ pub fn update_references(graph: &mut [Instruction], old: Id, new: Id) {
                 update_reference(if_true, old, new);
                 update_reference(if_false, old, new);
             }
+        }
 
-            Instruction::Ret { addr, code } => {
+        match &mut graph.terminator {
+            Terminator::Ret { addr, code } => {
                 update_reference(addr, old, new);
                 update_reference(code, old, new);
             }
@@ -281,11 +324,11 @@ pub fn update_references(graph: &mut [Instruction], old: Id, new: Id) {
 mod test {
     use ribit_core::{opcode, register};
 
-    use crate::{lower, Arg, Id, IdAllocator, Instruction, Source};
+    use crate::{lower, Arg, Block, Id, Instruction, Source, Terminator};
 
     pub const MEM_SIZE: u32 = 0x1000000;
 
-    pub fn max_fn() -> (Vec<Instruction>, IdAllocator) {
+    pub fn max_fn() -> Block {
         use ribit_core::instruction;
 
         let mut ctx = lower::Context::new(1024, MEM_SIZE);
@@ -352,17 +395,17 @@ mod test {
 
         let ctx = lower::Context::new(START_PC, MEM_SIZE);
 
-        let (instrs, _) = ctx.ret();
+        let block = ctx.ret();
 
-        assert_eq!(instrs.len(), 3);
+        assert_eq!(block.instructions.len(), 2);
 
-        assert_eq!(instrs[0], Instruction::Arg { src: Arg::Register, dest: Id(0) });
+        assert_eq!(block.instructions[0], Instruction::Arg { src: Arg::Register, dest: Id(0) });
 
-        assert_eq!(instrs[1], Instruction::Arg { src: Arg::Memory, dest: Id(1) });
+        assert_eq!(block.instructions[1], Instruction::Arg { src: Arg::Memory, dest: Id(1) });
 
         assert_eq!(
-            instrs[2],
-            Instruction::Ret { addr: Source::Val(START_PC), code: Source::Val(0) }
+            block.terminator,
+            Terminator::Ret { addr: Source::Val(START_PC), code: Source::Val(0) }
         );
     }
 
@@ -373,25 +416,28 @@ mod test {
         ctx.read_register(register::RiscV::X1);
         ctx.read_register(register::RiscV::X2);
         ctx.read_register(register::RiscV::X1);
-        let (instrs, _) = ctx.ret();
+        let block = ctx.ret();
 
-        assert_eq!(instrs.len(), 5);
+        assert_eq!(block.instructions.len(), 4);
 
-        assert_eq!(instrs[0], Instruction::Arg { dest: Id(0), src: Arg::Register });
+        assert_eq!(block.instructions[0], Instruction::Arg { dest: Id(0), src: Arg::Register });
 
-        assert_eq!(instrs[1], Instruction::Arg { dest: Id(1), src: Arg::Memory });
+        assert_eq!(block.instructions[1], Instruction::Arg { dest: Id(1), src: Arg::Memory });
 
         assert_eq!(
-            instrs[2],
+            block.instructions[2],
             Instruction::ReadReg { dest: Id(2), src: register::RiscV::X1, base: Source::Id(Id(0)) }
         );
 
         assert_eq!(
-            instrs[3],
+            block.instructions[3],
             Instruction::ReadReg { dest: Id(3), src: register::RiscV::X2, base: Source::Id(Id(0)) }
         );
 
-        assert_eq!(instrs[4], Instruction::Ret { addr: Source::Val(0), code: Source::Val(0) });
+        assert_eq!(
+            block.terminator,
+            Terminator::Ret { addr: Source::Val(0), code: Source::Val(0) }
+        );
     }
 
     #[test]
@@ -399,16 +445,16 @@ mod test {
         let mut ctx = lower::Context::new(0, MEM_SIZE);
 
         ctx.write_register(register::RiscV::X2, Source::Val(0));
-        let (instrs, _) = ctx.ret();
+        let block = ctx.ret();
 
-        assert_eq!(instrs.len(), 4);
+        assert_eq!(block.instructions.len(), 3);
 
-        assert_eq!(instrs[0], Instruction::Arg { src: Arg::Register, dest: Id(0) });
+        assert_eq!(block.instructions[0], Instruction::Arg { src: Arg::Register, dest: Id(0) });
 
-        assert_eq!(instrs[1], Instruction::Arg { src: Arg::Memory, dest: Id(1) });
+        assert_eq!(block.instructions[1], Instruction::Arg { src: Arg::Memory, dest: Id(1) });
 
         assert_eq!(
-            instrs[2],
+            block.instructions[2],
             Instruction::WriteReg {
                 dest: register::RiscV::X2,
                 src: Source::Val(0),

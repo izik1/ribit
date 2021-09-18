@@ -1,7 +1,7 @@
 use ribit_core::{instruction, opcode, register, Width};
 
 use super::{BinOp, CmpKind, Id, Instruction, Source};
-use crate::{eval, Arg, IdAllocator};
+use crate::{eval, Arg, Block, IdAllocator, Terminator};
 
 pub struct Context {
     id_allocator: IdAllocator,
@@ -158,7 +158,7 @@ impl Context {
     }
 
     #[must_use]
-    pub fn ret_with_code(mut self, addr: Source, code: Source) -> (Vec<Instruction>, IdAllocator) {
+    pub fn ret_with_code(mut self, addr: Source, code: Source) -> Block {
         for (idx, src) in self.registers.iter().enumerate().skip(1) {
             let dest = register::RiscV::with_u8(idx as u8).unwrap();
 
@@ -173,19 +173,20 @@ impl Context {
             }
         }
 
-        self.instructions.push(Instruction::Ret { addr, code });
-
-        // todo: assert well formedness here.
-        (self.instructions, self.id_allocator)
+        Block {
+            allocator: self.id_allocator,
+            instructions: self.instructions,
+            terminator: Terminator::Ret { addr, code },
+        }
     }
 
     #[must_use]
-    pub fn ret_with_addr(self, addr: Source) -> (Vec<Instruction>, IdAllocator) {
+    pub fn ret_with_addr(self, addr: Source) -> Block {
         self.ret_with_code(addr, Source::Val(0))
     }
 
     #[must_use]
-    pub fn ret(self) -> (Vec<Instruction>, IdAllocator) {
+    pub fn ret(self) -> Block {
         let pc = self.pc;
         self.ret_with_addr(pc)
     }
@@ -310,11 +311,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
 }
 
 #[must_use]
-pub fn terminal(
-    mut ctx: Context,
-    instruction: instruction::Instruction,
-    len: u32,
-) -> (Vec<Instruction>, IdAllocator) {
+pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u32) -> Block {
     match instruction {
         instruction::Instruction::J(instruction::J { opcode: opcode::J::JAL, rd, imm }) => {
             // load pc + len into rd (the link register)
@@ -398,7 +395,7 @@ pub fn terminal(
 #[cfg(test)]
 mod test {
     use insta::assert_display_snapshot;
-    use ribit_core::{instruction, opcode, register, DisplayDeferSlice, Width};
+    use ribit_core::{instruction, opcode, register, Width};
 
     use super::Context;
     use crate::test::MEM_SIZE;
@@ -428,7 +425,7 @@ mod test {
             4,
         );
 
-        let (instrs, _) = super::terminal(
+        let block = super::terminal(
             ctx,
             instruction::Instruction::IJump(instruction::IJump::new(
                 65279,
@@ -439,16 +436,14 @@ mod test {
             4,
         );
 
-        // super::fold_and_prop_consts(&mut instrs);
-
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(&block.display_instructions());
     }
 
     #[test]
     fn jalr_bit() {
         let ctx = Context::new(48, MEM_SIZE);
 
-        let (instrs, _) = super::terminal(
+        let block = super::terminal(
             ctx,
             instruction::Instruction::IJump(instruction::IJump {
                 imm: 2047,
@@ -459,14 +454,14 @@ mod test {
             4,
         );
 
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(&block.display_instructions());
     }
 
     #[test]
     fn jalr_pc() {
         let ctx = Context::new(48, MEM_SIZE);
 
-        let (instrs, _) = super::terminal(
+        let block = super::terminal(
             ctx,
             instruction::Instruction::IJump(instruction::IJump {
                 imm: 2046,
@@ -477,13 +472,14 @@ mod test {
             4,
         );
 
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(&block.display_instructions());
     }
+
     #[test]
     fn jal_basic() {
         let ctx = Context::new(0, MEM_SIZE);
 
-        let (instrs, _) = super::terminal(
+        let block = super::terminal(
             ctx,
             instruction::Instruction::J(instruction::J {
                 imm: 4096,
@@ -493,20 +489,20 @@ mod test {
             4,
         );
 
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(&block.display_instructions());
     }
 
     #[test]
     fn sys_break() {
         let ctx = Context::new(0, MEM_SIZE);
 
-        let (instrs, _) = super::terminal(
+        let block = super::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,
         );
 
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(&block.display_instructions());
     }
 
     #[test]
@@ -518,31 +514,31 @@ mod test {
             4,
         );
 
-        let (instrs, _) = super::terminal(
+        let block = super::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,
         );
 
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(&block.display_instructions());
     }
 
     #[test]
     fn branch_0_0_eq() {
         let ctx = Context::new(0, MEM_SIZE);
-        let (instrs, _) = super::terminal(
+        let block = super::terminal(
             ctx,
             instruction::Instruction::B(instruction::B::new(1024, None, None, opcode::Cmp::Eq)),
             4,
         );
 
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(&block.display_instructions());
     }
 
     #[test]
     fn branch_0_x1_eq() {
         let ctx = Context::new(0, MEM_SIZE);
-        let (instrs, _) = super::terminal(
+        let block = super::terminal(
             ctx,
             instruction::Instruction::B(instruction::B::new(
                 1024,
@@ -553,7 +549,7 @@ mod test {
             4,
         );
 
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(&block.display_instructions());
     }
 
     #[test]
@@ -570,13 +566,13 @@ mod test {
             4,
         );
 
-        let (instrs, _) = super::terminal(
+        let block = super::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,
         );
 
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(&block.display_instructions());
     }
 
     #[test]
@@ -615,13 +611,13 @@ mod test {
             4,
         );
 
-        let (instrs, _) = super::terminal(
+        let block = super::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,
         );
 
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(&block.display_instructions());
     }
 
     #[test]
@@ -638,12 +634,12 @@ mod test {
             4,
         );
 
-        let (instrs, _) = super::terminal(
+        let block = super::terminal(
             ctx,
             instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
             4,
         );
 
-        assert_display_snapshot!(DisplayDeferSlice(&instrs));
+        assert_display_snapshot!(&block.display_instructions());
     }
 }

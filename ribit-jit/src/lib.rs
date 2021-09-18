@@ -142,7 +142,7 @@ mod test {
     }
 
     // fixme: dedup with `ribit_ssa`'s version
-    pub fn max_fn() -> (Vec<ribit_ssa::Instruction>, ribit_ssa::IdAllocator) {
+    pub fn max_fn() -> ribit_ssa::Block {
         let mut ctx = ribit_ssa::lower::Context::new(1024, crate::MEMORY_SIZE);
 
         ribit_ssa::lower::non_terminal(

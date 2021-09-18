@@ -13,7 +13,7 @@ impl IdAllocator {
     pub fn allocate(&mut self) -> Id {
         let id_num = self.next_id.0;
 
-        assert!(id_num < u16::max_value());
+        assert!(id_num < u16::MAX);
 
         std::mem::replace(&mut self.next_id, Id(id_num + 1))
     }

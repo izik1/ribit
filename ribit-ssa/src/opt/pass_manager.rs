@@ -1,34 +1,20 @@
-use crate::Instruction;
+use crate::Block;
 
 pub trait InplacePass {
-    fn run(&self, graph: &mut [Instruction]);
-}
-
-pub trait ReplacePass {
-    fn run(&self, graph: &[Instruction]) -> Vec<Instruction>;
+    fn run(&self, graph: &mut Block);
 }
 
 impl<F> InplacePass for F
 where
-    F: Fn(&mut [Instruction]),
+    F: Fn(&mut Block),
 {
-    fn run(&self, graph: &mut [Instruction]) {
-        self(graph)
-    }
-}
-
-impl<F> ReplacePass for F
-where
-    F: Fn(&[Instruction]) -> Vec<Instruction>,
-{
-    fn run(&self, graph: &[Instruction]) -> Vec<Instruction> {
+    fn run(&self, graph: &mut Block) {
         self(graph)
     }
 }
 
 pub enum Pass {
     Inplace(Box<dyn InplacePass>),
-    Replace(Box<dyn ReplacePass>),
     ConstProp,
     DeadInstructionElimination,
     RegisterWritebackShrinking,
@@ -55,24 +41,15 @@ impl PassManager {
     }
 }
 
-impl ReplacePass for PassManager {
-    fn run(&self, graph: &[Instruction]) -> Vec<Instruction> {
-        let mut graph = graph.to_owned();
-
+impl InplacePass for PassManager {
+    fn run(&self, block: &mut Block) {
         for pass in &self.passes {
             match pass {
-                Pass::Inplace(p) => p.run(&mut graph),
-                Pass::Replace(p) => graph = p.run(&graph),
-                Pass::ConstProp => super::fold_and_prop_consts(&mut graph),
-                Pass::DeadInstructionElimination => {
-                    graph = super::dead_instruction_elimination(&graph)
-                }
-                Pass::RegisterWritebackShrinking => {
-                    graph = super::register_writeback_shrinking(&graph)
-                }
+                Pass::Inplace(p) => p.run(block),
+                Pass::ConstProp => super::fold_and_prop_consts(block),
+                Pass::DeadInstructionElimination => super::dead_instruction_elimination(block),
+                Pass::RegisterWritebackShrinking => super::register_writeback_shrinking(block),
             }
         }
-
-        graph
     }
 }

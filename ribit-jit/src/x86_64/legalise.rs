@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::mem;
 
 use rasen::params::Register;
-use ribit_ssa::{BinOp, Id, Instruction};
+use ribit_ssa::{BinOp, Block, Id, Instruction, Terminator};
 
 /// Counts the clobbers required to execute the instruction (optimally)
 ///
@@ -44,13 +44,24 @@ pub fn count_clobbers_for(instr: &Instruction, allocs: &HashMap<Id, Register>) -
                 (Some(_), Some(_)) => 0,
             }
         }
+    }
+}
 
-        Instruction::Ret { addr, code } => {
-            // this instruction "needs" at least two registers- unless addr and cond are both `val`, in which case, just one- one of which must be Zax.
+/// Counts the clobbers required to execute the terminator (optimally)
+#[must_use]
+pub fn count_clobbers_for_terminal(
+    terminator: &Terminator,
+    allocs: &HashMap<Id, Register>,
+) -> usize {
+    match terminator {
+        Terminator::Ret { addr, code } => {
+            // this terminator "needs" at least two registers- unless addr and cond are both `val`,
+            // in which case, just one- one of which must be Zax.
 
             let register_count = (addr.id().is_some() as usize) + (code.id().is_some() as usize);
 
-            let zax_used = addr.id().or_else(|| code.id()).map_or(false, |id| allocs[&id] == Register::Zax);
+            let zax_used =
+                addr.id().or_else(|| code.id()).map_or(false, |id| allocs[&id] == Register::Zax);
 
             if register_count == 1 && zax_used {
                 2
@@ -58,13 +69,12 @@ pub fn count_clobbers_for(instr: &Instruction, allocs: &HashMap<Id, Register>) -
                 0
             }
         }
-
     }
 }
 
 #[allow(clippy::match_same_arms)]
-pub fn legalise(graph: &mut [Instruction], allocs: &HashMap<Id, Register>) {
-    for instruction in graph.iter_mut() {
+pub fn legalise(block: &mut Block, allocs: &HashMap<Id, Register>) {
+    for instruction in block.instructions.iter_mut() {
         match instruction {
             Instruction::BinOp { dest, src1, src2, op } => {
                 let src_reg_1 = src1.id().and_then(|it| allocs.get(&it));
@@ -86,9 +96,12 @@ pub fn legalise(graph: &mut [Instruction], allocs: &HashMap<Id, Register>) {
             Instruction::LoadConst { dest: _, src: _ } => {}
             Instruction::Cmp { dest: _, src1: _, src2: _, kind: _ } => {}
             Instruction::Select { dest: _, cond: _, if_true: _, if_false: _ } => {}
-            Instruction::Ret { addr: _, code: _ } => {}
             Instruction::Fence => {}
         }
+    }
+
+    match &mut block.terminator {
+        ribit_ssa::Terminator::Ret { addr: _, code: _ } => {}
     }
 }
 
@@ -109,23 +122,27 @@ mod test {
 
     #[test]
     fn legalise_max() {
-        let (mut instrs, mut id_alloc) = max_fn();
+        let mut block = max_fn();
 
-        opt::fold_and_prop_consts(&mut instrs);
-        let instrs = opt::dead_instruction_elimination(&instrs);
-        let mut instrs = opt::register_writeback_shrinking(&instrs);
+        opt::fold_and_prop_consts(&mut block);
+        opt::dead_instruction_elimination(&mut block);
+        opt::register_writeback_shrinking(&mut block);
 
         let (allocs, _clobbers) = loop {
-            match register_alloc::allocate_registers(&instrs) {
+            match register_alloc::allocate_registers(&block) {
                 Ok(allocs) => break allocs,
-                Err(spill) => register_alloc::spill(&mut instrs, &mut id_alloc, spill),
+                Err(spill) => register_alloc::spill(&mut block, spill),
             }
         };
 
-        super::legalise(&mut instrs, &allocs);
+        super::legalise(&mut block, &allocs);
 
-        let lifetimes = analysis::lifetimes(&instrs);
-        let mut lifetimes = format!("{}", analysis::ShowLifetimes::new(&lifetimes, &instrs));
+        let lifetimes = analysis::lifetimes(&block);
+        let mut lifetimes = format!(
+            "{}",
+            analysis::ShowLifetimes::new(&lifetimes, &block.instructions, &block.terminator)
+        );
+
         for (id, register) in &allocs {
             lifetimes = lifetimes
                 .replace(&id.to_string(), &crate::test::FmtRegister(*register).to_string());
