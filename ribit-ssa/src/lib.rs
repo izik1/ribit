@@ -3,65 +3,22 @@
 use std::fmt;
 
 use reference::Reference;
-use ribit_core::{opcode, register, Width};
+use ribit_core::opcode;
 
 pub mod analysis;
+mod block;
 pub mod eval;
 mod id;
+mod instruction;
 pub mod lower;
 pub mod opt;
 pub mod reference;
 mod ty;
 
+pub use block::{Block, BlockDisplay};
 pub use id::{Id, IdAllocator};
-pub use ty::Constant;
-pub use ty::Type;
-
-pub struct BlockDisplay<'a>(&'a [Instruction], &'a Terminator);
-
-impl<'a> std::fmt::Display for BlockDisplay<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if let Some((first, rest)) = self.0.split_first() {
-            write!(f, "{}", first)?;
-            for item in rest {
-                write!(f, "\n{}", item)?;
-            }
-
-            write!(f, "\n{}", self.1)?;
-        } else {
-            write!(f, "{}", self.1)?;
-        }
-
-        Ok(())
-    }
-}
-
-pub struct Block {
-    pub allocator: IdAllocator,
-    pub instructions: Vec<Instruction>,
-    pub terminator: Terminator,
-}
-
-impl Block {
-    pub fn arg_ref(&self, arg: Arg) -> Option<Reference> {
-        self.instructions.iter().find_map(|it| match it {
-            Instruction::Arg { dest, src } if *src == arg => {
-                Some(Reference { ty: Type::I32, id: *dest })
-            }
-            _ => None,
-        })
-    }
-
-    pub fn reference(&self, id: Id) -> Option<Reference> {
-        self.instructions
-            .iter()
-            .find_map(|it| it.id().filter(|it| *it == id).map(|id| Reference { ty: it.ty(), id }))
-    }
-
-    pub fn display_instructions(&self) -> BlockDisplay<'_> {
-        BlockDisplay(&self.instructions, &self.terminator)
-    }
-}
+pub use instruction::Instruction;
+pub use ty::{Constant, Type};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, PartialOrd, Ord)]
 pub struct StackIndex(pub u8);
@@ -209,124 +166,6 @@ impl fmt::Display for Terminator {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Instruction {
-    Arg { dest: Id, src: Arg },
-    // A const should never be put on the stack, as you can just reload it.
-    WriteStack { dest: StackIndex, src: Reference },
-    ReadStack { dest: Id, src: StackIndex },
-    ReadReg { dest: Id, base: Source, src: register::RiscV },
-    WriteReg { dest: register::RiscV, base: Source, src: Source },
-    ReadMem { dest: Id, src: Source, base: Source, width: Width, sign_extend: bool },
-    WriteMem { addr: Source, src: Source, base: Source, width: Width },
-    BinOp { dest: Id, src1: Source, src2: Source, op: BinOp },
-    Cmp { dest: Id, src1: Source, src2: Source, kind: CmpKind },
-    // todo: box this
-    Select { dest: Id, cond: Source, if_true: Source, if_false: Source },
-    Fence,
-}
-
-impl Instruction {
-    pub fn ty(&self) -> Type {
-        match self {
-            Instruction::Arg { dest: _, src: _ } => Type::I32,
-            Instruction::WriteStack { dest: _, src: _ } => Type::Unit,
-            Instruction::ReadStack { dest: _, src: _ } => Type::I32,
-            Instruction::ReadReg { dest: _, base: _, src: _ } => Type::I32,
-            Instruction::WriteReg { dest: _, base: _, src: _ } => Type::Unit,
-            Instruction::ReadMem { dest: _, src: _, base: _, width: _, sign_extend: _ } => {
-                Type::I32
-            }
-            Instruction::WriteMem { addr: _, src: _, base: _, width: _ } => Type::Unit,
-            Instruction::BinOp { dest: _, src1, src2, op: _ } => {
-                let ty = src1.ty();
-
-                assert_eq!(ty, src2.ty());
-
-                // type technically depends on op, but... for now:
-                assert!(matches!(ty, Type::Int(_)));
-
-                ty
-            }
-            Instruction::Cmp { dest: _, src1, src2, kind: _ } => {
-                let ty = src1.ty();
-
-                assert_eq!(ty, src2.ty());
-
-                ty
-            }
-            Instruction::Select { dest: _, cond: _, if_true, if_false } => {
-                let ty = if_true.ty();
-
-                assert_eq!(ty, if_false.ty());
-
-                ty
-            }
-
-            Instruction::Fence => Type::Unit,
-        }
-    }
-
-    #[must_use]
-    pub fn id(&self) -> Option<Id> {
-        match self {
-            Self::Select { dest, .. }
-            | Self::ReadReg { dest, .. }
-            | Self::ReadMem { dest, .. }
-            | Self::ReadStack { dest, .. }
-            | Self::Cmp { dest, .. }
-            | Self::Arg { dest, .. }
-            | Self::BinOp { dest, .. } => Some(*dest),
-
-            Self::WriteStack { .. }
-            | Self::WriteReg { .. }
-            | Self::WriteMem { .. }
-            | Self::Fence => None,
-        }
-    }
-}
-
-impl fmt::Display for Instruction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::ReadReg { dest, base, src } => write!(f, "{} = x({}){}", dest, base, src.get()),
-
-            Self::ReadMem { dest, src, base, width, sign_extend } => match sign_extend {
-                true => write!(f, "{} = signed {} m({}){}", dest, width, base, src),
-                false => write!(f, "{} = {} m({}){}", dest, width, base, src),
-            },
-
-            Self::ReadStack { dest, src } => write!(f, "{} = {}", dest, src),
-
-            Self::WriteReg { base, dest, src } => write!(f, "x({}){} = {}", base, dest.get(), src),
-
-            Self::WriteMem { base, addr, src, width } => {
-                write!(f, "m({}){} = {} {}", base, addr, width, src)
-            }
-
-            Self::WriteStack { dest, src } => write!(f, "{} = {}", dest, src),
-
-            Self::Arg { dest, src } => write!(f, "{} = args[{}]", dest, *src as u8),
-            Self::BinOp { dest, src1, src2, op } => write!(
-                f,
-                "{dest} = {op} {src1}, {src2}",
-                dest = dest,
-                op = op,
-                src1 = src1,
-                src2 = src2
-            ),
-            Self::Cmp { dest, src1, src2, kind } => {
-                write!(f, "{} = cmp {} {}, {}", dest, kind, src1, src2)
-            }
-
-            Self::Select { dest, cond, if_true, if_false } => {
-                write!(f, "{} = select {}, {}, {}", dest, cond, if_true, if_false)
-            }
-            Self::Fence => write!(f, "fence"),
-        }
-    }
-}
-
 pub fn update_reference(src: &mut Source, old: Id, new: Id) {
     match src {
         Source::Ref(r) if r.id == old => r.id = new,
@@ -387,8 +226,7 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
 mod test {
     use ribit_core::{opcode, register};
 
-    use crate::ty::Constant;
-    use crate::{lower, Arg, Block, Id, Instruction, Source, Terminator};
+    use crate::{lower, Block};
 
     pub const MEM_SIZE: u32 = 0x1000000;
 
@@ -451,97 +289,5 @@ mod test {
             )),
             2,
         )
-    }
-
-    #[test]
-    fn empty() {
-        const START_PC: u32 = 0xfefe_fefe;
-
-        let ctx = lower::Context::new(START_PC, MEM_SIZE);
-
-        let block = ctx.ret();
-
-        assert_eq!(block.instructions.len(), 2);
-
-        assert_eq!(block.instructions[0], Instruction::Arg { src: Arg::Register, dest: Id(0) });
-
-        assert_eq!(block.instructions[1], Instruction::Arg { src: Arg::Memory, dest: Id(1) });
-
-        assert_eq!(
-            block.terminator,
-            Terminator::Ret {
-                addr: Source::Const(Constant::i32(START_PC)),
-                code: Source::Const(Constant::i32(0))
-            }
-        );
-    }
-
-    #[test]
-    fn reads_register() {
-        let mut ctx = lower::Context::new(0, MEM_SIZE);
-
-        ctx.read_register(register::RiscV::X1);
-        ctx.read_register(register::RiscV::X2);
-        ctx.read_register(register::RiscV::X1);
-        let block = ctx.ret();
-
-        assert_eq!(block.instructions.len(), 4);
-
-        assert_eq!(block.instructions[0], Instruction::Arg { dest: Id(0), src: Arg::Register });
-
-        assert_eq!(block.instructions[1], Instruction::Arg { dest: Id(1), src: Arg::Memory });
-
-        let reg_arg = block.arg_ref(Arg::Register).unwrap();
-
-        assert_eq!(
-            block.instructions[2],
-            Instruction::ReadReg {
-                dest: Id(2),
-                src: register::RiscV::X1,
-                base: Source::Ref(reg_arg)
-            }
-        );
-
-        assert_eq!(
-            block.instructions[3],
-            Instruction::ReadReg {
-                dest: Id(3),
-                src: register::RiscV::X2,
-                base: Source::Ref(reg_arg)
-            }
-        );
-
-        assert_eq!(
-            block.terminator,
-            Terminator::Ret {
-                addr: Source::Const(Constant::i32(0)),
-                code: Source::Const(Constant::i32(0))
-            }
-        );
-    }
-
-    #[test]
-    fn writes_register() {
-        let mut ctx = lower::Context::new(0, MEM_SIZE);
-
-        ctx.write_register(register::RiscV::X2, Source::Const(Constant::i32(0)));
-        let block = ctx.ret();
-
-        assert_eq!(block.instructions.len(), 3);
-
-        assert_eq!(block.instructions[0], Instruction::Arg { src: Arg::Register, dest: Id(0) });
-
-        assert_eq!(block.instructions[1], Instruction::Arg { src: Arg::Memory, dest: Id(1) });
-
-        let reg_arg = block.arg_ref(Arg::Register).unwrap();
-
-        assert_eq!(
-            block.instructions[2],
-            Instruction::WriteReg {
-                dest: register::RiscV::X2,
-                src: Source::Const(Constant::i32(0)),
-                base: Source::Ref(reg_arg),
-            }
-        );
     }
 }

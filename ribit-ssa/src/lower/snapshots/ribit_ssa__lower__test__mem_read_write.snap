@@ -1,6 +1,6 @@
 ---
-source: ribit-ssa/src/lower.rs
-expression: DisplayDeferSlice(&instrs)
+source: ribit-ssa/src/lower/test.rs
+expression: "&block.display_instructions()"
 
 ---
 %0 = args[0]

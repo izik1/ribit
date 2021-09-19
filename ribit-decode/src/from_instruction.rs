@@ -1,5 +1,6 @@
-use crate::{decode_rd, decode_rs, sign_extend, sign_extend_32};
 use ribit_core::{instruction, opcode, Width};
+
+use crate::{decode_rd, decode_rs, sign_extend, sign_extend_32};
 
 pub fn r(instruction: u32, opcode: opcode::R) -> instruction::R {
     let (rs1, rs2) = decode_rs(instruction);

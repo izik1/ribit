@@ -1,0 +1,8 @@
+---
+source: ribit-ssa/src/lower/test.rs
+expression: "&block.display_instructions()"
+
+---
+%0 = args[0]
+%1 = args[1]
+ret 00000000, 00000400

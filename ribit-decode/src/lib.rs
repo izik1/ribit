@@ -178,8 +178,9 @@ fn decode_branch(instruction: u32) -> Result<instruction::B, DecodeError> {
 
 #[cfg(test)]
 mod test {
-    use crate::opcode;
     use ribit_core::instruction::Instruction;
+
+    use crate::opcode;
 
     #[test]
     fn decode_ebreak() {
