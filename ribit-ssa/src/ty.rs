@@ -18,6 +18,8 @@ impl Type {
     pub const I8: Self = Self::Int(Bitness::B8);
     pub const I16: Self = Self::Int(Bitness::B16);
     pub const I32: Self = Self::Int(Bitness::B32);
+
+    
 }
 
 impl fmt::Display for Type {

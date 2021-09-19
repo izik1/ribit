@@ -36,9 +36,7 @@ fn lifetime_instruction<F: FnMut(&mut Lifetimes, Id, usize)>(
             update_source(lifetimes, base, idx, &mut update);
         }
 
-        Instruction::Arg { dest, .. }
-        | Instruction::LoadConst { dest, .. }
-        | Instruction::ReadStack { dest, .. } => {
+        Instruction::Arg { dest, .. } | Instruction::ReadStack { dest, .. } => {
             update(lifetimes, *dest, idx);
         }
 

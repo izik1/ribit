@@ -220,7 +220,6 @@ pub enum Instruction {
     ReadMem { dest: Id, src: Source, base: Source, width: Width, sign_extend: bool },
     WriteMem { addr: Source, src: Source, base: Source, width: Width },
     BinOp { dest: Id, src1: Source, src2: Source, op: BinOp },
-    LoadConst { dest: Id, src: Constant },
     Cmp { dest: Id, src1: Source, src2: Source, kind: CmpKind },
     // todo: box this
     Select { dest: Id, cond: Source, if_true: Source, if_false: Source },
@@ -249,7 +248,6 @@ impl Instruction {
 
                 ty
             }
-            Instruction::LoadConst { dest: _, src: _ } => Type::I32,
             Instruction::Cmp { dest: _, src1, src2, kind: _ } => {
                 let ty = src1.ty();
 
@@ -276,7 +274,6 @@ impl Instruction {
             | Self::ReadReg { dest, .. }
             | Self::ReadMem { dest, .. }
             | Self::ReadStack { dest, .. }
-            | Self::LoadConst { dest, .. }
             | Self::Cmp { dest, .. }
             | Self::Arg { dest, .. }
             | Self::BinOp { dest, .. } => Some(*dest),
@@ -309,7 +306,6 @@ impl fmt::Display for Instruction {
 
             Self::WriteStack { dest, src } => write!(f, "{} = {}", dest, src),
 
-            Self::LoadConst { dest, src } => write!(f, "{} = {}", dest, src),
             Self::Arg { dest, src } => write!(f, "{} = args[{}]", dest, *src as u8),
             Self::BinOp { dest, src1, src2, op } => write!(
                 f,
@@ -342,10 +338,7 @@ pub fn update_reference(src: &mut Source, old: Id, new: Id) {
 pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id) {
     for instr in &mut graph.instructions[start_from..] {
         match instr {
-            Instruction::Fence
-            | Instruction::Arg { .. }
-            | Instruction::LoadConst { .. }
-            | Instruction::ReadStack { .. } => {}
+            Instruction::Fence | Instruction::Arg { .. } | Instruction::ReadStack { .. } => {}
 
             Instruction::BinOp { dest: _, src1, src2, .. }
             | Instruction::Cmp { dest: _, src1, src2, .. } => {

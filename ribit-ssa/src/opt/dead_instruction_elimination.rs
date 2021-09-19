@@ -33,9 +33,7 @@ pub fn run(block: &mut Block) {
                 }
             }
 
-            Instruction::ReadStack { dest, src: _ }
-            | Instruction::LoadConst { dest, .. }
-            | Instruction::Arg { dest, .. } => {
+            Instruction::ReadStack { dest, src: _ } | Instruction::Arg { dest, .. } => {
                 if live_ids[dest.0 as usize] {
                     live_instruction_count += 1;
                 }
