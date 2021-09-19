@@ -123,16 +123,6 @@ pub fn lifetimes(block: &Block) -> Lifetimes {
 
 #[must_use]
 pub fn surrounding_usages(block: &Block, needle: usize) -> Lifetimes {
-    let mut lifetimes = HashMap::new();
-
-    for (idx, instr) in block.instructions.iter().enumerate().take(needle) {
-        lifetime_instruction(instr, idx, &mut lifetimes, |lifetimes, src, idx| {
-            if let Some(id) = src.id() {
-                lifetimes.insert(id, Lifetime { start: idx, end: idx });
-            }
-        })
-    }
-
     fn update_post_needle(lifetimes: &mut HashMap<Id, Lifetime>, src: Source, idx: usize) {
         if let Some(id) = src.id() {
             lifetimes.entry(id).and_modify(|it| {
@@ -141,6 +131,16 @@ pub fn surrounding_usages(block: &Block, needle: usize) -> Lifetimes {
                 }
             });
         }
+    }
+
+    let mut lifetimes = HashMap::new();
+
+    for (idx, instr) in block.instructions.iter().enumerate().take(needle) {
+        lifetime_instruction(instr, idx, &mut lifetimes, |lifetimes, src, idx| {
+            if let Some(id) = src.id() {
+                lifetimes.insert(id, Lifetime { start: idx, end: idx });
+            }
+        })
     }
 
     for (idx, instr) in block.instructions.iter().enumerate().skip(needle) {
