@@ -33,11 +33,11 @@ pub fn count_clobbers_for(instr: &Instruction, allocs: &HashMap<Id, Register>) -
             if_true,
             if_false,
         } => {
-            match (if_true.id(), if_false.id()) {
+            match (if_true.reference(), if_false.reference()) {
                 // both sources are consts, so we need a clobber register (otherwise we have no way of loading the number without branching)
                 (None, None) => 1,
                 // one of the sources is the same as the dest, so we need a clobber to store `dest` as a temporary
-                (Some(id), None) | (None, Some(id)) if allocs[&id] == allocs[dest] => 1,
+                (Some(r), None) | (None, Some(r)) if allocs[&r.id] == allocs[dest] => 1,
                 // no source is the same as dest, so we can avoid a clobber by loading the const into dest _first_.
                 (Some(_), None) | (None, Some(_)) => 0,
                 // both registers are already allocated, so we definitely _don't_ need a clobber.
@@ -58,10 +58,13 @@ pub fn count_clobbers_for_terminal(
             // this terminator "needs" at least two registers- unless addr and cond are both `val`,
             // in which case, just one- one of which must be Zax.
 
-            let register_count = (addr.id().is_some() as usize) + (code.id().is_some() as usize);
+            let register_count =
+                (addr.reference().is_some() as usize) + (code.reference().is_some() as usize);
 
-            let zax_used =
-                addr.id().or_else(|| code.id()).map_or(false, |id| allocs[&id] == Register::Zax);
+            let zax_used = addr
+                .reference()
+                .or_else(|| code.reference())
+                .map_or(false, |r| allocs[&r.id] == Register::Zax);
 
             if register_count == 1 && zax_used {
                 2
@@ -77,8 +80,8 @@ pub fn legalise(block: &mut Block, allocs: &HashMap<Id, Register>) {
     for instruction in block.instructions.iter_mut() {
         match instruction {
             Instruction::BinOp { dest, src1, src2, op } => {
-                let src_reg_1 = src1.id().and_then(|it| allocs.get(&it));
-                let src_reg_2 = src2.id().and_then(|it| allocs.get(&it));
+                let src_reg_1 = src1.reference().and_then(|it| allocs.get(&it.id));
+                let src_reg_2 = src2.reference().and_then(|it| allocs.get(&it.id));
                 let dest_reg = allocs.get(dest);
 
                 if src_reg_1 != dest_reg && src_reg_2 == dest_reg && commutative(*op) {

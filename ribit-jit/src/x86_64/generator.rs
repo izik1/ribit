@@ -191,7 +191,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 }
 
                 ssa::Instruction::WriteStack { dest, src } => {
-                    let src = *allocs.get(&src).expect("src not allocated!?");
+                    let src = *allocs.get(&src.id).expect("src not allocated!?");
 
                     self.stream.mov_mem_reg(Mem32(memory::stack(*dest, true)), Reg32(src))
                 }

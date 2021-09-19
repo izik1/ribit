@@ -32,7 +32,7 @@ impl Source {
     pub fn from_ssa_src(src: ssa::Source, map: &HashMap<ssa::Id, Register>) -> Option<Self> {
         match src {
             ssa::Source::Val(v) => Some(Self::Val(v)),
-            ssa::Source::Id(id) => map.get(&id).copied().map(Self::Register),
+            ssa::Source::Ref(r) => map.get(&r.id).copied().map(Self::Register),
         }
     }
 

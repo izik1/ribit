@@ -1,6 +1,7 @@
 use ribit_core::{instruction, opcode, register, Width};
 
 use super::{BinOp, CmpKind, Id, Instruction, Source};
+use crate::reference::Reference;
 use crate::{eval, Arg, Block, IdAllocator, Terminator};
 
 pub struct Context {
@@ -50,8 +51,12 @@ impl Context {
 
     fn instruction<F: FnOnce(Id) -> Instruction>(&mut self, f: F) -> Source {
         let id = self.id_allocator.allocate();
-        self.instructions.push(f(id));
-        Source::Id(id)
+
+        let instr = f(id);
+        let ty = instr.ty();
+
+        self.instructions.push(instr);
+        Source::Ref(Reference { ty, id })
     }
 
     pub fn binop(&mut self, op: BinOp, src1: Source, src2: Source) -> Source {
@@ -65,16 +70,21 @@ impl Context {
     pub fn read_register(&mut self, reg: register::RiscV) -> Source {
         self.registers[reg.get() as usize].unwrap_or_else(|| {
             let id = self.id_allocator.allocate();
-
-            self.instructions.push(Instruction::ReadReg {
+            let instr = Instruction::ReadReg {
                 dest: id,
                 base: self.register_arg.expect("Register arg wasn't initialized?"),
                 src: reg,
-            });
+            };
 
-            self.registers[reg.get() as usize] = Some(Source::Id(id));
+            let ty = instr.ty();
 
-            Source::Id(id)
+            self.instructions.push(instr);
+
+            let r = Source::Ref(Reference { ty, id });
+
+            self.registers[reg.get() as usize] = Some(r);
+
+            r
         })
     }
 

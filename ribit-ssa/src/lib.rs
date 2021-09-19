@@ -2,6 +2,7 @@
 
 use std::fmt;
 
+use reference::Reference;
 use ribit_core::{opcode, register, Width};
 
 pub mod analysis;
@@ -9,8 +10,11 @@ pub mod eval;
 mod id;
 pub mod lower;
 pub mod opt;
+pub mod reference;
+mod ty;
 
 pub use id::{Id, IdAllocator};
+pub use ty::Type;
 
 pub struct BlockDisplay<'a>(&'a [Instruction], &'a Terminator);
 
@@ -38,6 +42,21 @@ pub struct Block {
 }
 
 impl Block {
+    pub fn arg_ref(&self, arg: Arg) -> Option<Reference> {
+        self.instructions.iter().find_map(|it| match it {
+            Instruction::Arg { dest, src } if *src == arg => {
+                Some(Reference { ty: Type::Int32, id: *dest })
+            }
+            _ => None,
+        })
+    }
+
+    pub fn reference(&self, id: Id) -> Option<Reference> {
+        self.instructions
+            .iter()
+            .find_map(|it| it.id().filter(|it| *it == id).map(|id| Reference { ty: it.ty(), id }))
+    }
+
     pub fn display_instructions(&self) -> BlockDisplay<'_> {
         BlockDisplay(&self.instructions, &self.terminator)
     }
@@ -104,7 +123,7 @@ impl fmt::Display for CmpKind {
 #[cfg_attr(test, derive(serde::Serialize))]
 pub enum Source {
     Val(u32),
-    Id(Id),
+    Ref(Reference),
 }
 
 impl Source {
@@ -112,15 +131,23 @@ impl Source {
     pub fn val(self) -> Option<u32> {
         match self {
             Self::Val(v) => Some(v),
-            Self::Id(_) => None,
+            Self::Ref(_) => None,
         }
     }
 
     #[must_use]
-    pub fn id(self) -> Option<Id> {
+    pub fn reference(self) -> Option<Reference> {
         match self {
-            Self::Id(id) => Some(id),
+            Self::Ref(r) => Some(r),
             Self::Val(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub fn ty(self) -> Type {
+        match self {
+            Source::Val(_) => Type::Int32,
+            Source::Ref(r) => r.ty,
         }
     }
 }
@@ -129,7 +156,7 @@ impl fmt::Display for Source {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Val(v) => write!(f, "{:08x}", v),
-            Self::Id(id) => id.fmt(f),
+            Self::Ref(r) => r.fmt(f),
         }
     }
 }
@@ -185,7 +212,7 @@ impl fmt::Display for Terminator {
 pub enum Instruction {
     Arg { dest: Id, src: Arg },
     // A const should never be put on the stack.
-    WriteStack { dest: StackIndex, src: Id },
+    WriteStack { dest: StackIndex, src: Reference },
     ReadStack { dest: Id, src: StackIndex },
     ReadReg { dest: Id, base: Source, src: register::RiscV },
     WriteReg { dest: register::RiscV, base: Source, src: Source },
@@ -200,6 +227,47 @@ pub enum Instruction {
 }
 
 impl Instruction {
+    pub fn ty(&self) -> Type {
+        match self {
+            Instruction::Arg { dest: _, src: _ } => Type::Int32,
+            Instruction::WriteStack { dest: _, src: _ } => Type::Unit,
+            Instruction::ReadStack { dest: _, src: _ } => Type::Int32,
+            Instruction::ReadReg { dest: _, base: _, src: _ } => Type::Int32,
+            Instruction::WriteReg { dest: _, base: _, src: _ } => Type::Unit,
+            Instruction::ReadMem { dest: _, src: _, base: _, width: _, sign_extend: _ } => {
+                Type::Int32
+            }
+            Instruction::WriteMem { addr: _, src: _, base: _, width: _ } => Type::Unit,
+            Instruction::BinOp { dest: _, src1, src2, op: _ } => {
+                let ty = src1.ty();
+
+                assert_eq!(ty, src2.ty());
+
+                // type technically depends on op, but... for now:
+                assert_eq!(ty, Type::Int32);
+
+                ty
+            }
+            Instruction::LoadConst { dest: _, src: _ } => Type::Int32,
+            Instruction::Cmp { dest: _, src1, src2, kind: _ } => {
+                let ty = src1.ty();
+
+                assert_eq!(ty, src2.ty());
+
+                ty
+            }
+            Instruction::Select { dest: _, cond: _, if_true, if_false } => {
+                let ty = if_true.ty();
+
+                assert_eq!(ty, if_false.ty());
+
+                ty
+            }
+
+            Instruction::Fence => Type::Unit,
+        }
+    }
+
     #[must_use]
     pub fn id(&self) -> Option<Id> {
         match self {
@@ -264,13 +332,14 @@ impl fmt::Display for Instruction {
 
 pub fn update_reference(src: &mut Source, old: Id, new: Id) {
     match src {
-        Source::Id(id) if *id == old => *id = new,
+        Source::Ref(r) if r.id == old => r.id = new,
         _ => {}
     }
 }
 
-pub fn update_references(graph: &mut Block, old: Id, new: Id) {
-    for instr in &mut graph.instructions {
+// hack: do something better than `start_from`
+pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id) {
+    for instr in &mut graph.instructions[start_from..] {
         match instr {
             Instruction::Fence
             | Instruction::Arg { .. }
@@ -288,8 +357,8 @@ pub fn update_references(graph: &mut Block, old: Id, new: Id) {
             }
 
             Instruction::WriteStack { dest: _, src } => {
-                if *src == old {
-                    *src = new
+                if src.id == old {
+                    src.id = new
                 }
             }
 
@@ -424,14 +493,24 @@ mod test {
 
         assert_eq!(block.instructions[1], Instruction::Arg { dest: Id(1), src: Arg::Memory });
 
+        let reg_arg = block.arg_ref(Arg::Register).unwrap();
+
         assert_eq!(
             block.instructions[2],
-            Instruction::ReadReg { dest: Id(2), src: register::RiscV::X1, base: Source::Id(Id(0)) }
+            Instruction::ReadReg {
+                dest: Id(2),
+                src: register::RiscV::X1,
+                base: Source::Ref(reg_arg)
+            }
         );
 
         assert_eq!(
             block.instructions[3],
-            Instruction::ReadReg { dest: Id(3), src: register::RiscV::X2, base: Source::Id(Id(0)) }
+            Instruction::ReadReg {
+                dest: Id(3),
+                src: register::RiscV::X2,
+                base: Source::Ref(reg_arg)
+            }
         );
 
         assert_eq!(
@@ -453,12 +532,14 @@ mod test {
 
         assert_eq!(block.instructions[1], Instruction::Arg { src: Arg::Memory, dest: Id(1) });
 
+        let reg_arg = block.arg_ref(Arg::Register).unwrap();
+
         assert_eq!(
             block.instructions[2],
             Instruction::WriteReg {
                 dest: register::RiscV::X2,
                 src: Source::Val(0),
-                base: Source::Id(Id(0)),
+                base: Source::Ref(reg_arg),
             }
         );
     }

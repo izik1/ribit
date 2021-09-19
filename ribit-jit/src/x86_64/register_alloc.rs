@@ -212,6 +212,9 @@ pub fn spill(block: &mut ribit_ssa::Block, spill: RegisterSpill) {
         .max_by_key(|(_, lt)| lt.end - lt.start)
         .expect("Impossible to solve spill");
 
+    // fixme: no unwrap
+    let r = block.reference(id).unwrap();
+
     // todo: try to do more optimal spills
     //  for instance, if it's a register read (of the latest value),
     // we should avoid stack ops and instead just re-read it
@@ -220,7 +223,7 @@ pub fn spill(block: &mut ribit_ssa::Block, spill: RegisterSpill) {
 
     let stack_index = analysis::min_stack(lt, &analysis::stack_lifetimes(&block));
 
-    let start = Instruction::WriteStack { src: id, dest: stack_index };
+    let start = Instruction::WriteStack { src: r, dest: stack_index };
 
     let end = Instruction::ReadStack { src: stack_index, dest: end_id };
 
@@ -228,8 +231,7 @@ pub fn spill(block: &mut ribit_ssa::Block, spill: RegisterSpill) {
 
     block.instructions.insert(lt.end, end);
 
-    // fixme: avoid rechecking more than needed (see previous code)
-    ssa::update_references(block, id, end_id);
+    ssa::update_references(block, lt.end, id, end_id);
 }
 
 #[cfg(test)]

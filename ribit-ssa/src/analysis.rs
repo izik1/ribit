@@ -4,7 +4,19 @@ use std::fmt;
 
 use crate::{Block, Id, Instruction, Source, StackIndex, Terminator};
 
-fn lifetime_instruction<F: FnMut(&mut Lifetimes, Source, usize)>(
+#[inline]
+fn update_source<F: FnMut(&mut Lifetimes, Id, usize)>(
+    lifetimes: &mut Lifetimes,
+    source: &Source,
+    idx: usize,
+    update: &mut F,
+) {
+    if let Source::Ref(r) = source {
+        update(lifetimes, r.id, idx)
+    }
+}
+
+fn lifetime_instruction<F: FnMut(&mut Lifetimes, Id, usize)>(
     instr: &Instruction,
     idx: usize,
     lifetimes: &mut Lifetimes,
@@ -14,53 +26,54 @@ fn lifetime_instruction<F: FnMut(&mut Lifetimes, Source, usize)>(
         Instruction::Fence => {}
 
         Instruction::BinOp { dest, src1, src2, .. } | Instruction::Cmp { dest, src1, src2, .. } => {
-            update(lifetimes, Source::Id(*dest), idx);
-            update(lifetimes, *src1, idx);
-            update(lifetimes, *src2, idx);
+            update(lifetimes, *dest, idx);
+            update_source(lifetimes, src1, idx, &mut update);
+            update_source(lifetimes, src2, idx, &mut update);
         }
 
         Instruction::ReadReg { dest, base, .. } => {
-            update(lifetimes, *base, idx);
-            update(lifetimes, Source::Id(*dest), idx);
+            update(lifetimes, *dest, idx);
+            update_source(lifetimes, base, idx, &mut update);
         }
 
         Instruction::Arg { dest, .. }
         | Instruction::LoadConst { dest, .. }
         | Instruction::ReadStack { dest, .. } => {
-            update(lifetimes, Source::Id(*dest), idx);
+            update(lifetimes, *dest, idx);
         }
 
         Instruction::WriteStack { dest: _, src } => {
-            update(lifetimes, Source::Id(*src), idx);
+            update(lifetimes, src.id, idx);
         }
 
         Instruction::WriteReg { src, base, .. } => {
-            update(lifetimes, *base, idx);
-            update(lifetimes, *src, idx);
+            update_source(lifetimes, base, idx, &mut update);
+            update_source(lifetimes, src, idx, &mut update);
         }
 
         Instruction::ReadMem { dest, src, base, .. } => {
-            update(lifetimes, *base, idx);
-            update(lifetimes, Source::Id(*dest), idx);
-            update(lifetimes, *src, idx);
+            update(lifetimes, *dest, idx);
+
+            update_source(lifetimes, base, idx, &mut update);
+            update_source(lifetimes, src, idx, &mut update);
         }
 
         Instruction::WriteMem { addr, src, base, .. } => {
-            update(lifetimes, *base, idx);
-            update(lifetimes, *addr, idx);
-            update(lifetimes, *src, idx);
+            update_source(lifetimes, base, idx, &mut update);
+            update_source(lifetimes, addr, idx, &mut update);
+            update_source(lifetimes, src, idx, &mut update);
         }
 
         Instruction::Select { dest, cond, if_true, if_false } => {
-            update(lifetimes, Source::Id(*dest), idx);
-            update(lifetimes, *cond, idx);
-            update(lifetimes, *if_true, idx);
-            update(lifetimes, *if_false, idx);
+            update(lifetimes, *dest, idx);
+            update_source(lifetimes, cond, idx, &mut update);
+            update_source(lifetimes, if_true, idx, &mut update);
+            update_source(lifetimes, if_false, idx, &mut update);
         }
     }
 }
 
-fn lifetime_terminator<F: FnMut(&mut Lifetimes, Source, usize)>(
+fn lifetime_terminator<F: FnMut(&mut Lifetimes, Id, usize)>(
     term: &Terminator,
     idx: usize,
     lifetimes: &mut Lifetimes,
@@ -68,8 +81,8 @@ fn lifetime_terminator<F: FnMut(&mut Lifetimes, Source, usize)>(
 ) {
     match term {
         Terminator::Ret { addr, code } => {
-            update(lifetimes, *addr, idx);
-            update(lifetimes, *code, idx);
+            update_source(lifetimes, addr, idx, &mut update);
+            update_source(lifetimes, code, idx, &mut update);
         }
     }
 }
@@ -94,13 +107,8 @@ impl Lifetime {
 
 pub type Lifetimes = HashMap<Id, Lifetime>;
 
-fn update_lifetime(lifetimes: &mut Lifetimes, src: Source, idx: usize) {
-    if let Some(id) = src.id() {
-        lifetimes
-            .entry(id)
-            .and_modify(|it| it.end = idx)
-            .or_insert(Lifetime { start: idx, end: idx });
-    }
+fn update_lifetime(lifetimes: &mut Lifetimes, id: Id, idx: usize) {
+    lifetimes.entry(id).and_modify(|it| it.end = idx).or_insert(Lifetime { start: idx, end: idx });
 }
 
 #[must_use]
@@ -123,23 +131,19 @@ pub fn lifetimes(block: &Block) -> Lifetimes {
 
 #[must_use]
 pub fn surrounding_usages(block: &Block, needle: usize) -> Lifetimes {
-    fn update_post_needle(lifetimes: &mut HashMap<Id, Lifetime>, src: Source, idx: usize) {
-        if let Some(id) = src.id() {
-            lifetimes.entry(id).and_modify(|it| {
-                if it.is_empty() {
-                    it.end = idx
-                }
-            });
-        }
+    fn update_post_needle(lifetimes: &mut HashMap<Id, Lifetime>, id: Id, idx: usize) {
+        lifetimes.entry(id).and_modify(|it| {
+            if it.is_empty() {
+                it.end = idx
+            }
+        });
     }
 
     let mut lifetimes = HashMap::new();
 
     for (idx, instr) in block.instructions.iter().enumerate().take(needle) {
-        lifetime_instruction(instr, idx, &mut lifetimes, |lifetimes, src, idx| {
-            if let Some(id) = src.id() {
-                lifetimes.insert(id, Lifetime { start: idx, end: idx });
-            }
+        lifetime_instruction(instr, idx, &mut lifetimes, |lifetimes, id, idx| {
+            lifetimes.insert(id, Lifetime { start: idx, end: idx });
         })
     }
 
