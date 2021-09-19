@@ -56,9 +56,12 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
 
         for (idx, instruction) in instructions.iter().enumerate() {
             match instruction {
-                &ssa::Instruction::LoadConst { dest, src } => {
-                    self.mov_r32_imm32(*allocs.get(&dest).expect("dest not allocated!?"), src)
-                }
+                &ssa::Instruction::LoadConst { dest, src } => match src {
+                    ssa::Constant::Int(i) => self.mov_r32_imm32(
+                        *allocs.get(&dest).expect("dest not allocated!?"),
+                        i.unsigned(),
+                    ),
+                },
 
                 &ssa::Instruction::BinOp { dest, src1, src2, op } => {
                     let dest = *allocs.get(&dest).expect("dest not allocated!?");

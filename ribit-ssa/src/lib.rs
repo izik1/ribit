@@ -14,6 +14,7 @@ pub mod reference;
 mod ty;
 
 pub use id::{Id, IdAllocator};
+pub use ty::Constant;
 pub use ty::Type;
 
 pub struct BlockDisplay<'a>(&'a [Instruction], &'a Terminator);
@@ -45,7 +46,7 @@ impl Block {
     pub fn arg_ref(&self, arg: Arg) -> Option<Reference> {
         self.instructions.iter().find_map(|it| match it {
             Instruction::Arg { dest, src } if *src == arg => {
-                Some(Reference { ty: Type::Int32, id: *dest })
+                Some(Reference { ty: Type::I32, id: *dest })
             }
             _ => None,
         })
@@ -122,15 +123,15 @@ impl fmt::Display for CmpKind {
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub enum Source {
-    Val(u32),
+    Const(Constant),
     Ref(Reference),
 }
 
 impl Source {
     #[must_use]
-    pub fn val(self) -> Option<u32> {
+    pub fn constant(self) -> Option<Constant> {
         match self {
-            Self::Val(v) => Some(v),
+            Self::Const(v) => Some(v),
             Self::Ref(_) => None,
         }
     }
@@ -139,14 +140,14 @@ impl Source {
     pub fn reference(self) -> Option<Reference> {
         match self {
             Self::Ref(r) => Some(r),
-            Self::Val(_) => None,
+            Self::Const(_) => None,
         }
     }
 
     #[must_use]
     pub fn ty(self) -> Type {
         match self {
-            Source::Val(_) => Type::Int32,
+            Source::Const(konst) => konst.ty(),
             Source::Ref(r) => r.ty,
         }
     }
@@ -155,7 +156,7 @@ impl Source {
 impl fmt::Display for Source {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Val(v) => write!(f, "{:08x}", v),
+            Self::Const(v) => v.fmt(f),
             Self::Ref(r) => r.fmt(f),
         }
     }
@@ -211,7 +212,7 @@ impl fmt::Display for Terminator {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Instruction {
     Arg { dest: Id, src: Arg },
-    // A const should never be put on the stack.
+    // A const should never be put on the stack, as you can just reload it.
     WriteStack { dest: StackIndex, src: Reference },
     ReadStack { dest: Id, src: StackIndex },
     ReadReg { dest: Id, base: Source, src: register::RiscV },
@@ -219,7 +220,7 @@ pub enum Instruction {
     ReadMem { dest: Id, src: Source, base: Source, width: Width, sign_extend: bool },
     WriteMem { addr: Source, src: Source, base: Source, width: Width },
     BinOp { dest: Id, src1: Source, src2: Source, op: BinOp },
-    LoadConst { dest: Id, src: u32 },
+    LoadConst { dest: Id, src: Constant },
     Cmp { dest: Id, src1: Source, src2: Source, kind: CmpKind },
     // todo: box this
     Select { dest: Id, cond: Source, if_true: Source, if_false: Source },
@@ -229,13 +230,13 @@ pub enum Instruction {
 impl Instruction {
     pub fn ty(&self) -> Type {
         match self {
-            Instruction::Arg { dest: _, src: _ } => Type::Int32,
+            Instruction::Arg { dest: _, src: _ } => Type::I32,
             Instruction::WriteStack { dest: _, src: _ } => Type::Unit,
-            Instruction::ReadStack { dest: _, src: _ } => Type::Int32,
-            Instruction::ReadReg { dest: _, base: _, src: _ } => Type::Int32,
+            Instruction::ReadStack { dest: _, src: _ } => Type::I32,
+            Instruction::ReadReg { dest: _, base: _, src: _ } => Type::I32,
             Instruction::WriteReg { dest: _, base: _, src: _ } => Type::Unit,
             Instruction::ReadMem { dest: _, src: _, base: _, width: _, sign_extend: _ } => {
-                Type::Int32
+                Type::I32
             }
             Instruction::WriteMem { addr: _, src: _, base: _, width: _ } => Type::Unit,
             Instruction::BinOp { dest: _, src1, src2, op: _ } => {
@@ -244,11 +245,11 @@ impl Instruction {
                 assert_eq!(ty, src2.ty());
 
                 // type technically depends on op, but... for now:
-                assert_eq!(ty, Type::Int32);
+                assert!(matches!(ty, Type::Int(_)));
 
                 ty
             }
-            Instruction::LoadConst { dest: _, src: _ } => Type::Int32,
+            Instruction::LoadConst { dest: _, src: _ } => Type::I32,
             Instruction::Cmp { dest: _, src1, src2, kind: _ } => {
                 let ty = src1.ty();
 
@@ -308,7 +309,7 @@ impl fmt::Display for Instruction {
 
             Self::WriteStack { dest, src } => write!(f, "{} = {}", dest, src),
 
-            Self::LoadConst { dest, src } => write!(f, "{} = {:08x}", dest, src),
+            Self::LoadConst { dest, src } => write!(f, "{} = {}", dest, src),
             Self::Arg { dest, src } => write!(f, "{} = args[{}]", dest, *src as u8),
             Self::BinOp { dest, src1, src2, op } => write!(
                 f,
@@ -393,6 +394,7 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
 mod test {
     use ribit_core::{opcode, register};
 
+    use crate::ty::Constant;
     use crate::{lower, Arg, Block, Id, Instruction, Source, Terminator};
 
     pub const MEM_SIZE: u32 = 0x1000000;
@@ -474,7 +476,10 @@ mod test {
 
         assert_eq!(
             block.terminator,
-            Terminator::Ret { addr: Source::Val(START_PC), code: Source::Val(0) }
+            Terminator::Ret {
+                addr: Source::Const(Constant::i32(START_PC)),
+                code: Source::Const(Constant::i32(0))
+            }
         );
     }
 
@@ -515,7 +520,10 @@ mod test {
 
         assert_eq!(
             block.terminator,
-            Terminator::Ret { addr: Source::Val(0), code: Source::Val(0) }
+            Terminator::Ret {
+                addr: Source::Const(Constant::i32(0)),
+                code: Source::Const(Constant::i32(0))
+            }
         );
     }
 
@@ -523,7 +531,7 @@ mod test {
     fn writes_register() {
         let mut ctx = lower::Context::new(0, MEM_SIZE);
 
-        ctx.write_register(register::RiscV::X2, Source::Val(0));
+        ctx.write_register(register::RiscV::X2, Source::Const(Constant::i32(0)));
         let block = ctx.ret();
 
         assert_eq!(block.instructions.len(), 3);
@@ -538,7 +546,7 @@ mod test {
             block.instructions[2],
             Instruction::WriteReg {
                 dest: register::RiscV::X2,
-                src: Source::Val(0),
+                src: Source::Const(Constant::i32(0)),
                 base: Source::Ref(reg_arg),
             }
         );

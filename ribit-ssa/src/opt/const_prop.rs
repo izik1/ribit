@@ -1,16 +1,17 @@
 use std::collections::HashMap;
 
+use crate::ty::Constant;
 use crate::{eval, Block, Id, Instruction, Source, Terminator};
 
-fn const_id_lookup(consts: &HashMap<Id, u32>, src: Source) -> Option<u32> {
+fn const_id_lookup(consts: &HashMap<Id, Constant>, src: Source) -> Option<Constant> {
     src.reference().and_then(|it| consts.get(&it.id).copied())
 }
 
-fn const_prop(consts: &HashMap<Id, u32>, src: &mut Source) -> Option<u32> {
+fn const_prop(consts: &HashMap<Id, Constant>, src: &mut Source) -> Option<Constant> {
     if let Some(v) = const_id_lookup(consts, *src) {
-        *src = Source::Val(v);
+        *src = Source::Const(v);
         Some(v)
-    } else if let Source::Val(v) = src {
+    } else if let Source::Const(v) = src {
         Some(*v)
     } else {
         None
@@ -47,9 +48,21 @@ pub fn run(block: &mut Block) {
                 let src1 = const_prop(&consts, src1);
                 let src2 = const_prop(&consts, src2);
 
-                let res = match (src1, src2) {
-                    (Some(src1), Some(src2)) => eval::binop(src1, src2, *op),
+                let (lhs, rhs) = match (src1, src2) {
+                    (Some(lhs), Some(rhs)) => (lhs, rhs),
                     _ => continue,
+                };
+
+                let res = match (lhs, rhs) {
+                    (Constant::Int(lhs), Constant::Int(rhs))
+                        if lhs.bits() == rhs.bits() && lhs.bits() == 32 =>
+                    {
+                        Constant::i32(eval::binop(lhs.1, rhs.1, *op))
+                    }
+
+                    (Constant::Int(lhs), Constant::Int(rhs)) => {
+                        panic!("mismatched integral bitness: ({} != {})", lhs.bits(), rhs.bits())
+                    }
                 };
 
                 (*dest, res)
@@ -63,9 +76,19 @@ pub fn run(block: &mut Block) {
                 // `cmp eq %0, %0`, that's for a different pass
                 // todo: write pass for the above.
 
-                let res = match (src1, src2) {
-                    (Some(src1), Some(src2)) => eval::cmp(src1, src2, *kind),
+                let (lhs, rhs) = match (src1, src2) {
+                    (Some(lhs), Some(rhs)) => (lhs, rhs),
                     _ => continue,
+                };
+
+                let res = match (lhs, rhs) {
+                    (Constant::Int(lhs), Constant::Int(rhs)) if lhs.bits() == rhs.bits() => {
+                        Constant::Int(eval::cmp_int(lhs, rhs, *kind))
+                    }
+
+                    (Constant::Int(lhs), Constant::Int(rhs)) => {
+                        panic!("mismatched integral bitness: ({} != {})", lhs.bits(), rhs.bits())
+                    }
                 };
 
                 (*dest, res)
@@ -76,7 +99,16 @@ pub fn run(block: &mut Block) {
                 let if_true = const_prop(&consts, if_true);
                 let if_false = const_prop(&consts, if_false);
 
-                if let Some(res) = eval::try_select(cond, if_true, if_false) {
+                let cond = match cond {
+                    Some(cond) => cond,
+                    None => continue,
+                };
+
+                let cond = match cond {
+                    Constant::Int(i) => i,
+                };
+
+                if let Some(res) = eval::partial_select_int(cond, if_true, if_false) {
                     (*dest, res)
                 } else {
                     continue;

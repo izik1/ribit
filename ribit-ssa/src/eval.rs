@@ -1,3 +1,4 @@
+use crate::ty::{Constant, Int};
 use crate::{BinOp, CmpKind};
 
 #[must_use]
@@ -12,6 +13,23 @@ pub fn cmp(src1: u32, src2: u32, mode: CmpKind) -> u32 {
     };
 
     res as u32
+}
+
+#[must_use]
+pub fn cmp_int(lhs: Int, rhs: Int, op: CmpKind) -> Int {
+    assert_eq!(lhs.bits(), rhs.bits());
+
+    let res = match op {
+        CmpKind::Eq => lhs.unsigned() == rhs.unsigned(),
+        CmpKind::Ne => lhs.unsigned() != rhs.unsigned(),
+        CmpKind::Sge => lhs.signed() >= rhs.signed(),
+        CmpKind::Sl => lhs.signed() < rhs.signed(),
+        CmpKind::Uge => lhs.unsigned() >= rhs.unsigned(),
+        CmpKind::Ul => lhs.unsigned() < rhs.unsigned(),
+    };
+
+    // fixme: `bool`
+    Int::i32(res as u32)
 }
 
 #[must_use]
@@ -30,17 +48,38 @@ pub fn binop(src1: u32, src2: u32, op: BinOp) -> u32 {
 
 #[must_use]
 pub fn select(cond: u32, if_true: u32, if_false: u32) -> u32 {
-    if cond >= 1 { if_true } else { if_false }
+    if cond >= 1 {
+        if_true
+    } else {
+        if_false
+    }
 }
 
 #[must_use]
 pub fn partial_select(cond: u32, if_true: Option<u32>, if_false: Option<u32>) -> Option<u32> {
-    if cond >= 1 { if_true } else { if_false }
+    if cond >= 1 {
+        if_true
+    } else {
+        if_false
+    }
 }
 
 #[must_use]
 pub fn try_select(cond: Option<u32>, if_true: Option<u32>, if_false: Option<u32>) -> Option<u32> {
     cond.and_then(|cond| partial_select(cond, if_true, if_false))
+}
+
+#[must_use]
+pub fn partial_select_int(
+    cond: Int,
+    if_true: Option<Constant>,
+    if_false: Option<Constant>,
+) -> Option<Constant> {
+    if cond.unsigned() > 0 {
+        if_true
+    } else {
+        if_false
+    }
 }
 
 #[cfg(test)]

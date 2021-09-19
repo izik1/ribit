@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use rasen::params::Register;
 use ribit_ssa as ssa;
 pub use rt::{Block, Runtime, Target};
+use ssa::Constant;
 
 /// Runtime for X86-64 hosts.
 pub type AMD64Runtime = rt::Runtime<x86_64::rt::X86_64>;
@@ -31,7 +32,10 @@ impl Source {
     #[must_use]
     pub fn from_ssa_src(src: ssa::Source, map: &HashMap<ssa::Id, Register>) -> Option<Self> {
         match src {
-            ssa::Source::Val(v) => Some(Self::Val(v)),
+            ssa::Source::Const(Constant::Int(i)) => {
+                assert_eq!(i.bits(), 32);
+                Some(Source::Val(i.unsigned()))
+            }
             ssa::Source::Ref(r) => map.get(&r.id).copied().map(Self::Register),
         }
     }

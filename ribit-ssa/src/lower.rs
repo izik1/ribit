@@ -2,6 +2,7 @@ use ribit_core::{instruction, opcode, register, Width};
 
 use super::{BinOp, CmpKind, Id, Instruction, Source};
 use crate::reference::Reference;
+use crate::ty::{Bitness, Constant, Int};
 use crate::{eval, Arg, Block, IdAllocator, Terminator};
 
 pub struct Context {
@@ -22,7 +23,7 @@ impl Context {
 
         let mut self_ = Self {
             id_allocator: IdAllocator::new(),
-            pc: Source::Val(start_pc),
+            pc: Source::Const(Constant::i32(start_pc)),
             registers: [None; 32],
             register_arg: None,
             memory_arg: None,
@@ -60,8 +61,19 @@ impl Context {
     }
 
     pub fn binop(&mut self, op: BinOp, src1: Source, src2: Source) -> Source {
-        if let (Some(src1), Some(src2)) = (src1.val(), src2.val()) {
-            Source::Val(eval::binop(src1, src2, op))
+        assert_eq!(src1.ty(), src2.ty());
+
+        if let (Some(src1), Some(src2)) = (src1.constant(), src2.constant()) {
+            // "just work with arbitrary constants of compatable types"
+            match (src1, src2) {
+                (Constant::Int(Int(Bitness::B32, lhs)), Constant::Int(Int(Bitness::B32, rhs))) => {
+                    Source::Const(Constant::i32(eval::binop(lhs, rhs, op)))
+                }
+
+                (Constant::Int(lhs), Constant::Int(rhs)) => {
+                    panic!("binop between unsupported types: ({},{})", lhs.ty(), rhs.ty())
+                }
+            }
         } else {
             self.instruction(|dest| Instruction::BinOp { dest, src1, src2, op })
         }
@@ -89,7 +101,7 @@ impl Context {
     }
 
     pub fn load_register(&mut self, reg: Option<register::RiscV>) -> Source {
-        reg.map_or(Source::Val(0), |reg| self.read_register(reg))
+        reg.map_or(Source::Const(Constant::i32(0)), |reg| self.read_register(reg))
     }
 
     pub fn read_memory(&mut self, src: Source, width: Width, sign_extend: bool) -> Source {
@@ -144,23 +156,35 @@ impl Context {
     }
 
     pub fn cmp(&mut self, src1: Source, src2: Source, mode: CmpKind) -> Source {
-        if let (Some(src1), Some(src2)) = (src1.val(), src2.val()) {
-            Source::Val(eval::cmp(src1, src2, mode))
+        if let (Some(src1), Some(src2)) = (src1.constant(), src2.constant()) {
+            match (src1, src2) {
+                (Constant::Int(lhs), Constant::Int(rhs)) => {
+                    Source::Const(Constant::Int(eval::cmp_int(lhs, rhs, mode)))
+                }
+            }
         } else {
             self.instruction(|dest| Instruction::Cmp { dest, src1, src2, kind: mode })
         }
     }
 
     pub fn select(&mut self, cond: Source, if_true: Source, if_false: Source) -> Source {
-        if let Some(res) = eval::try_select(cond.val(), if_true.val(), if_false.val()) {
-            Source::Val(res)
+        let selected = cond.constant().and_then(|cond| match cond {
+            Constant::Int(cond) => {
+                eval::partial_select_int(cond, if_true.constant(), if_false.constant())
+            }
+        });
+
+        if let Some(res) = selected {
+            Source::Const(res)
         } else {
             self.instruction(|dest| Instruction::Select { dest, if_true, if_false, cond })
         }
     }
 
     pub fn mem_mask(&mut self, address: Source) -> Source {
-        self.and(address, Source::Val(self.memory_size - 1))
+        let memory_size = Source::Const(Constant::i32(self.memory_size - 1));
+
+        self.and(address, memory_size)
     }
 
     pub fn fence(&mut self) {
@@ -192,7 +216,7 @@ impl Context {
 
     #[must_use]
     pub fn ret_with_addr(self, addr: Source) -> Block {
-        self.ret_with_code(addr, Source::Val(0))
+        self.ret_with_code(addr, Source::Const(Constant::i32(0)))
     }
 
     #[must_use]
@@ -215,9 +239,10 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
                 opcode::IMem::FENCE => ctx.fence(),
                 opcode::IMem::LD(width) => {
                     let imm = imm as i16 as u32;
+                    let imm = Source::Const(Constant::i32(imm));
 
                     let src = ctx.load_register(rs1);
-                    let offset = ctx.add(src, Source::Val(imm));
+                    let offset = ctx.add(src, imm);
                     let offset = ctx.mem_mask(offset);
 
                     let mem = ctx.read_memory(offset, width, true);
@@ -229,9 +254,10 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
                 // todo: deduplicate with previous
                 opcode::IMem::LDU(width) => {
                     let imm = imm as i16 as u32;
+                    let imm = Source::Const(Constant::i32(imm));
 
                     let src = ctx.load_register(rs1);
-                    let offset = ctx.add(src, Source::Val(imm));
+                    let offset = ctx.add(src, imm);
                     let offset = ctx.mem_mask(offset);
 
                     let mem = ctx.read_memory(offset, width, false);
@@ -246,16 +272,17 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
         instruction::Instruction::I(instruction::I { opcode, imm, rs1, rd }) => {
             let imm = imm as i16 as u32;
             let src = ctx.load_register(rs1);
+            let imm = Source::Const(Constant::i32(imm));
 
             let res = match opcode {
-                opcode::I::ADDI => ctx.add(src, Source::Val(imm)),
-                opcode::I::XORI => ctx.xor(src, Source::Val(imm)),
-                opcode::I::ANDI => ctx.and(src, Source::Val(imm)),
-                opcode::I::SLLI => ctx.sll(src, Source::Val(imm)),
-                opcode::I::SRLI => ctx.srl(src, Source::Val(imm)),
-                opcode::I::SRAI => ctx.sra(src, Source::Val(imm)),
-                opcode::I::ORI => ctx.or(src, Source::Val(imm)),
-                opcode::I::SICond(cmp_mode) => ctx.cmp(src, Source::Val(imm), cmp_mode.into()),
+                opcode::I::ADDI => ctx.add(src, imm),
+                opcode::I::XORI => ctx.xor(src, imm),
+                opcode::I::ANDI => ctx.and(src, imm),
+                opcode::I::SLLI => ctx.sll(src, imm),
+                opcode::I::SRLI => ctx.srl(src, imm),
+                opcode::I::SRAI => ctx.sra(src, imm),
+                opcode::I::ORI => ctx.or(src, imm),
+                opcode::I::SICond(cmp_mode) => ctx.cmp(src, imm, cmp_mode.into()),
             };
 
             if let Some(rd) = rd {
@@ -294,10 +321,11 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
         }
         instruction::Instruction::S(instruction::S { width, rs1, rs2, imm }) => {
             let imm = imm as i16 as u32;
+            let imm = Source::Const(Constant::i32(imm));
 
             let src1 = ctx.load_register(rs1);
-            let addr = ctx.add(src1, Source::Val(imm));
-            let addr = ctx.and(addr, Source::Val(ctx.memory_size - 1));
+            let addr = ctx.add(src1, imm);
+            let addr = ctx.mem_mask(addr);
 
             let src2 = ctx.load_register(rs2);
             ctx.write_memory(addr, src2, width);
@@ -305,10 +333,11 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
         instruction::Instruction::U(instruction::U { opcode, imm, rd }) => {
             // ensure that the immediate only uses the upper 20 bits.
             let imm = imm & 0xffff_f000;
+            let imm = Source::Const(Constant::i32(imm));
 
             let res = match opcode {
-                opcode::U::LUI => Source::Val(imm),
-                opcode::U::AUIPC => ctx.add(ctx.pc, Source::Val(imm)),
+                opcode::U::LUI => imm,
+                opcode::U::AUIPC => ctx.add(ctx.pc, imm),
             };
 
             if let Some(rd) = rd {
@@ -317,23 +346,28 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
         }
     }
 
-    ctx.add_pc(Source::Val(len));
+    ctx.add_pc(Source::Const(Constant::i32(len)));
 }
 
 #[must_use]
 pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u32) -> Block {
+    let len = Source::Const(Constant::i32(len));
+
     match instruction {
         instruction::Instruction::J(instruction::J { opcode: opcode::J::JAL, rd, imm }) => {
             // load pc + len into rd (the link register)
             if let Some(rd) = rd {
                 // we specifically need to avoid modifying `pc`, since we need the
                 // old value for adding the immediate.
-                let next_pc = ctx.add(ctx.pc, Source::Val(len));
+
+                let next_pc = ctx.add(ctx.pc, len);
 
                 ctx.write_register(rd, next_pc);
             }
 
-            ctx.add_pc(Source::Val(imm));
+            let imm = Source::Const(Constant::i32(imm));
+
+            ctx.add_pc(imm);
 
             ctx.ret()
         }
@@ -351,7 +385,7 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
 
             // load pc + len into rd (the link register)
             if let Some(rd) = rd {
-                let next_pc = ctx.add_pc(Source::Val(len));
+                let next_pc = ctx.add_pc(len);
 
                 ctx.write_register(rd, next_pc);
             }
@@ -359,13 +393,16 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
             // adding 0 is the same as not adding, so don't bother with a match here.
             if let Some(mut src) = src {
                 if imm != 0 {
-                    src = ctx.add(src, Source::Val(imm));
+                    let imm = Source::Const(Constant::i32(imm));
+                    src = ctx.add(src, imm);
                 }
 
-                src = ctx.and(src, Source::Val(!1));
+                src = ctx.and(src, Source::Const(Constant::i32(!1)));
                 ctx.override_pc(src);
             } else {
-                ctx.override_pc(Source::Val(imm & !1));
+                let imm = Source::Const(Constant::i32(imm));
+                let imm = ctx.and(imm, Source::Const(Constant::i32(!1)));
+                ctx.override_pc(imm);
             }
 
             ctx.ret()
@@ -378,20 +415,24 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
                 opcode::RSys::ECALL => ReturnCode::ECall,
             } as u32;
 
-            let pc = ctx.add_pc(Source::Val(len));
+            let return_code = Source::Const(Constant::i32(return_code));
 
-            ctx.ret_with_code(pc, Source::Val(return_code))
+            let pc = ctx.add_pc(len);
+
+            ctx.ret_with_code(pc, return_code)
         }
 
         instruction::Instruction::B(instruction::B { imm, rs1, rs2, cmp_mode }) => {
+            let imm = Source::Const(Constant::i32(imm as i16 as u32));
+
             let src1 = ctx.load_register(rs1);
             let src2 = ctx.load_register(rs2);
 
             let cmp = ctx.cmp(src1, src2, cmp_mode.into());
 
-            let continue_pc = ctx.add(ctx.pc, Source::Val(len));
+            let continue_pc = ctx.add(ctx.pc, len);
 
-            let jump_pc = ctx.add(ctx.pc, Source::Val(imm as i16 as u32));
+            let jump_pc = ctx.add(ctx.pc, imm);
 
             let addr = ctx.select(cmp, jump_pc, continue_pc);
 
