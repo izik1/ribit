@@ -236,7 +236,7 @@ pub fn spill(block: &mut ribit_ssa::Block, spill: RegisterSpill) {
 
 #[cfg(test)]
 mod test {
-    use insta::{assert_display_snapshot, assert_snapshot};
+    use expect_test::expect;
     use ribit_ssa::{analysis, opt};
 
     use crate::test::max_fn;
@@ -268,7 +268,36 @@ mod test {
         }
 
         // the main snapshot (long form, allows human readability)
-        assert_snapshot!(lifetimes);
-        assert_display_snapshot!(crate::test::ShowAllocs { allocs: &allocs, clobbers: &clobbers });
+        expect![[r#"
+            [10, -, -, -, -, -, -, -, -] zdi = args[0]
+            [ 9, 7, -, -, -, -, -, -, -] zax = x(zdi)10
+            [ 8, 6, 1, -, -, -, -, -, -] zcx = x(zdi)11
+            [ 7, 5, 0, 3, -, -, -, -, -] zcx = add zax, zcx
+            [ 6, 4, -, 2, 2, -, -, -, -] zdx = srl zcx, 0000001f
+            [ 5, 3, -, 1, 1, -, -, -, -] x(zdi)12 = zdx
+            [ 4, 2, -, 0, 0, 2, -, -, -] zcx = and zcx, zdx
+            [ 3, 1, -, -, -, 1, -, -, -] x(zdi)11 = zcx
+            [ 2, 0, -, -, -, 0, 1, -, -] zax = add zax, zcx
+            [ 1, -, -, -, -, -, 0, -, -] x(zdi)10 = zax
+            [ 0, -, -, -, -, -, -, 1, -] zax = x(zdi)1
+            [--, -, -, -, -, -, -, 0, 1] zax = and zax, fffffffe
+            [--, -, -, -, -, -, -, -, 0] ret 00000000, zax
+        "#]]
+        .assert_eq(&lifetimes);
+
+        expect![[r#"
+            %0 => zdi
+            %2 => zax
+            %3 => zcx
+            %4 => zcx
+            %5 => zdx
+            %6 => zcx
+            %7 => zax
+            %8 => zax
+            %9 => zax
+            ---------
+            12 => [zax, zcx]
+        "#]]
+        .assert_eq(&crate::test::ShowAllocs { allocs: &allocs, clobbers: &clobbers }.to_string());
     }
 }

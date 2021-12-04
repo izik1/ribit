@@ -65,7 +65,11 @@ pub fn count_clobbers_for_terminal(
                 .or_else(|| code.reference())
                 .map_or(false, |r| allocs[&r.id] == Register::Zax);
 
-            if register_count == 1 && zax_used { 2 } else { 0 }
+            if register_count == 1 && zax_used {
+                2
+            } else {
+                0
+            }
         }
     }
 }
@@ -111,7 +115,6 @@ fn commutative(op: BinOp) -> bool {
 
 #[cfg(test)]
 mod test {
-    use insta::assert_snapshot;
     use ribit_ssa::{analysis, opt};
 
     use crate::test::max_fn;
@@ -146,6 +149,21 @@ mod test {
         }
 
         // the main snapshot (long form, allows human readability)
-        assert_snapshot!(lifetimes);
+
+        expect_test::expect![[r#"
+            [10, -, -, -, -, -, -, -, -] zdi = args[0]
+            [ 9, 7, -, -, -, -, -, -, -] zax = x(zdi)10
+            [ 8, 6, 1, -, -, -, -, -, -] zcx = x(zdi)11
+            [ 7, 5, 0, 3, -, -, -, -, -] zcx = add zcx, zax
+            [ 6, 4, -, 2, 2, -, -, -, -] zdx = srl zcx, 0000001f
+            [ 5, 3, -, 1, 1, -, -, -, -] x(zdi)12 = zdx
+            [ 4, 2, -, 0, 0, 2, -, -, -] zcx = and zcx, zdx
+            [ 3, 1, -, -, -, 1, -, -, -] x(zdi)11 = zcx
+            [ 2, 0, -, -, -, 0, 1, -, -] zax = add zax, zcx
+            [ 1, -, -, -, -, -, 0, -, -] x(zdi)10 = zax
+            [ 0, -, -, -, -, -, -, 1, -] zax = x(zdi)1
+            [--, -, -, -, -, -, -, 0, 1] zax = and zax, fffffffe
+            [--, -, -, -, -, -, -, -, 0] ret 00000000, zax
+        "#]].assert_eq(&lifetimes);
     }
 }

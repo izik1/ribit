@@ -5,7 +5,6 @@ mod bitness;
 pub use bitness::Bitness;
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
-#[cfg_attr(test, derive(serde::Serialize))]
 pub enum Type {
     Int(Bitness),
     /// Unit type, `()` in Rust, `void` in C
@@ -30,7 +29,6 @@ impl fmt::Display for Type {
 }
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
-#[cfg_attr(test, derive(serde::Serialize))]
 pub enum Constant {
     Int(Int),
 }
@@ -64,7 +62,6 @@ impl fmt::Display for Constant {
 }
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
-#[cfg_attr(test, derive(serde::Serialize))]
 pub struct Int(pub Bitness, pub u32);
 
 impl Int {

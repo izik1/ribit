@@ -1,4 +1,4 @@
-use insta::assert_display_snapshot;
+use expect_test::expect;
 use ribit_core::{instruction, opcode, register, Width};
 
 use super::Context;
@@ -41,7 +41,12 @@ fn jalr_link_eq_src() {
         4,
     );
 
-    assert_display_snapshot!(&block.display_instructions());
+    expect![[r#"
+        %0 = args[0]
+        %1 = args[1]
+        x(%0)17 = 00010138
+        ret 00000000, 00010148"#]]
+    .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
@@ -59,7 +64,15 @@ fn jalr_bit() {
         4,
     );
 
-    assert_display_snapshot!(&block.display_instructions());
+    expect![[r#"
+        %0 = args[0]
+        %1 = args[1]
+        %2 = x(%0)1
+        %3 = add %2, 000007ff
+        %4 = and %3, fffffffe
+        x(%0)4 = 00000034
+        ret 00000000, %4"#]]
+    .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
@@ -77,7 +90,15 @@ fn jalr_pc() {
         4,
     );
 
-    assert_display_snapshot!(&block.display_instructions());
+    expect![[r#"
+        %0 = args[0]
+        %1 = args[1]
+        %2 = x(%0)1
+        %3 = add %2, 000007fe
+        %4 = and %3, fffffffe
+        x(%0)4 = 00000034
+        ret 00000000, %4"#]]
+    .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
@@ -94,7 +115,12 @@ fn jal_basic() {
         4,
     );
 
-    assert_display_snapshot!(&block.display_instructions());
+    expect![[r#"
+        %0 = args[0]
+        %1 = args[1]
+        x(%0)4 = 00000004
+        ret 00000000, 00001000"#]]
+    .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
@@ -107,7 +133,11 @@ fn sys_break() {
         4,
     );
 
-    assert_display_snapshot!(&block.display_instructions());
+    expect![[r#"
+        %0 = args[0]
+        %1 = args[1]
+        ret 00000001, 00000004"#]]
+    .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
@@ -125,7 +155,11 @@ fn addi_nop() {
         4,
     );
 
-    assert_display_snapshot!(&block.display_instructions());
+    expect![[r#"
+        %0 = args[0]
+        %1 = args[1]
+        ret 00000001, 00000008"#]]
+    .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
@@ -137,7 +171,11 @@ fn branch_0_0_eq() {
         4,
     );
 
-    assert_display_snapshot!(&block.display_instructions());
+    expect![[r#"
+        %0 = args[0]
+        %1 = args[1]
+        ret 00000000, 00000400"#]]
+    .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
@@ -154,7 +192,14 @@ fn branch_0_x1_eq() {
         4,
     );
 
-    assert_display_snapshot!(&block.display_instructions());
+    expect![[r#"
+        %0 = args[0]
+        %1 = args[1]
+        %2 = x(%0)1
+        %3 = cmp EQ 00000000, %2
+        %4 = select %3, 00000400, 00000004
+        ret 00000000, %4"#]]
+    .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
@@ -177,7 +222,13 @@ fn addi_no_dest() {
         4,
     );
 
-    assert_display_snapshot!(&block.display_instructions());
+    expect![[r#"
+        %0 = args[0]
+        %1 = args[1]
+        %2 = x(%0)1
+        %3 = add %2, 00000032
+        ret 00000001, 00000008"#]]
+    .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
@@ -222,7 +273,20 @@ fn mem_read_write() {
         4,
     );
 
-    assert_display_snapshot!(&block.display_instructions());
+    expect![[r#"
+        %0 = args[0]
+        %1 = args[1]
+        %2 = x(%0)1
+        %3 = add %2, 00000000
+        %4 = and %3, 00ffffff
+        %5 = signed dword m(%1)%4
+        %6 = add %5, 00000064
+        %7 = add %6, 00000032
+        %8 = and %7, 00ffffff
+        m(%1)%8 = dword %2
+        x(%0)2 = %6
+        ret 00000001, 00000010"#]]
+    .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
@@ -245,7 +309,12 @@ fn addi_no_src() {
         4,
     );
 
-    assert_display_snapshot!(&block.display_instructions());
+    expect![[r#"
+        %0 = args[0]
+        %1 = args[1]
+        x(%0)2 = 00000032
+        ret 00000001, 00000008"#]]
+    .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]

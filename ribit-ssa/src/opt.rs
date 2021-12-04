@@ -9,7 +9,7 @@ pub use pass_manager::PassManager;
 pub use register_writeback_shrinking::run as register_writeback_shrinking;
 #[cfg(test)]
 mod test {
-    use insta::assert_display_snapshot;
+    use expect_test::expect;
     use ribit_core::{instruction, opcode, register, Width};
 
     use crate::lower;
@@ -31,7 +31,11 @@ mod test {
 
         super::fold_and_prop_consts(&mut block);
 
-        assert_display_snapshot!(block.display_instructions());
+        expect![[r#"
+            %0 = args[0]
+            %1 = args[1]
+            x(%0)4 = 00000004
+            ret 00000000, 00001000"#]].assert_eq(&block.display_instructions().to_string())
     }
 
     #[test]
@@ -80,7 +84,19 @@ mod test {
         super::dead_instruction_elimination(&mut block);
         super::register_writeback_shrinking(&mut block);
 
-        assert_display_snapshot!(block.display_instructions());
+        expect![[r#"
+            %0 = args[0]
+            %1 = args[1]
+            %2 = x(%0)1
+            %3 = add %2, 00000000
+            %4 = and %3, 00ffffff
+            %5 = signed dword m(%1)%4
+            %6 = add %5, 00000064
+            x(%0)2 = %6
+            %7 = add %6, 00000032
+            %8 = and %7, 00ffffff
+            m(%1)%8 = dword %2
+            ret 00000001, 00000010"#]].assert_eq(&block.display_instructions().to_string())
     }
 
     #[test]
@@ -91,7 +107,20 @@ mod test {
         super::dead_instruction_elimination(&mut block);
         super::register_writeback_shrinking(&mut block);
 
-        assert_display_snapshot!(block.display_instructions());
+        expect![[r#"
+            %0 = args[0]
+            %2 = x(%0)10
+            %3 = x(%0)11
+            %4 = add %2, %3
+            %5 = srl %4, 0000001f
+            x(%0)12 = %5
+            %6 = and %4, %5
+            x(%0)11 = %6
+            %7 = add %2, %6
+            x(%0)10 = %7
+            %8 = x(%0)1
+            %9 = and %8, fffffffe
+            ret 00000000, %9"#]].assert_eq(&block.display_instructions().to_string())
     }
 
     #[test]
@@ -145,7 +174,20 @@ mod test {
 
         // todo: C-constprop (add %n, 0) instructions
 
-        assert_display_snapshot!(block.display_instructions());
+        expect![[r#"
+            %0 = args[0]
+            %1 = args[1]
+            %2 = x(%0)2
+            %3 = add %2, 00000000
+            %4 = and %3, 00ffffff
+            %5 = x(%0)11
+            m(%1)%4 = byte %5
+            %6 = x(%0)12
+            %7 = add %6, 00000000
+            x(%0)2 = %7
+            x(%0)1 = 0001002c
+            x(%0)6 = 00010024
+            ret 00000000, 00010190"#]].assert_eq(&block.display_instructions().to_string())
     }
 
     #[test]
@@ -165,6 +207,9 @@ mod test {
         super::fold_and_prop_consts(&mut block);
         super::dead_instruction_elimination(&mut block);
 
-        assert_display_snapshot!(block.display_instructions());
+        expect![[r#"
+            %0 = args[0]
+            x(%0)4 = 00000004
+            ret 00000000, 00001000"#]].assert_eq(&block.display_instructions().to_string())
     }
 }

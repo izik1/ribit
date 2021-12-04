@@ -3,7 +3,6 @@ use std::fmt;
 use crate::{Id, Type};
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
-#[cfg_attr(test, derive(serde::Serialize))]
 pub struct Reference {
     pub ty: Type,
     pub id: Id,

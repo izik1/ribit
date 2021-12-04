@@ -1,7 +1,6 @@
 use std::num::NonZeroU8;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-#[cfg_attr(test, derive(serde::Serialize))]
 pub struct RiscV(NonZeroU8);
 
 // all of these functions are super trivial and should *always* be inlined.

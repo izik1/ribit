@@ -41,7 +41,6 @@ impl StackIndex {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-#[cfg_attr(test, derive(serde::Serialize))]
 pub enum CmpKind {
     Eq,
     Ne,
@@ -78,7 +77,6 @@ impl fmt::Display for CmpKind {
 }
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
-#[cfg_attr(test, derive(serde::Serialize))]
 pub enum Source {
     Const(Constant),
     Ref(Reference),
@@ -120,7 +118,6 @@ impl fmt::Display for Source {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-#[cfg_attr(test, derive(serde::Serialize))]
 pub enum BinOp {
     And,
     Add,

@@ -20,7 +20,6 @@ impl IdAllocator {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, PartialOrd, Ord)]
-#[cfg_attr(test, derive(serde::Serialize))]
 pub struct Id(pub(crate) u16);
 
 impl fmt::Display for Id {

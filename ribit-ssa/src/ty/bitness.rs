@@ -68,13 +68,3 @@ impl Ord for Bitness {
         self.to_bits().cmp(&other.to_bits())
     }
 }
-
-#[cfg(test)]
-impl serde::Serialize for Bitness {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_u8(self.to_bits())
-    }
-}

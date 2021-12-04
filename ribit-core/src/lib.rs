@@ -13,7 +13,6 @@ pub mod register;
 
 // note: RISC-V would have these be: B, H(W), W
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-#[cfg_attr(test, derive(serde::Serialize))]
 pub enum Width {
     Byte,
     Word,

@@ -10,7 +10,3 @@ log = "0.4.8"
 
 [dependencies.ribit-core]
 path = "../ribit-core"
-
-[dev-dependencies]
-insta = { version = "1.7.0" }
-serde = "1.0.104"
