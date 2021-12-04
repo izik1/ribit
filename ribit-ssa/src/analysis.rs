@@ -742,7 +742,8 @@ mod test {
             [ 0, -, -, -, -, -, -, 1, -] %8 = x(%0)1
             [--, -, -, -, -, -, -, 0, 1] %9 = and %8, fffffffe
             [--, -, -, -, -, -, -, -, 0] ret 00000000, %9
-        "#]].assert_eq(
+        "#]]
+        .assert_eq(
             &ShowLifetimes::new(&lifetimes, &block.instructions, &block.terminator).to_string(),
         );
     }

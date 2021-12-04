@@ -32,11 +32,7 @@ impl fmt::Display for StackIndex {
 impl StackIndex {
     #[must_use]
     pub fn offset(self, redzone: bool) -> i32 {
-        if redzone {
-            (self.0 as i32 + 1) * -4
-        } else {
-            self.0 as i32 * 4
-        }
+        if redzone { (self.0 as i32 + 1) * -4 } else { self.0 as i32 * 4 }
     }
 }
 

@@ -65,11 +65,7 @@ pub fn count_clobbers_for_terminal(
                 .or_else(|| code.reference())
                 .map_or(false, |r| allocs[&r.id] == Register::Zax);
 
-            if register_count == 1 && zax_used {
-                2
-            } else {
-                0
-            }
+            if register_count == 1 && zax_used { 2 } else { 0 }
         }
     }
 }
@@ -164,6 +160,7 @@ mod test {
             [ 0, -, -, -, -, -, -, 1, -] zax = x(zdi)1
             [--, -, -, -, -, -, -, 0, 1] zax = and zax, fffffffe
             [--, -, -, -, -, -, -, -, 0] ret 00000000, zax
-        "#]].assert_eq(&lifetimes);
+        "#]]
+        .assert_eq(&lifetimes);
     }
 }

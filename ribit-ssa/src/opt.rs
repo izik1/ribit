@@ -35,7 +35,8 @@ mod test {
             %0 = args[0]
             %1 = args[1]
             x(%0)4 = 00000004
-            ret 00000000, 00001000"#]].assert_eq(&block.display_instructions().to_string())
+            ret 00000000, 00001000"#]]
+        .assert_eq(&block.display_instructions().to_string())
     }
 
     #[test]
@@ -96,7 +97,8 @@ mod test {
             %7 = add %6, 00000032
             %8 = and %7, 00ffffff
             m(%1)%8 = dword %2
-            ret 00000001, 00000010"#]].assert_eq(&block.display_instructions().to_string())
+            ret 00000001, 00000010"#]]
+        .assert_eq(&block.display_instructions().to_string())
     }
 
     #[test]
@@ -120,7 +122,8 @@ mod test {
             x(%0)10 = %7
             %8 = x(%0)1
             %9 = and %8, fffffffe
-            ret 00000000, %9"#]].assert_eq(&block.display_instructions().to_string())
+            ret 00000000, %9"#]]
+        .assert_eq(&block.display_instructions().to_string())
     }
 
     #[test]
@@ -187,7 +190,8 @@ mod test {
             x(%0)2 = %7
             x(%0)1 = 0001002c
             x(%0)6 = 00010024
-            ret 00000000, 00010190"#]].assert_eq(&block.display_instructions().to_string())
+            ret 00000000, 00010190"#]]
+        .assert_eq(&block.display_instructions().to_string())
     }
 
     #[test]
@@ -210,6 +214,7 @@ mod test {
         expect![[r#"
             %0 = args[0]
             x(%0)4 = 00000004
-            ret 00000000, 00001000"#]].assert_eq(&block.display_instructions().to_string())
+            ret 00000000, 00001000"#]]
+        .assert_eq(&block.display_instructions().to_string())
     }
 }

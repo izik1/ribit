@@ -48,11 +48,7 @@ pub fn binop(src1: u32, src2: u32, op: BinOp) -> u32 {
 
 #[must_use]
 pub fn select(cond: u32, if_true: u32, if_false: u32) -> u32 {
-    if cond >= 1 {
-        if_true
-    } else {
-        if_false
-    }
+    if cond >= 1 { if_true } else { if_false }
 }
 
 #[must_use]
@@ -61,11 +57,7 @@ pub fn partial_select_int(
     if_true: Option<Constant>,
     if_false: Option<Constant>,
 ) -> Option<Constant> {
-    if cond.unsigned() > 0 {
-        if_true
-    } else {
-        if_false
-    }
+    if cond.unsigned() > 0 { if_true } else { if_false }
 }
 
 #[cfg(test)]
