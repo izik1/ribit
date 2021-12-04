@@ -52,6 +52,7 @@
                   nixpkgs-fmt
                   cargo-outdated
                   cargo-edit
+                  cargo-llvm-lines
                 ]);
               RUST_SRC_PATH = "${pkgs.rust-bin.${rustChannel}.${rustVersion}.rust-src}/lib/rustlib/src/rust/library";
             };
