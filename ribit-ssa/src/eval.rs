@@ -1,5 +1,5 @@
 use crate::ty::{Constant, Int};
-use crate::{BinOp, CmpKind, Bitness};
+use crate::{BinOp, Bitness, CmpKind, CommutativeBinOp};
 
 #[must_use]
 pub fn cmp(src1: u32, src2: u32, mode: CmpKind) -> u32 {
@@ -32,14 +32,20 @@ pub fn cmp_int(lhs: Int, rhs: Int, op: CmpKind) -> bool {
 #[must_use]
 pub fn binop(src1: u32, src2: u32, op: BinOp) -> u32 {
     match op {
-        BinOp::And => src1 & src2,
-        BinOp::Add => src1.wrapping_add(src2),
-        BinOp::Or => src1 | src2,
         BinOp::Sll => src1 << (src2 & 0x1f),
         BinOp::Srl => src1 >> (src2 & 0x1f),
         BinOp::Sra => ((src1 as i32) >> (src2 & 0x1f)) as u32,
         BinOp::Sub => src1.wrapping_sub(src2),
-        BinOp::Xor => src1 ^ src2,
+    }
+}
+
+#[must_use]
+pub fn commutative_binop(src1: u32, src2: u32, op: CommutativeBinOp) -> u32 {
+    match op {
+        CommutativeBinOp::And => src1 & src2,
+        CommutativeBinOp::Add => src1.wrapping_add(src2),
+        CommutativeBinOp::Or => src1 | src2,
+        CommutativeBinOp::Xor => src1 ^ src2,
     }
 }
 
@@ -66,7 +72,7 @@ pub fn partial_select_int(
 }
 
 #[must_use]
-pub fn extend_int(width: ribit_core::Width, src: Constant, signed:  bool) -> Int {
+pub fn extend_int(width: ribit_core::Width, src: Constant, signed: bool) -> Int {
     let target_bitness = Bitness::from(width);
     let value = match src {
         Constant::Int(i) => {
@@ -87,7 +93,6 @@ pub fn extend_int(width: ribit_core::Width, src: Constant, signed:  bool) -> Int
     let value = value & (1 << target_bitness.to_bits() - 1);
     Int(target_bitness, value)
 }
-
 
 #[cfg(test)]
 mod test {

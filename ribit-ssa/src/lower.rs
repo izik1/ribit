@@ -6,7 +6,7 @@ use ribit_core::{instruction, opcode, register, Width};
 use super::{AnySource, BinOp, CmpKind, Id, Instruction};
 use crate::reference::Reference;
 use crate::ty::{Bitness, BoolTy, ConstTy, Constant, Int};
-use crate::{eval, Arg, Block, IdAllocator, Terminator, TypedSource};
+use crate::{eval, Arg, Block, CommutativeBinOp, IdAllocator, Terminator, TypedSource};
 
 pub struct Context {
     id_allocator: IdAllocator,
@@ -76,6 +76,38 @@ impl Context {
         TypedSource::Ref(id)
     }
 
+    pub fn commutative_binop(
+        &mut self,
+        op: CommutativeBinOp,
+        src1: AnySource,
+        src2: AnySource,
+    ) -> AnySource {
+        assert_eq!(src1.ty(), src2.ty());
+
+        match (src1, src2) {
+            (AnySource::Const(src1), AnySource::Const(src2)) => match (src1, src2) {
+                (Constant::Int(Int(Bitness::B32, lhs)), Constant::Int(Int(Bitness::B32, rhs))) => {
+                    AnySource::Const(Constant::i32(eval::commutative_binop(lhs, rhs, op)))
+                }
+
+                (lhs, rhs) => {
+                    panic!("binop between unsupported types: ({},{})", lhs.ty(), rhs.ty())
+                }
+            },
+            (AnySource::Const(c), AnySource::Ref(r)) | (AnySource::Ref(r), AnySource::Const(c)) => {
+                self.instruction(|dest| Instruction::CommutativeBinOp {
+                    dest,
+                    src1: r,
+                    src2: AnySource::Const(c),
+                    op,
+                })
+            }
+            (AnySource::Ref(src1), src2 @ AnySource::Ref(_)) => {
+                self.instruction(|dest| Instruction::CommutativeBinOp { dest, src1, src2, op })
+            }
+        }
+    }
+
     pub fn binop(&mut self, op: BinOp, src1: AnySource, src2: AnySource) -> AnySource {
         assert_eq!(src1.ty(), src2.ty());
 
@@ -140,7 +172,7 @@ impl Context {
     }
 
     pub fn or(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
-        self.binop(BinOp::Or, src1, src2)
+        self.commutative_binop(CommutativeBinOp::Or, src1, src2)
     }
 
     pub fn sll(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
@@ -156,15 +188,15 @@ impl Context {
     }
 
     pub fn xor(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
-        self.binop(BinOp::Xor, src1, src2)
+        self.commutative_binop(CommutativeBinOp::Xor, src1, src2)
     }
 
     pub fn and(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
-        self.binop(BinOp::And, src1, src2)
+        self.commutative_binop(CommutativeBinOp::And, src1, src2)
     }
 
     pub fn add(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
-        self.binop(BinOp::Add, src1, src2)
+        self.commutative_binop(CommutativeBinOp::Add, src1, src2)
     }
 
     pub fn sub(&mut self, src1: AnySource, src2: AnySource) -> AnySource {

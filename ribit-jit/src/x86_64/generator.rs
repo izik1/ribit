@@ -68,6 +68,15 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                     math::binop(self, dest, src1, src2, op)
                 }
 
+                &ssa::Instruction::CommutativeBinOp { dest, src1, src2, op } => {
+                    let dest = *allocs.get(&dest).expect("dest not allocated!?");
+                    let src1 = *allocs.get(&src1.id).expect("src1 not allocated!?");
+                    let src2 =
+                        crate::Source::from_ssa_src(src2, allocs).expect("src2 not allocated!?");
+
+                    math::commutative_binop(self, dest, src1, src2, op)
+                }
+
                 &ssa::Instruction::ReadReg { dest, base, src } => {
                     let base =
                         crate::Source::from_ssa_src(base, allocs).expect("base not allocated!?");

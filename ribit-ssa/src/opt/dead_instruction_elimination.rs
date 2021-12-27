@@ -69,6 +69,15 @@ pub fn run(block: &mut Block) {
                 mark_live(&mut live_ids, *base);
             }
 
+            Instruction::CommutativeBinOp { dest, src1, src2, .. } => {
+                if live_ids[dest.0 as usize] {
+                    live_instruction_count += 1;
+                    mark_id_live(&mut live_ids, src1.id);
+                    mark_live(&mut live_ids, *src2);
+
+                }
+            }
+
             Instruction::BinOp { dest, src1, src2, .. }
             | Instruction::Cmp { dest, src1, src2, .. } => {
                 if live_ids[dest.0 as usize] {

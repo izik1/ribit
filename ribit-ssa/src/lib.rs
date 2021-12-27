@@ -196,31 +196,43 @@ impl fmt::Display for AnySource {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum BinOp {
+pub enum CommutativeBinOp {
     And,
     Add,
     Or,
-    Sll,
-    Srl,
-    Sra,
-    Sub,
     Xor,
 }
 
-impl fmt::Display for BinOp {
+impl fmt::Display for CommutativeBinOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::And => f.write_str("and"),
             Self::Add => f.write_str("add"),
             Self::Or => f.write_str("or"),
-            Self::Sll => f.write_str("sll"),
-            Self::Srl => f.write_str("srl"),
-            Self::Sra => f.write_str("sra"),
-            Self::Sub => f.write_str("sub"),
             Self::Xor => f.write_str("xor"),
         }
     }
 }
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum BinOp {
+    Sll,
+    Srl,
+    Sra,
+    Sub,
+}
+
+impl fmt::Display for BinOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Sll => f.write_str("sll"),
+            Self::Srl => f.write_str("srl"),
+            Self::Sra => f.write_str("sra"),
+            Self::Sub => f.write_str("sub"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(u8)]
 pub enum Arg {
@@ -264,6 +276,14 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
             Instruction::BinOp { dest: _, src1, src2, .. }
             | Instruction::Cmp { dest: _, src1, src2, .. } => {
                 update_reference(src1, old, new);
+                update_reference(src2, old, new);
+            }
+
+            Instruction::CommutativeBinOp { dest: _, src1, src2, .. } => {
+                if src1.id == old {
+                    src1.id = new;
+                }
+
                 update_reference(src2, old, new);
             }
 

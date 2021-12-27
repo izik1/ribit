@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::mem;
 
 use rasen::params::Register;
-use ribit_ssa::{BinOp, Block, Id, Instruction, Terminator};
+use ribit_ssa::{Block, Id, Instruction, Terminator, AnySource};
 
 /// Counts the clobbers required to execute the instruction (optimally)
 ///
@@ -20,6 +20,7 @@ pub fn count_clobbers_for(instr: &Instruction, allocs: &HashMap<Id, Register>) -
         | Instruction::Fence
         | Instruction::ExtInt { .. }
         | Instruction::BinOp {.. } 
+        | Instruction::CommutativeBinOp {.. } 
         // note: although slightly complicated, this can indeed be done without any branching
         // in even the worst cases, by doing the following:
         // <comparision>
@@ -79,12 +80,17 @@ pub fn count_clobbers_for_terminal(
 pub fn legalise(block: &mut Block, allocs: &HashMap<Id, Register>) {
     for instruction in &mut block.instructions {
         match instruction {
-            Instruction::BinOp { dest, src1, src2, op } => {
-                let src_reg_1 = src1.reference().and_then(|it| allocs.get(&it.id));
-                let src_reg_2 = src2.reference().and_then(|it| allocs.get(&it.id));
+            Instruction::CommutativeBinOp { dest, src1, src2, op: _} => {
+                let src2 = match src2 {
+                    AnySource::Const(_) => continue,
+                    AnySource::Ref(r) => r,
+                };
+
+                let src_reg_1 = allocs.get(&src1.id);
+                let src_reg_2 = allocs.get(&src2.id);
                 let dest_reg = allocs.get(dest);
 
-                if src_reg_1 != dest_reg && src_reg_2 == dest_reg && commutative(*op) {
+                if src_reg_1 != dest_reg && src_reg_2 == dest_reg  {
                     mem::swap(src1, src2);
                 }
             }
@@ -100,18 +106,12 @@ pub fn legalise(block: &mut Block, allocs: &HashMap<Id, Register>) {
             Instruction::Select { dest: _, cond: _, if_true: _, if_false: _ } => {}
             Instruction::Fence => {}
             Instruction::ExtInt { .. } => {}
+            Instruction::BinOp { .. } => {}
         }
     }
 
     match &mut block.terminator {
         ribit_ssa::Terminator::Ret { addr: _, code: _ } => {}
-    }
-}
-
-fn commutative(op: BinOp) -> bool {
-    match op {
-        BinOp::Add | BinOp::And | BinOp::Or | BinOp::Xor => true,
-        BinOp::Sub | BinOp::Sll | BinOp::Sra | BinOp::Srl => false,
     }
 }
 

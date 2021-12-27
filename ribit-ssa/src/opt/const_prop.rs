@@ -57,6 +57,42 @@ fn run_instruction(
             None
         }
 
+        Instruction::CommutativeBinOp { dest, src1, src2, op } => {
+            const_prop(consts, src2);
+
+            let lhs = const_id_lookup(consts, AnySource::Ref(*src1))?;
+
+            // have to indiana jones this stuff around...
+            // potentially confusing note: if we return early,
+            // this change happens, but if we don't, we ignore it.
+            let old_src2 = std::mem::replace(src2, AnySource::Const(lhs));
+
+            let rhs = match old_src2 {
+                AnySource::Ref(r) => {
+                    *src1 = r;
+                    return None;
+                }
+                AnySource::Const(konst) => konst,
+            };
+
+            let res = match (lhs, rhs) {
+                (Constant::Int(lhs), Constant::Int(rhs))
+                    if lhs.bits() == rhs.bits() && lhs.bits() == 32 =>
+                {
+                    Constant::i32(eval::commutative_binop(lhs.1, rhs.1, *op))
+                }
+
+                (Constant::Int(lhs), Constant::Int(rhs)) => {
+                    panic!("mismatched integral bitness: ({} != {})", lhs.bits(), rhs.bits())
+                }
+                (lhs, rhs) => {
+                    panic!("can't compare types of `{}` and `{}`", lhs.ty(), rhs.ty())
+                }
+            };
+
+            Some((*dest, res))
+        }
+
         Instruction::BinOp { dest, src1, src2, op } => {
             const_prop(consts, src1);
             const_prop(consts, src2);

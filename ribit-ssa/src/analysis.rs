@@ -44,6 +44,12 @@ fn lifetime_instruction<F: FnMut(&mut Lifetimes, Id, usize)>(
             update_source(lifetimes, src2, idx, &mut update);
         }
 
+        Instruction::CommutativeBinOp { dest, src1, src2, .. } => {
+            update(lifetimes, *dest, idx);
+            update(lifetimes, src1.id, idx);
+            update_source(lifetimes, src2, idx, &mut update);
+        }
+
         Instruction::ReadReg { dest, base, .. } => {
             update(lifetimes, *dest, idx);
             update_source(lifetimes, base, idx, &mut update);

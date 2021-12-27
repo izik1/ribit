@@ -4,7 +4,7 @@ use ribit_core::{register, Width};
 
 use crate::reference::Reference;
 use crate::ty::{Bitness, BoolTy};
-use crate::{AnySource, Arg, BinOp, CmpKind, Id, StackIndex, Type, TypedSource};
+use crate::{AnySource, Arg, BinOp, CmpKind, CommutativeBinOp, Id, StackIndex, Type, TypedSource};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Instruction {
@@ -17,13 +17,13 @@ pub enum Instruction {
     ReadMem { dest: Id, src: AnySource, base: AnySource, width: Width, sign_extend: bool },
     WriteMem { addr: AnySource, src: AnySource, base: AnySource, width: Width },
     BinOp { dest: Id, src1: AnySource, src2: AnySource, op: BinOp },
+    CommutativeBinOp { dest: Id, src1: Reference, src2: AnySource, op: CommutativeBinOp },
     Cmp { dest: Id, src1: AnySource, src2: AnySource, kind: CmpKind },
     // todo: box this
     Select { dest: Id, cond: TypedSource<BoolTy>, if_true: AnySource, if_false: AnySource },
     ExtInt { dest: Id, width: Width, src: Reference, signed: bool },
     Fence,
 }
-
 impl Instruction {
     #[must_use]
     pub fn ty(&self) -> Type {
@@ -39,6 +39,16 @@ impl Instruction {
             Instruction::WriteMem { addr: _, src: _, base: _, width: _ } => Type::Unit,
             Instruction::BinOp { dest: _, src1, src2, op: _ } => {
                 let ty = src1.ty();
+
+                assert_eq!(ty, src2.ty());
+
+                // type technically depends on op, but... for now:
+                assert!(matches!(ty, Type::Int(_)));
+
+                ty
+            }
+            Instruction::CommutativeBinOp { dest: _, src1, src2, op: _ } => {
+                let ty = src1.ty;
 
                 assert_eq!(ty, src2.ty());
 
@@ -79,6 +89,7 @@ impl Instruction {
             | Self::ReadStack { dest, .. }
             | Self::Cmp { dest, .. }
             | Self::Arg { dest, .. }
+            | Self::CommutativeBinOp { dest, .. }
             | Self::BinOp { dest, .. }
             | Self::ExtInt { dest, .. } => Some(*dest),
 
@@ -111,6 +122,16 @@ impl fmt::Display for Instruction {
             Self::WriteStack { dest, src } => write!(f, "{} = {}", dest, src),
 
             Self::Arg { dest, src } => write!(f, "{} = args[{}]", dest, *src as u8),
+
+            Self::CommutativeBinOp { dest, src1, src2, op } => write!(
+                f,
+                "{dest} = {op} {src1}, {src2}",
+                dest = dest,
+                op = op,
+                src1 = src1,
+                src2 = src2
+            ),
+
             Self::BinOp { dest, src1, src2, op } => write!(
                 f,
                 "{dest} = {op} {src1}, {src2}",
