@@ -10,32 +10,20 @@ fn typed_const_ref_lookup<T: ConstTy>(
     consts.get(&src.id).copied().and_then(T::downcast)
 }
 
-fn const_id_lookup(consts: &HashMap<Id, Constant>, src: AnySource) -> Option<Constant> {
-    src.reference().and_then(|it| consts.get(&it.id).copied())
-}
-
-fn const_prop2(consts: &HashMap<Id, Constant>, src: AnySource) -> AnySource {
-    let it = match src {
-        AnySource::Const(c) => return AnySource::Const(c),
-        AnySource::Ref(r) => r,
-    };
-
-    match consts.get(&it.id).copied() {
-        Some(konst) => AnySource::Const(konst),
-        None => AnySource::Ref(it),
-    }
-}
-
-fn const_prop(consts: &HashMap<Id, Constant>, src: &mut AnySource) {
-    if let Some(v) = const_id_lookup(consts, *src) {
-        *src = AnySource::Const(v);
+fn lookup(consts: &HashMap<Id, Constant>, src: AnySource) -> AnySource {
+    match src {
+        AnySource::Const(c) => AnySource::Const(c),
+        AnySource::Ref(it) => match consts.get(&it.id).copied() {
+            Some(konst) => AnySource::Const(konst),
+            None => AnySource::Ref(it),
+        },
     }
 }
 
 // todo: `pub fn complex_const_prop(graph: &mut [Instruction])`
 
 fn run_instruction(
-    consts: &mut HashMap<Id, Constant>,
+    consts: &HashMap<Id, Constant>,
     instruction: &mut Instruction,
 ) -> Option<(Id, Constant)> {
     match instruction {
@@ -44,23 +32,23 @@ fn run_instruction(
         | Instruction::ReadStack { .. }
         | Instruction::WriteStack { .. } => None,
         Instruction::ReadReg { base, .. } => {
-            const_prop(consts, base);
+            *base = lookup(consts, *base);
             None
         }
 
         Instruction::WriteReg { src, base, .. }
         | Instruction::ReadMem { src, base, .. }
         | Instruction::WriteMem { src, base, .. } => {
-            const_prop(consts, src);
-            const_prop(consts, base);
+            *src = lookup(consts, *src);
+            *base = lookup(consts, *base);
 
             None
         }
 
         Instruction::CommutativeBinOp { dest, src1, src2, op } => {
-            const_prop(consts, src2);
+            *src2 = lookup(consts, *src2);
 
-            let lhs = const_id_lookup(consts, AnySource::Ref(*src1))?;
+            let lhs = lookup(consts, AnySource::Ref(*src1)).constant()?;
 
             // have to indiana jones this stuff around...
             // potentially confusing note: if we return early,
@@ -94,8 +82,8 @@ fn run_instruction(
         }
 
         Instruction::BinOp { dest, src, op } => {
-            let lhs = const_prop2(consts, src.lhs());
-            let rhs = const_prop2(consts, src.rhs());
+            let lhs = lookup(consts, src.lhs());
+            let rhs = lookup(consts, src.rhs());
 
             let (lhs, rhs) = match SourcePair::try_from((lhs, rhs)) {
                 Ok(it) => {
@@ -129,8 +117,8 @@ fn run_instruction(
             // `cmp eq %0, %0`, that's for a different pass
             // todo: write pass for the above.
 
-            let lhs = const_prop2(consts, src.lhs());
-            let rhs = const_prop2(consts, src.rhs());
+            let lhs = lookup(consts, src.lhs());
+            let rhs = lookup(consts, src.rhs());
 
             let (lhs, rhs) = match SourcePair::try_from((lhs, rhs)) {
                 Ok(it) => {
@@ -159,8 +147,8 @@ fn run_instruction(
         }
 
         Instruction::Select { dest, cond, if_true, if_false } => {
-            const_prop(consts, if_true);
-            const_prop(consts, if_false);
+            *if_true = lookup(consts, *if_true);
+            *if_false = lookup(consts, *if_false);
 
             let konst = typed_const_ref_lookup(consts, *cond)?;
 
@@ -173,7 +161,7 @@ fn run_instruction(
         }
 
         Instruction::ExtInt { dest, width, src, signed } => {
-            let src = const_id_lookup(consts, AnySource::Ref(*src))?;
+            let src = lookup(consts, AnySource::Ref(*src)).constant()?;
 
             Some((*dest, Constant::Int(eval::extend_int(*width, src, *signed))))
         }
@@ -190,8 +178,8 @@ pub fn run(block: &mut Block) {
 
     match &mut block.terminator {
         Terminator::Ret { addr, code } => {
-            const_prop(&consts, addr);
-            const_prop(&consts, code);
+            *addr = lookup(&consts, *addr);
+            *code = lookup(&consts, *code);
         }
     }
 }
