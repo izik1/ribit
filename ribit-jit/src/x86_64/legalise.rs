@@ -65,14 +65,18 @@ pub fn count_clobbers_for_terminal(
                 .or_else(|| code.reference())
                 .map_or(false, |r| allocs[&r.id] == Register::Zax);
 
-            if register_count == 1 && zax_used { 2 } else { 0 }
+            if register_count == 1 && zax_used {
+                2
+            } else {
+                0
+            }
         }
     }
 }
 
 #[allow(clippy::match_same_arms)]
 pub fn legalise(block: &mut Block, allocs: &HashMap<Id, Register>) {
-    for instruction in block.instructions.iter_mut() {
+    for instruction in &mut block.instructions {
         match instruction {
             Instruction::BinOp { dest, src1, src2, op } => {
                 let src_reg_1 = src1.reference().and_then(|it| allocs.get(&it.id));

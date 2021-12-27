@@ -1,4 +1,10 @@
 #![forbid(unsafe_code)]
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::match_bool
+)]
 
 use std::fmt;
 
@@ -32,7 +38,11 @@ impl fmt::Display for StackIndex {
 impl StackIndex {
     #[must_use]
     pub fn offset(self, redzone: bool) -> i32 {
-        if redzone { (self.0 as i32 + 1) * -4 } else { self.0 as i32 * 4 }
+        if redzone {
+            (i32::from(self.0) + 1) * -4
+        } else {
+            i32::from(self.0) * 4
+        }
     }
 }
 
@@ -184,7 +194,7 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
 
             Instruction::WriteStack { dest: _, src } => {
                 if src.id == old {
-                    src.id = new
+                    src.id = new;
                 }
             }
 

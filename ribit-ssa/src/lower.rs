@@ -191,7 +191,7 @@ impl Context {
     }
 
     pub fn fence(&mut self) {
-        self.instructions.push(Instruction::Fence)
+        self.instructions.push(Instruction::Fence);
     }
 
     #[must_use]

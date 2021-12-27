@@ -75,6 +75,8 @@ impl RegisterAllocator {
         }
     }
 
+    // we only do a cast if the number is < 16, so, it can't truncate.
+    #[allow(clippy::cast_possible_truncation)]
     fn first_unallocated(&self) -> Option<Register> {
         match (!(self.currently_allocated | self.currently_clobbered)).trailing_zeros() {
             it if it < 16 => Some(register_from_index(it as u8)),
@@ -156,7 +158,7 @@ pub fn allocate_registers(
     };
 
     // todo: find an efficient way of pre-checking lifetimes to avoid unneeded work on spills.
-    let lifetimes = analysis::lifetimes(&block);
+    let lifetimes = analysis::lifetimes(block);
 
     for (idx, instr) in block.instructions[start..].iter().enumerate() {
         let idx = idx + start;
@@ -172,7 +174,7 @@ pub fn allocate_registers(
         }
 
         // make sure we allocate clobber registers
-        let clobbers = legalise::count_clobbers_for(&instr, &allocator.allocations);
+        let clobbers = legalise::count_clobbers_for(instr, &allocator.allocations);
 
         for _ in 0..clobbers {
             match allocator.first_unallocated() {
@@ -204,7 +206,7 @@ pub fn allocate_registers(
 
 pub fn spill(block: &mut ribit_ssa::Block, spill: RegisterSpill) {
     let spill = spill.0;
-    let surrounds = analysis::surrounding_usages(&block, spill);
+    let surrounds = analysis::surrounding_usages(block, spill);
 
     let (id, lt) = surrounds
         .into_iter()
@@ -221,7 +223,7 @@ pub fn spill(block: &mut ribit_ssa::Block, spill: RegisterSpill) {
 
     let end_id = block.allocator.allocate();
 
-    let stack_index = analysis::min_stack(lt, &analysis::stack_lifetimes(&block));
+    let stack_index = analysis::min_stack(lt, &analysis::stack_lifetimes(block));
 
     let start = Instruction::WriteStack { src: r, dest: stack_index };
 

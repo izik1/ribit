@@ -32,7 +32,7 @@ impl X86_64 {
         let mut build_context = BlockBuilder::start(stream);
 
         build_context
-            .make_block(&block.instructions, &allocs, &clobbers)
+            .make_block(&block.instructions, allocs, clobbers)
             .expect("todo: handle block creation error");
 
         let final_clobbers = {
@@ -42,7 +42,7 @@ impl X86_64 {
         };
 
         build_context
-            .complete(&block.terminator, &allocs, &*final_clobbers)
+            .complete(&block.terminator, allocs, &*final_clobbers)
             .expect("todo: handle block creation error");
 
         let start = mem::replace(&mut buffer.write_offset, writer.position());

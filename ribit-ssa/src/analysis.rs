@@ -12,7 +12,7 @@ fn update_source<F: FnMut(&mut Lifetimes, Id, usize)>(
     update: &mut F,
 ) {
     if let Source::Ref(r) = source {
-        update(lifetimes, r.id, idx)
+        update(lifetimes, r.id, idx);
     }
 }
 
@@ -132,7 +132,7 @@ pub fn surrounding_usages(block: &Block, needle: usize) -> Lifetimes {
     fn update_post_needle(lifetimes: &mut HashMap<Id, Lifetime>, id: Id, idx: usize) {
         lifetimes.entry(id).and_modify(|it| {
             if it.is_empty() {
-                it.end = idx
+                it.end = idx;
             }
         });
     }
@@ -142,11 +142,11 @@ pub fn surrounding_usages(block: &Block, needle: usize) -> Lifetimes {
     for (idx, instr) in block.instructions.iter().enumerate().take(needle) {
         lifetime_instruction(instr, idx, &mut lifetimes, |lifetimes, id, idx| {
             lifetimes.insert(id, Lifetime { start: idx, end: idx });
-        })
+        });
     }
 
     for (idx, instr) in block.instructions.iter().enumerate().skip(needle) {
-        lifetime_instruction(instr, idx, &mut lifetimes, update_post_needle)
+        lifetime_instruction(instr, idx, &mut lifetimes, update_post_needle);
     }
 
     lifetime_terminator(
@@ -167,7 +167,7 @@ pub fn stack_lifetimes(block: &Block) -> HashMap<StackIndex, Vec<(usize, usize)>
     for (idx, instr) in block.instructions.iter().enumerate() {
         match instr {
             Instruction::WriteStack { dest, src: _ } => {
-                lifetimes.entry(*dest).or_insert_with(Vec::new).push((idx, idx))
+                lifetimes.entry(*dest).or_insert_with(Vec::new).push((idx, idx));
             }
             Instruction::ReadStack { dest: _, src } => {
                 lifetimes.get_mut(src).unwrap().last_mut().unwrap().1 = idx;
@@ -224,6 +224,7 @@ pub struct ShowLifetimes<'a, 'b> {
 }
 
 impl<'a, 'b> ShowLifetimes<'a, 'b> {
+    #[must_use]
     pub fn new(
         lifetimes: &'a Lifetimes,
         instrs: &'b [Instruction],
@@ -244,7 +245,7 @@ fn show_lifetime(f: &mut fmt::Formatter, lifetime: &Lifetime, idx: usize) -> fmt
 
 impl fmt::Display for ShowLifetimes<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut lifetimes: Vec<Lifetime> = self.lifetimes.values().cloned().collect();
+        let mut lifetimes: Vec<Lifetime> = self.lifetimes.values().copied().collect();
         lifetimes.sort_by(|a, b| a.start.cmp(&b.start));
         for (idx, instr) in self
             .instrs

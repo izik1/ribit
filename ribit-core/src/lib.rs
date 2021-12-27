@@ -53,6 +53,7 @@ pub enum ReturnCode {
 }
 
 impl ReturnCode {
+    #[must_use]
     pub fn new(code: u32) -> Option<Self> {
         match code {
             0 => Some(Self::Normal),

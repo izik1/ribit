@@ -22,7 +22,7 @@ impl BlockReturn {
     }
 
     fn from_parts(addr: u32, return_code: ReturnCode) -> Self {
-        Self((addr as u64) | ((return_code as u64) << 32))
+        Self(u64::from(addr) | ((return_code as u64) << 32))
     }
 
     fn as_u64(self) -> u64 {

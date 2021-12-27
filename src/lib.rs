@@ -3,9 +3,9 @@
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,
     clippy::cast_sign_loss,
-    clippy::cast_lossless,
     clippy::match_bool
 )]
+#![warn(clippy::must_use_candidate)]
 
 use std::convert::TryInto;
 
@@ -180,9 +180,9 @@ impl ExecutionEngine {
             if inst_info.instruction.is_terminator() {
                 terminator = inst_info;
                 break;
-            } else {
-                block_instrs.push(inst_info);
             }
+
+            block_instrs.push(inst_info);
         }
 
         self.pc = pc;
@@ -201,12 +201,14 @@ impl ExecutionEngine {
         Ok(())
     }
 
+    #[must_use]
     pub fn to_host(&self) -> bool {
         self.test_ctx.as_ref().map_or(false, |it| {
             u32::from_le_bytes(self.memory[it.to_host as usize..][..4].try_into().unwrap()) != 0
         })
     }
 
+    #[must_use]
     pub fn signature(&self) -> Option<&[u8]> {
         self.test_ctx
             .as_ref()

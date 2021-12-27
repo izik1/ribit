@@ -25,22 +25,22 @@ fn run_instruction(
         | Instruction::ReadStack { .. }
         | Instruction::WriteStack { .. } => None,
         Instruction::ReadReg { base, .. } => {
-            const_prop(&consts, base);
+            const_prop(consts, base);
             None
         }
 
         Instruction::WriteReg { src, base, .. }
         | Instruction::ReadMem { src, base, .. }
         | Instruction::WriteMem { src, base, .. } => {
-            const_prop(&consts, src);
-            const_prop(&consts, base);
+            const_prop(consts, src);
+            const_prop(consts, base);
 
             None
         }
 
         Instruction::BinOp { dest, src1, src2, op } => {
-            const_prop(&consts, src1);
-            const_prop(&consts, src2);
+            const_prop(consts, src1);
+            const_prop(consts, src2);
 
             let (lhs, rhs) = (src1.constant()?, src2.constant()?);
 
@@ -60,8 +60,8 @@ fn run_instruction(
         }
 
         Instruction::Cmp { dest, src1, src2, kind } => {
-            const_prop(&consts, src1);
-            const_prop(&consts, src2);
+            const_prop(consts, src1);
+            const_prop(consts, src2);
 
             // note: this explicitly doesn't simplify things like
             // `cmp eq %0, %0`, that's for a different pass
@@ -69,7 +69,7 @@ fn run_instruction(
 
             let (lhs, rhs) = (src1.constant()?, src2.constant()?);
 
-            let res = match (lhs, rhs) {
+            let result = match (lhs, rhs) {
                 (Constant::Int(lhs), Constant::Int(rhs)) if lhs.bits() == rhs.bits() => {
                     Constant::Int(eval::cmp_int(lhs, rhs, *kind))
                 }
@@ -79,19 +79,17 @@ fn run_instruction(
                 }
             };
 
-            Some((*dest, res))
+            Some((*dest, result))
         }
 
         Instruction::Select { dest, cond, if_true, if_false } => {
-            const_prop(&consts, cond);
-            const_prop(&consts, if_true);
-            const_prop(&consts, if_false);
+            const_prop(consts, cond);
+            const_prop(consts, if_true);
+            const_prop(consts, if_false);
 
             let cond = cond.constant()?;
 
-            let cond = match cond {
-                Constant::Int(i) => i,
-            };
+            let Constant::Int(cond) = cond;
 
             eval::partial_select_int(cond, if_true.constant(), if_false.constant())
                 .map(|res| (*dest, res))
@@ -101,7 +99,7 @@ fn run_instruction(
 
 pub fn run(block: &mut Block) {
     let mut consts = HashMap::new();
-    for instruction in block.instructions.iter_mut() {
+    for instruction in &mut block.instructions {
         if let Some((dest, val)) = run_instruction(&mut consts, instruction) {
             consts.insert(dest, val);
         }

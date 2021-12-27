@@ -181,7 +181,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 ssa::Instruction::Fence => continue,
 
                 ssa::Instruction::ReadStack { dest, src } => {
-                    let dest = *allocs.get(&dest).expect("dest not allocated!?");
+                    let dest = *allocs.get(dest).expect("dest not allocated!?");
 
                     self.stream.mov_reg_mem(Reg32(dest), Mem32(memory::stack(*src, true)))
                 }

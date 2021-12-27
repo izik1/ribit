@@ -9,7 +9,7 @@ where
     F: Fn(&mut Block),
 {
     fn run(&self, graph: &mut Block) {
-        self(graph)
+        self(graph);
     }
 }
 
@@ -25,11 +25,13 @@ pub struct PassManager {
 }
 
 impl PassManager {
+    #[must_use]
     pub fn new() -> Self {
         Self { passes: Vec::new() }
     }
 
     // Theoretically the best for most situations where optimized output is desired.
+    #[must_use]
     pub fn optimized() -> Self {
         Self {
             passes: vec![

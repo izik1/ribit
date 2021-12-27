@@ -34,18 +34,22 @@ pub enum Constant {
 }
 
 impl Constant {
+    #[must_use]
     pub const fn i32(v: u32) -> Self {
         Self::Int(Int::i32(v))
     }
 
+    #[must_use]
     pub const fn i16(v: u16) -> Self {
         Self::Int(Int::i16(v))
     }
 
+    #[must_use]
     pub const fn i8(v: u8) -> Self {
         Self::Int(Int::i8(v))
     }
 
+    #[must_use]
     pub const fn ty(self) -> Type {
         match self {
             Constant::Int(it) => it.ty(),
@@ -65,23 +69,28 @@ impl fmt::Display for Constant {
 pub struct Int(pub Bitness, pub u32);
 
 impl Int {
+    #[must_use]
     pub const fn i32(v: u32) -> Self {
         Self(Bitness::B32, v)
     }
 
+    #[must_use]
     pub const fn i16(v: u16) -> Self {
         Self(Bitness::B16, v as u32)
     }
 
+    #[must_use]
     pub const fn i8(v: u8) -> Self {
         Self(Bitness::B8, v as u32)
     }
 
+    #[must_use]
     pub const fn ty(self) -> Type {
         Type::Int(self.0)
     }
 
     /// Sign extends [`self`](Self) to a [`i32`].
+    #[must_use]
     pub const fn signed(self) -> i32 {
         match self.0 {
             Bitness::B8 => self.1 as i8 as i32,
@@ -91,6 +100,7 @@ impl Int {
     }
 
     /// Zero extends [`self`](Self) to a [`u32`].
+    #[must_use]
     pub const fn unsigned(self) -> u32 {
         match self.0 {
             Bitness::B8 => self.1 as u8 as u32,
@@ -99,7 +109,8 @@ impl Int {
         }
     }
 
-    pub fn bits(&self) -> u8 {
+    #[must_use]
+    pub fn bits(self) -> u8 {
         self.0.to_bits()
     }
 }
@@ -107,9 +118,9 @@ impl Int {
 impl fmt::Display for Int {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if f.sign_minus() {
-            return self.signed().fmt(f);
+            self.signed().fmt(f)
         } else {
-            return self.unsigned().fmt(f);
+            self.unsigned().fmt(f)
         }
     }
 }

@@ -1,5 +1,4 @@
 // these opcode names are _exact_, and naming rules don't apply to them
-#![allow(clippy::pub_enum_variant_names)]
 
 use std::fmt;
 
@@ -119,6 +118,7 @@ impl I {
             I::SRAI => "SRAI",
             I::SICond(Cmp::Lt) => "SLTI",
             I::SICond(Cmp::Ltu) => "SLTIU",
+            // todo: log a warning and return the string anyway.
             I::SICond(Cmp::Eq) => panic!("invalid instruction: SEQI"),
             I::SICond(Cmp::Ne) => panic!("invalid instruction: SNEI"),
             I::SICond(Cmp::Ge) => panic!("invalid instruction: SGEI"),

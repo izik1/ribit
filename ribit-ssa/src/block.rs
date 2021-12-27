@@ -27,6 +27,7 @@ pub struct Block {
 }
 
 impl Block {
+    #[must_use]
     pub fn arg_ref(&self, arg: Arg) -> Option<Reference> {
         self.instructions.iter().find_map(|it| match it {
             Instruction::Arg { dest, src } if *src == arg => {
@@ -36,12 +37,14 @@ impl Block {
         })
     }
 
+    #[must_use]
     pub fn reference(&self, id: Id) -> Option<Reference> {
         self.instructions
             .iter()
             .find_map(|it| it.id().filter(|it| *it == id).map(|id| Reference { ty: it.ty(), id }))
     }
 
+    #[must_use]
     pub fn display_instructions(&self) -> BlockDisplay<'_> {
         BlockDisplay(&self.instructions, &self.terminator)
     }

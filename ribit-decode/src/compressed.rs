@@ -14,7 +14,7 @@ fn decode_register(instruction: u16) -> RiscVRegister {
 }
 
 fn decode_full_register(instruction: u16) -> Option<RiscVRegister> {
-    super::decode_register(instruction as u32)
+    super::decode_register(u32::from(instruction))
 }
 
 #[allow(clippy::too_many_lines)]
@@ -63,7 +63,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
             return Err(CompressedDecodeError::UnimplementedExtension(Extension::D, instruction));
         }
 
-        (0b00, 0b010) | (0b00, 0b110) => {
+        (0b00, 0b010 | 0b110) => {
             let rs1 = Some(decode_register(instruction >> 7));
             let r = Some(decode_register(instruction >> 2));
 
@@ -92,7 +92,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
         }
 
         (0b00, 0b100) => return Err(CompressedDecodeError::InvalidInstruction(instruction)), // reserved
-        (0b01, 0b000) | (0b01, 0b010) => {
+        (0b01, 0b000 | 0b010) => {
             let imm = ((instruction >> 7) & 0b0010_0000) | ((instruction >> 2) & 0b0001_1111);
             let imm = sign_extend(imm, 6);
 
@@ -107,16 +107,18 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
             }
         }
 
-        (0b01, 0b001) | (0b01, 0b101) => {
+        (0b01, 0b001 | 0b101) => {
             // xxxa_bccd_efgg_ghxx -> 0000_adcc_fehb_ggg0
-            let imm = (((instruction >> 1) & 0b1000_0000_0000)
-                | ((instruction >> 7) & 0b0000_0001_0000)
-                | ((instruction >> 1) & 0b0011_0000_0000)
-                | ((instruction << 2) & 0b0100_0000_0000)
-                | ((instruction >> 1) & 0b0000_0100_0000)
-                | ((instruction << 1) & 0b0000_1000_0000)
-                | ((instruction >> 2) & 0b0000_0000_1110)
-                | ((instruction << 3) & 0b0000_0010_0000)) as u32;
+            let imm = u32::from(
+                ((instruction >> 1) & 0b1000_0000_0000)
+                    | ((instruction >> 7) & 0b0000_0001_0000)
+                    | ((instruction >> 1) & 0b0011_0000_0000)
+                    | ((instruction << 2) & 0b0100_0000_0000)
+                    | ((instruction >> 1) & 0b0000_0100_0000)
+                    | ((instruction << 1) & 0b0000_1000_0000)
+                    | ((instruction >> 2) & 0b0000_0000_1110)
+                    | ((instruction << 3) & 0b0000_0010_0000),
+            );
 
             let imm = sign_extend_32(imm, 12);
 
@@ -156,7 +158,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
                 }
 
                 _ => {
-                    let imm = imm as u32;
+                    let imm = u32::from(imm);
                     // 000a_0000_0bbb_bb00 -> 00ab_bbbb_0000_0000_0000
                     let imm = ((imm << 5) & 0b0010_0000_0000_0000_0000)
                         | ((imm << 10) & 0b0001_1111_0000_0000_0000);
@@ -202,7 +204,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
             }
         }
 
-        (0b01, 0b110) | (0b01, 0b111) => {
+        (0b01, 0b110 | 0b111) => {
             let rs1 = decode_register(instruction >> 7);
 
             // 000a_bbxx_xccd_de00 -> 0b000a_cceb_bdd0
@@ -236,7 +238,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
             return Err(CompressedDecodeError::UnimplementedExtension(Extension::D, instruction));
         }
 
-        (0b10, 0b010) | (0b10, 0b011) => {
+        (0b10, 0b010 | 0b011) => {
             // 0bxxxa_0000_0bbb_ccxx -> ccab_bb00
             let imm = ((instruction >> 7) & 0b0010_0000)
                 | ((instruction >> 2) & 0b0001_1100)

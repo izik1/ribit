@@ -23,6 +23,7 @@ pub enum Instruction {
 }
 
 impl Instruction {
+    #[must_use]
     pub fn ty(&self) -> Type {
         match self {
             Instruction::Arg { dest: _, src: _ } => Type::I32,

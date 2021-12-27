@@ -59,7 +59,7 @@ impl fmt::Debug for Bitness {
 
 impl PartialOrd for Bitness {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.to_bits().partial_cmp(&other.to_bits())
+        Some(self.cmp(other))
     }
 }
 

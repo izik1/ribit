@@ -5,8 +5,8 @@ use ribit_ssa::StackIndex;
 
 pub fn src_rv_reg(base: crate::Source, reg: register::RiscV) -> Mem {
     match base {
-        crate::Source::Val(base) => Mem::displacement((base + (reg.get() * 4) as u32) as i32),
-        crate::Source::Register(base) => Mem::base_displacement(base, (reg.get() * 4) as i32),
+        crate::Source::Val(base) => Mem::displacement((base + u32::from(reg.get() * 4)) as i32),
+        crate::Source::Register(base) => Mem::base_displacement(base, i32::from(reg.get() * 4)),
     }
 }
 

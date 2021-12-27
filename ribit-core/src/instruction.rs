@@ -31,11 +31,7 @@ pub enum Instruction {
 impl Instruction {
     #[must_use]
     pub fn is_terminator(&self) -> bool {
-        match self {
-            Self::J(_) | Self::B(_) | Self::Sys(_) | Self::IJump(_) => true,
-
-            _ => false,
-        }
+        matches!(self, Self::J(_) | Self::B(_) | Self::Sys(_) | Self::IJump(_))
     }
 }
 
@@ -45,6 +41,7 @@ pub struct Sys {
 }
 
 impl Sys {
+    #[must_use]
     pub fn new(opcode: opcode::RSys) -> Self {
         Self { opcode }
     }
@@ -59,6 +56,7 @@ pub struct R {
 }
 
 impl R {
+    #[must_use]
     pub fn new(
         rs1: Option<RiscVRegister>,
         rs2: Option<RiscVRegister>,
@@ -78,6 +76,7 @@ pub struct I {
 }
 
 impl I {
+    #[must_use]
     pub fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
@@ -97,6 +96,7 @@ pub struct IJump {
 }
 
 impl IJump {
+    #[must_use]
     pub fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
@@ -116,6 +116,7 @@ pub struct IMem {
 }
 
 impl IMem {
+    #[must_use]
     pub fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
@@ -135,6 +136,7 @@ pub struct S {
 }
 
 impl S {
+    #[must_use]
     pub fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
@@ -154,13 +156,14 @@ pub struct B {
 }
 
 impl B {
+    #[must_use]
     pub fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
         rs2: Option<RiscVRegister>,
         cmp_mode: opcode::Cmp,
     ) -> Self {
-        Self { imm, rs1, rs2, cmp_mode }
+        Self { rs1, rs2, imm, cmp_mode }
     }
 }
 
@@ -172,6 +175,7 @@ pub struct U {
 }
 
 impl U {
+    #[must_use]
     pub fn new(imm: u32, rd: Option<RiscVRegister>, opcode: opcode::U) -> Self {
         Self { imm, rd, opcode }
     }
@@ -185,6 +189,7 @@ pub struct J {
 }
 
 impl J {
+    #[must_use]
     pub fn new(imm: u32, rd: Option<RiscVRegister>, opcode: opcode::J) -> Self {
         Self { imm, rd, opcode }
     }

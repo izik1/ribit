@@ -1,3 +1,10 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::match_bool
+)]
+
 #[macro_use]
 extern crate static_assertions;
 
@@ -44,7 +51,7 @@ impl Source {
     pub fn val(self) -> Option<u32> {
         match self {
             Self::Val(v) => Some(v),
-            _ => None,
+            Self::Register(_) => None,
         }
     }
 
@@ -52,7 +59,7 @@ impl Source {
     pub fn reg(self) -> Option<Register> {
         match self {
             Self::Register(reg) => Some(reg),
-            _ => None,
+            Self::Val(_) => None,
         }
     }
 

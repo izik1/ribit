@@ -37,7 +37,7 @@ pub fn s(instruction: u32, width: Width) -> instruction::S {
 
     let imm = sign_extend(imm, 12);
 
-    instruction::S { rs1, rs2, imm, width }
+    instruction::S { imm, rs1, rs2, width }
 }
 
 pub fn u(instruction: u32, opcode: opcode::U) -> instruction::U {
@@ -45,7 +45,7 @@ pub fn u(instruction: u32, opcode: opcode::U) -> instruction::U {
 
     let imm = instruction & 0xffff_f000;
 
-    instruction::U { rd, imm, opcode }
+    instruction::U { imm, rd, opcode }
 }
 
 pub fn j(instruction: u32, opcode: opcode::J) -> instruction::J {

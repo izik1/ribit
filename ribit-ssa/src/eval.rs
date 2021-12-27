@@ -19,7 +19,7 @@ pub fn cmp(src1: u32, src2: u32, mode: CmpKind) -> u32 {
 pub fn cmp_int(lhs: Int, rhs: Int, op: CmpKind) -> Int {
     assert_eq!(lhs.bits(), rhs.bits());
 
-    let res = match op {
+    let result = match op {
         CmpKind::Eq => lhs.unsigned() == rhs.unsigned(),
         CmpKind::Ne => lhs.unsigned() != rhs.unsigned(),
         CmpKind::Sge => lhs.signed() >= rhs.signed(),
@@ -29,7 +29,7 @@ pub fn cmp_int(lhs: Int, rhs: Int, op: CmpKind) -> Int {
     };
 
     // fixme: `bool`
-    Int::i32(res as u32)
+    Int::i32(result as u32)
 }
 
 #[must_use]

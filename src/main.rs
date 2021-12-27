@@ -37,7 +37,7 @@ fn main() {
                         "Tried to parse invalid instruction: `{:04x}`.C @ pc {:08x}",
                         instruction,
                         ee.pc()
-                    )
+                    );
                 }
                 DecodeError::Compressed(CompressedDecodeError::UnimplementedExtension(
                     ext,
@@ -54,7 +54,7 @@ fn main() {
                 let mut file = File::create(sig_file).unwrap();
 
                 for chunk in signature.chunks(4) {
-                    write!(file, "{:08x}\n", u32::from_le_bytes(chunk.try_into().unwrap()))
+                    writeln!(file, "{:08x}", u32::from_le_bytes(chunk.try_into().unwrap()))
                         .unwrap();
                 }
                 break;

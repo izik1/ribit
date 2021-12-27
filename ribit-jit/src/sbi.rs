@@ -90,10 +90,10 @@ fn console_getchar() -> (StatusCode, u32) {
         Err(_) => StatusCode::ErrFailure,
     };
 
-    log::debug!("{}", buf[0] as u32);
+    log::debug!("{}", u32::from(buf[0]));
     log::debug!("{:?}", code);
 
-    (code, buf[0] as u32)
+    (code, u32::from(buf[0]))
 }
 
 fn console_putchar(ch: u32) -> (StatusCode, u32) {
