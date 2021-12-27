@@ -77,12 +77,11 @@ pub fn run(block: &mut Block) {
                 }
             }
 
-            Instruction::BinOp { dest, src1, src2, .. }
-            | Instruction::Cmp { dest, src1, src2, .. } => {
+            Instruction::BinOp { dest, src, .. } | Instruction::Cmp { dest, src, .. } => {
                 if live_ids[dest.0 as usize] {
                     live_instruction_count += 1;
-                    mark_live(&mut live_ids, *src1);
-                    mark_live(&mut live_ids, *src2);
+                    mark_live(&mut live_ids, src.lhs());
+                    mark_live(&mut live_ids, src.rhs());
                 }
             }
 

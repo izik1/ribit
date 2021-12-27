@@ -25,10 +25,17 @@ fn lifetime_instruction<F: FnMut(&mut Lifetimes, Id, usize)>(
     match instr {
         Instruction::Fence => {}
 
-        Instruction::BinOp { dest, src1, src2, .. } | Instruction::Cmp { dest, src1, src2, .. } => {
+        Instruction::BinOp { dest, src, .. } | Instruction::Cmp { dest, src, .. } => {
             update(lifetimes, *dest, idx);
-            update_source(lifetimes, src1, idx, &mut update);
-            update_source(lifetimes, src2, idx, &mut update);
+            match *src {
+                crate::SourcePair::RefRef(lhs, rhs) => {
+                    update(lifetimes, lhs.id, idx);
+                    update(lifetimes, rhs.id, idx);
+                }
+                crate::SourcePair::RefConst(it, _) | crate::SourcePair::ConstRef(_, it) => {
+                    update(lifetimes, it.id, idx)
+                }
+            }
         }
 
         Instruction::CommutativeBinOp { dest, src1, src2, .. } => {

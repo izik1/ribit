@@ -102,7 +102,7 @@ pub fn legalise(block: &mut Block, allocs: &HashMap<Id, Register>) {
             Instruction::WriteReg { dest: _, base: _, src: _ } => {}
             Instruction::ReadMem { dest: _, src: _, base: _, width: _, sign_extend: _ } => {}
             Instruction::WriteMem { addr: _, src: _, base: _, width: _ } => {}
-            Instruction::Cmp { dest: _, src1: _, src2: _, kind: _ } => {}
+            Instruction::Cmp { dest: _, src: _, kind: _ } => {}
             Instruction::Select { dest: _, cond: _, if_true: _, if_false: _ } => {}
             Instruction::Fence => {}
             Instruction::ExtInt { .. } => {}

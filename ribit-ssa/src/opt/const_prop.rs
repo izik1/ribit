@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ty::{ConstTy, Constant};
-use crate::{eval, AnySource, Block, Id, Instruction, Terminator, TypedRef};
+use crate::{eval, AnySource, Block, Id, Instruction, SourcePair, Terminator, TypedRef};
 
 fn typed_const_ref_lookup<T: ConstTy>(
     consts: &HashMap<Id, Constant>,
@@ -12,6 +12,18 @@ fn typed_const_ref_lookup<T: ConstTy>(
 
 fn const_id_lookup(consts: &HashMap<Id, Constant>, src: AnySource) -> Option<Constant> {
     src.reference().and_then(|it| consts.get(&it.id).copied())
+}
+
+fn const_prop2(consts: &HashMap<Id, Constant>, src: AnySource) -> AnySource {
+    let it = match src {
+        AnySource::Const(c) => return AnySource::Const(c),
+        AnySource::Ref(r) => r,
+    };
+
+    match consts.get(&it.id).copied() {
+        Some(konst) => AnySource::Const(konst),
+        None => AnySource::Ref(it),
+    }
 }
 
 fn const_prop(consts: &HashMap<Id, Constant>, src: &mut AnySource) {
@@ -81,11 +93,18 @@ fn run_instruction(
             Some((*dest, res))
         }
 
-        Instruction::BinOp { dest, src1, src2, op } => {
-            const_prop(consts, src1);
-            const_prop(consts, src2);
+        Instruction::BinOp { dest, src, op } => {
+            let lhs = const_prop2(consts, src.lhs());
+            let rhs = const_prop2(consts, src.rhs());
 
-            let (lhs, rhs) = (src1.constant()?, src2.constant()?);
+            let (lhs, rhs) = match SourcePair::try_from((lhs, rhs)) {
+                Ok(it) => {
+                    *src = it;
+                    return None;
+                }
+
+                Err(it) => it,
+            };
 
             let res = match (lhs, rhs) {
                 (Constant::Int(lhs), Constant::Int(rhs))
@@ -105,15 +124,22 @@ fn run_instruction(
             Some((*dest, res))
         }
 
-        Instruction::Cmp { dest, src1, src2, kind } => {
-            const_prop(consts, src1);
-            const_prop(consts, src2);
-
+        Instruction::Cmp { dest, src, kind } => {
             // note: this explicitly doesn't simplify things like
             // `cmp eq %0, %0`, that's for a different pass
             // todo: write pass for the above.
 
-            let (lhs, rhs) = (src1.constant()?, src2.constant()?);
+            let lhs = const_prop2(consts, src.lhs());
+            let rhs = const_prop2(consts, src.rhs());
+
+            let (lhs, rhs) = match SourcePair::try_from((lhs, rhs)) {
+                Ok(it) => {
+                    *src = it;
+                    return None;
+                }
+
+                Err(it) => it,
+            };
 
             let result = match (lhs, rhs) {
                 (Constant::Int(lhs), Constant::Int(rhs)) if lhs.bits() == rhs.bits() => {

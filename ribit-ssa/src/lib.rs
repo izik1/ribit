@@ -7,6 +7,7 @@
 )]
 #![warn(clippy::must_use_candidate, clippy::clone_on_copy)]
 
+use std::convert::TryFrom;
 use std::fmt;
 
 use reference::{Reference, TypedRef};
@@ -204,6 +205,45 @@ impl fmt::Display for AnySource {
     }
 }
 
+/// A pair of constants/references that specifically *can't* be `const,const`
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum SourcePair {
+    RefRef(Reference, Reference),
+    RefConst(Reference, Constant),
+    ConstRef(Constant, Reference),
+}
+
+impl SourcePair {
+    #[must_use]
+    pub fn lhs(self) -> AnySource {
+        match self {
+            Self::RefRef(lhs, _) | Self::RefConst(lhs, _) => AnySource::Ref(lhs),
+            Self::ConstRef(lhs, _) => AnySource::Const(lhs),
+        }
+    }
+
+    #[must_use]
+    pub fn rhs(self) -> AnySource {
+        match self {
+            Self::RefRef(_, rhs) | Self::ConstRef(_, rhs) => AnySource::Ref(rhs),
+            Self::RefConst(_, rhs) => AnySource::Const(rhs),
+        }
+    }
+}
+
+impl TryFrom<(AnySource, AnySource)> for SourcePair {
+    type Error = (Constant, Constant);
+
+    fn try_from(value: (AnySource, AnySource)) -> Result<Self, Self::Error> {
+        match value {
+            (AnySource::Const(lhs), AnySource::Const(rhs)) => Err((lhs, rhs)),
+            (AnySource::Const(lhs), AnySource::Ref(rhs)) => Ok(Self::ConstRef(lhs, rhs)),
+            (AnySource::Ref(lhs), AnySource::Const(rhs)) => Ok(Self::RefConst(lhs, rhs)),
+            (AnySource::Ref(lhs), AnySource::Ref(rhs)) => Ok(Self::RefRef(lhs, rhs)),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum CommutativeBinOp {
     And,
@@ -282,10 +322,23 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
         match instr {
             Instruction::Fence | Instruction::Arg { .. } | Instruction::ReadStack { .. } => {}
 
-            Instruction::BinOp { dest: _, src1, src2, .. }
-            | Instruction::Cmp { dest: _, src1, src2, .. } => {
-                update_reference(src1, old, new);
-                update_reference(src2, old, new);
+            Instruction::BinOp { dest: _, src, .. } | Instruction::Cmp { dest: _, src, .. } => {
+                match src {
+                    SourcePair::RefRef(lhs, rhs) => {
+                        if lhs.id == old {
+                            lhs.id = new;
+                        }
+
+                        if rhs.id == old {
+                            rhs.id = new;
+                        }
+                    }
+                    SourcePair::RefConst(it, _) | SourcePair::ConstRef(_, it) => {
+                        if it.id == old {
+                            it.id = new;
+                        }
+                    }
+                }
             }
 
             Instruction::CommutativeBinOp { dest: _, src1, src2, .. } => {

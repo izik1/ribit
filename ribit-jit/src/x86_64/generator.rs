@@ -58,12 +58,14 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
 
         for (idx, instruction) in instructions.iter().enumerate() {
             match instruction {
-                &ssa::Instruction::BinOp { dest, src1, src2, op } => {
+                &ssa::Instruction::BinOp { dest, src, op } => {
                     let dest = *allocs.get(&dest).expect("dest not allocated!?");
-                    let src1 =
-                        crate::Source::from_ssa_src(src1, allocs).expect("src1 not allocated!?");
-                    let src2 =
-                        crate::Source::from_ssa_src(src2, allocs).expect("src2 not allocated!?");
+
+                    let src1 = crate::Source::from_ssa_src(src.lhs(), allocs)
+                        .expect("lhs not allocated!?");
+
+                    let src2 = crate::Source::from_ssa_src(src.rhs(), allocs)
+                        .expect("src2 not allocated!?");
 
                     math::binop(self, dest, src1, src2, op)
                 }
@@ -153,14 +155,14 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                     }
                 }
 
-                &ssa::Instruction::Cmp { dest, src1, src2, kind } => {
+                &ssa::Instruction::Cmp { dest, src, kind } => {
                     let dest = *allocs.get(&dest).expect("dest not allocated!?");
 
-                    let src1 =
-                        crate::Source::from_ssa_src(src1, allocs).expect("src1 not allocated!?");
+                    let src1 = crate::Source::from_ssa_src(src.lhs(), allocs)
+                        .expect("lhs not allocated!?");
 
-                    let src2 =
-                        crate::Source::from_ssa_src(src2, allocs).expect("src2 not allocated!?");
+                    let src2 = crate::Source::from_ssa_src(src.rhs(), allocs)
+                        .expect("src2 not allocated!?");
 
                     cmp::set_bool_conditional(self, dest, src1, src2, kind)
                 }

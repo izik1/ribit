@@ -4,7 +4,9 @@ use ribit_core::{register, Width};
 
 use crate::reference::Reference;
 use crate::ty::{Bitness, BoolTy};
-use crate::{AnySource, Arg, BinOp, CmpKind, CommutativeBinOp, Id, StackIndex, Type, TypedRef};
+use crate::{
+    AnySource, Arg, BinOp, CmpKind, CommutativeBinOp, Id, SourcePair, StackIndex, Type, TypedRef,
+};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Instruction {
@@ -16,9 +18,9 @@ pub enum Instruction {
     WriteReg { dest: register::RiscV, base: AnySource, src: AnySource },
     ReadMem { dest: Id, src: AnySource, base: AnySource, width: Width, sign_extend: bool },
     WriteMem { addr: AnySource, src: AnySource, base: AnySource, width: Width },
-    BinOp { dest: Id, src1: AnySource, src2: AnySource, op: BinOp },
+    BinOp { dest: Id, src: SourcePair, op: BinOp },
+    Cmp { dest: Id, src: SourcePair, kind: CmpKind },
     CommutativeBinOp { dest: Id, src1: Reference, src2: AnySource, op: CommutativeBinOp },
-    Cmp { dest: Id, src1: AnySource, src2: AnySource, kind: CmpKind },
     // todo: box this
     Select { dest: Id, cond: TypedRef<BoolTy>, if_true: AnySource, if_false: AnySource },
     ExtInt { dest: Id, width: Width, src: Reference, signed: bool },
@@ -37,10 +39,10 @@ impl Instruction {
                 Type::I32
             }
             Instruction::WriteMem { addr: _, src: _, base: _, width: _ } => Type::Unit,
-            Instruction::BinOp { dest: _, src1, src2, op: _ } => {
-                let ty = src1.ty();
+            Instruction::BinOp { dest: _, src, op: _ } => {
+                let ty = src.lhs().ty();
 
-                assert_eq!(ty, src2.ty());
+                assert_eq!(ty, src.rhs().ty());
 
                 // type technically depends on op, but... for now:
                 assert!(matches!(ty, Type::Int(_)));
@@ -57,10 +59,10 @@ impl Instruction {
 
                 ty
             }
-            Instruction::Cmp { dest: _, src1, src2, kind: _ } => {
-                let ty = src1.ty();
+            Instruction::Cmp { dest: _, src, kind: _ } => {
+                let ty = src.lhs().ty();
 
-                assert_eq!(ty, src2.ty());
+                assert_eq!(ty, src.rhs().ty());
 
                 Type::Boolean
             }
@@ -132,16 +134,16 @@ impl fmt::Display for Instruction {
                 src2 = src2
             ),
 
-            Self::BinOp { dest, src1, src2, op } => write!(
+            Self::BinOp { dest, src, op } => write!(
                 f,
                 "{dest} = {op} {src1}, {src2}",
                 dest = dest,
                 op = op,
-                src1 = src1,
-                src2 = src2
+                src1 = src.lhs(),
+                src2 = src.rhs()
             ),
-            Self::Cmp { dest, src1, src2, kind } => {
-                write!(f, "{} = cmp {} {}, {}", dest, kind, src1, src2)
+            Self::Cmp { dest, src, kind } => {
+                write!(f, "{} = cmp {} {}, {}", dest, kind, src.lhs(), src.rhs())
             }
 
             Self::Select { dest, cond, if_true, if_false } => {

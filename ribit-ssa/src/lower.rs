@@ -6,7 +6,9 @@ use ribit_core::{instruction, opcode, register, Width};
 use super::{AnySource, BinOp, CmpKind, Id, Instruction};
 use crate::reference::Reference;
 use crate::ty::{Bitness, BoolTy, ConstTy, Constant, Int};
-use crate::{eval, Arg, Block, CommutativeBinOp, IdAllocator, Terminator, TypedRef, TypedSource};
+use crate::{
+    eval, Arg, Block, CommutativeBinOp, IdAllocator, SourcePair, Terminator, TypedRef, TypedSource,
+};
 
 pub struct Context {
     id_allocator: IdAllocator,
@@ -111,19 +113,20 @@ impl Context {
     pub fn binop(&mut self, op: BinOp, src1: AnySource, src2: AnySource) -> AnySource {
         assert_eq!(src1.ty(), src2.ty());
 
-        if let (Some(src1), Some(src2)) = (src1.constant(), src2.constant()) {
-            // "just work with arbitrary constants of compatable types"
-            match (src1, src2) {
-                (Constant::Int(Int(Bitness::B32, lhs)), Constant::Int(Int(Bitness::B32, rhs))) => {
-                    AnySource::Const(Constant::i32(eval::binop(lhs, rhs, op)))
-                }
+        let consts = match SourcePair::try_from((src1, src2)) {
+            Ok(src) => return self.instruction(|dest| Instruction::BinOp { dest, src, op }),
+            Err(consts) => consts,
+        };
 
-                (lhs, rhs) => {
-                    panic!("binop between unsupported types: ({},{})", lhs.ty(), rhs.ty())
-                }
+        // "just work with arbitrary constants of compatable types"
+        match consts {
+            (Constant::Int(Int(Bitness::B32, lhs)), Constant::Int(Int(Bitness::B32, rhs))) => {
+                AnySource::Const(Constant::i32(eval::binop(lhs, rhs, op)))
             }
-        } else {
-            self.instruction(|dest| Instruction::BinOp { dest, src1, src2, op })
+
+            (lhs, rhs) => {
+                panic!("binop between unsupported types: ({},{})", lhs.ty(), rhs.ty())
+            }
         }
     }
 
@@ -204,17 +207,21 @@ impl Context {
     }
 
     pub fn cmp(&mut self, src1: AnySource, src2: AnySource, mode: CmpKind) -> TypedSource<BoolTy> {
-        if let (Some(src1), Some(src2)) = (src1.constant(), src2.constant()) {
-            match (src1, src2) {
-                (Constant::Int(lhs), Constant::Int(rhs)) => {
-                    TypedSource::Const(eval::cmp_int(lhs, rhs, mode))
-                }
-                (src1, src2) => {
-                    panic!("can't compare constants of types `{}` and `{}`", src1.ty(), src2.ty())
-                }
+        let consts = match SourcePair::try_from((src1, src2)) {
+            Ok(src) => {
+                return self.typed_instruction(|dest| Instruction::Cmp { dest, src, kind: mode })
             }
-        } else {
-            self.typed_instruction(|dest| Instruction::Cmp { dest, src1, src2, kind: mode })
+            Err(consts) => consts,
+        };
+
+        match consts {
+            (Constant::Int(lhs), Constant::Int(rhs)) => {
+                TypedSource::Const(eval::cmp_int(lhs, rhs, mode))
+            }
+
+            (src1, src2) => {
+                panic!("can't compare constants of types `{}` and `{}`", src1.ty(), src2.ty())
+            }
         }
     }
 
