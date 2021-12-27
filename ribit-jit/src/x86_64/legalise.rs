@@ -18,14 +18,15 @@ pub fn count_clobbers_for(instr: &Instruction, allocs: &HashMap<Id, Register>) -
         | Instruction::ReadMem { .. }
         | Instruction::WriteMem { .. }
         | Instruction::Fence
-        | Instruction::BinOp {.. } |
+        | Instruction::ExtInt { .. }
+        | Instruction::BinOp {.. } 
         // note: although slightly complicated, this can indeed be done without any branching
         // in even the worst cases, by doing the following:
         // <comparision>
         // set<cc> dest
         // and dest, 0x0000_0001
         // However, there are frequently more efficent code paths than that.
-        Instruction::Cmp { .. } => 0,
+        | Instruction::Cmp { .. } => 0,
         Instruction::Select {
             dest,
             cond: _,
@@ -98,6 +99,7 @@ pub fn legalise(block: &mut Block, allocs: &HashMap<Id, Register>) {
             Instruction::Cmp { dest: _, src1: _, src2: _, kind: _ } => {}
             Instruction::Select { dest: _, cond: _, if_true: _, if_false: _ } => {}
             Instruction::Fence => {}
+            Instruction::ExtInt { .. } => {}
         }
     }
 

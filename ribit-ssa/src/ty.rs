@@ -29,10 +29,37 @@ impl fmt::Display for Type {
     }
 }
 
+pub trait ConstTy {
+    type Const;
+    const TY: Type;
+    fn downcast(constant: Constant) -> Option<Self::Const>;
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub struct BoolTy;
+
+impl ConstTy for BoolTy {
+    type Const = bool;
+    const TY: Type = Type::Boolean;
+
+    fn downcast(constant: Constant) -> Option<Self::Const> {
+        match constant {
+            Constant::Bool(b) => Some(b),
+            _ => None,
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum Constant {
     Int(Int),
     Bool(bool),
+}
+
+impl From<bool> for Constant {
+    fn from(b: bool) -> Self {
+        Self::Bool(b)
+    }
 }
 
 impl Constant {

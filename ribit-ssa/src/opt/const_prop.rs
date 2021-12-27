@@ -1,15 +1,34 @@
 use std::collections::HashMap;
 
-use crate::ty::Constant;
-use crate::{eval, Block, Id, Instruction, Source, Terminator};
+use crate::ty::{ConstTy, Constant};
+use crate::{eval, AnySource, Block, Id, Instruction, Terminator, TypedSource};
 
-fn const_id_lookup(consts: &HashMap<Id, Constant>, src: Source) -> Option<Constant> {
+fn typed_const_id_lookup<T: ConstTy>(
+    consts: &HashMap<Id, Constant>,
+    src: TypedSource<T>,
+) -> Option<T::Const> {
+    match src {
+        TypedSource::Ref(it) => consts.get(&it).copied().and_then(T::downcast),
+        TypedSource::Const(_) => None,
+    }
+}
+
+fn const_id_lookup(consts: &HashMap<Id, Constant>, src: AnySource) -> Option<Constant> {
     src.reference().and_then(|it| consts.get(&it.id).copied())
 }
 
-fn const_prop(consts: &HashMap<Id, Constant>, src: &mut Source) {
+fn const_prop(consts: &HashMap<Id, Constant>, src: &mut AnySource) {
     if let Some(v) = const_id_lookup(consts, *src) {
-        *src = Source::Const(v);
+        *src = AnySource::Const(v);
+    }
+}
+
+fn typed_const_prop<T: ConstTy>(consts: &HashMap<Id, Constant>, src: &mut TypedSource<T>)
+where
+    T::Const: Copy,
+{
+    if let Some(v) = typed_const_id_lookup(consts, *src) {
+        *src = TypedSource::Const(v);
     }
 }
 
@@ -90,21 +109,21 @@ fn run_instruction(
         }
 
         Instruction::Select { dest, cond, if_true, if_false } => {
-            const_prop(consts, cond);
+            // todo: const prop doesn't play nice with this.
+            typed_const_prop(consts, cond);
             const_prop(consts, if_true);
             const_prop(consts, if_false);
 
             let cond = cond.constant()?;
 
-            let cond = match cond {
-                Constant::Bool(b) => b,
-                cond @ Constant::Int(_) => {
-                    panic!("expected boolean constant, found, {}", cond.ty())
-                }
-            };
-
             eval::partial_select_int(cond, if_true.constant(), if_false.constant())
                 .map(|res| (*dest, res))
+        }
+
+        Instruction::ExtInt { dest, width, src, signed } => {
+            let src = const_id_lookup(consts, AnySource::Ref(*src))?;
+
+            Some((*dest, Constant::Int(eval::extend_int(*width, src, *signed))))
         }
     }
 }

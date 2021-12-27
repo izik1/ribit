@@ -1,7 +1,7 @@
-use crate::{Block, Id, Instruction, Source, Terminator};
+use crate::{AnySource, Block, Id, Instruction, Terminator, TypedSource};
 
-fn mark_live(live_instructions: &mut [bool; 0x1_0000], src: Source) {
-    if let Source::Ref(r) = src {
+fn mark_live(live_instructions: &mut [bool; 0x1_0000], src: AnySource) {
+    if let AnySource::Ref(r) = src {
         mark_id_live(live_instructions, r.id);
     }
 }
@@ -81,9 +81,18 @@ pub fn run(block: &mut Block) {
             Instruction::Select { dest, cond, if_true, if_false } => {
                 if live_ids[dest.0 as usize] {
                     live_instruction_count += 1;
-                    mark_live(&mut live_ids, *cond);
+                    if let TypedSource::Ref(id) = *cond {
+                        mark_id_live(&mut live_ids, id)
+                    }
+
                     mark_live(&mut live_ids, *if_true);
                     mark_live(&mut live_ids, *if_false);
+                }
+            }
+            Instruction::ExtInt { dest, width: _, src, signed: _ } => {
+                if live_ids[dest.0 as usize] {
+                    live_instruction_count += 1;
+                    mark_id_live(&mut live_ids, src.id);
                 }
             }
         }

@@ -3,17 +3,17 @@ mod test;
 
 use ribit_core::{instruction, opcode, register, Width};
 
-use super::{BinOp, CmpKind, Id, Instruction, Source};
+use super::{AnySource, BinOp, CmpKind, Id, Instruction};
 use crate::reference::Reference;
-use crate::ty::{Bitness, Constant, Int};
-use crate::{eval, Arg, Block, IdAllocator, Terminator};
+use crate::ty::{Bitness, BoolTy, ConstTy, Constant, Int};
+use crate::{eval, Arg, Block, IdAllocator, Terminator, TypedSource};
 
 pub struct Context {
     id_allocator: IdAllocator,
-    pub pc: Source,
-    registers: [Option<Source>; 32],
-    register_arg: Option<Source>,
-    memory_arg: Option<Source>,
+    pub pc: AnySource,
+    registers: [Option<AnySource>; 32],
+    register_arg: Option<AnySource>,
+    memory_arg: Option<AnySource>,
     registers_written: u32,
     instructions: Vec<Instruction>,
     memory_size: u32,
@@ -26,7 +26,7 @@ impl Context {
 
         let mut self_ = Self {
             id_allocator: IdAllocator::new(),
-            pc: Source::Const(Constant::i32(start_pc)),
+            pc: AnySource::Const(Constant::i32(start_pc)),
             registers: [None; 32],
             register_arg: None,
             memory_arg: None,
@@ -40,37 +40,50 @@ impl Context {
         self_
     }
 
-    fn arg(&mut self, arg: Arg) -> Source {
+    fn arg(&mut self, arg: Arg) -> AnySource {
         self.instruction(|id| Instruction::Arg { dest: id, src: arg })
     }
 
-    pub fn add_pc(&mut self, src: Source) -> Source {
+    pub fn add_pc(&mut self, src: AnySource) -> AnySource {
         self.pc = self.add(src, self.pc);
         self.pc
     }
 
-    pub fn override_pc(&mut self, src: Source) {
+    pub fn override_pc(&mut self, src: AnySource) {
         self.pc = src;
     }
 
-    fn instruction<F: FnOnce(Id) -> Instruction>(&mut self, f: F) -> Source {
+    fn instruction<F: FnOnce(Id) -> Instruction>(&mut self, f: F) -> AnySource {
         let id = self.id_allocator.allocate();
 
         let instr = f(id);
         let ty = instr.ty();
 
         self.instructions.push(instr);
-        Source::Ref(Reference { ty, id })
+        AnySource::Ref(Reference { ty, id })
     }
 
-    pub fn binop(&mut self, op: BinOp, src1: Source, src2: Source) -> Source {
+    fn typed_instruction<T: ConstTy, F: FnOnce(Id) -> Instruction>(
+        &mut self,
+        f: F,
+    ) -> TypedSource<T> {
+        let id = self.id_allocator.allocate();
+
+        let instr = f(id);
+        assert_eq!(instr.ty(), T::TY);
+
+        self.instructions.push(instr);
+        TypedSource::Ref(id)
+    }
+
+    pub fn binop(&mut self, op: BinOp, src1: AnySource, src2: AnySource) -> AnySource {
         assert_eq!(src1.ty(), src2.ty());
 
         if let (Some(src1), Some(src2)) = (src1.constant(), src2.constant()) {
             // "just work with arbitrary constants of compatable types"
             match (src1, src2) {
                 (Constant::Int(Int(Bitness::B32, lhs)), Constant::Int(Int(Bitness::B32, rhs))) => {
-                    Source::Const(Constant::i32(eval::binop(lhs, rhs, op)))
+                    AnySource::Const(Constant::i32(eval::binop(lhs, rhs, op)))
                 }
 
                 (lhs, rhs) => {
@@ -82,7 +95,7 @@ impl Context {
         }
     }
 
-    pub fn read_register(&mut self, reg: register::RiscV) -> Source {
+    pub fn read_register(&mut self, reg: register::RiscV) -> AnySource {
         self.registers[reg.get() as usize].unwrap_or_else(|| {
             let id = self.id_allocator.allocate();
             let instr = Instruction::ReadReg {
@@ -95,7 +108,7 @@ impl Context {
 
             self.instructions.push(instr);
 
-            let r = Source::Ref(Reference { ty, id });
+            let r = AnySource::Ref(Reference { ty, id });
 
             self.registers[reg.get() as usize] = Some(r);
 
@@ -103,21 +116,21 @@ impl Context {
         })
     }
 
-    pub fn load_register(&mut self, reg: Option<register::RiscV>) -> Source {
-        reg.map_or(Source::Const(Constant::i32(0)), |reg| self.read_register(reg))
+    pub fn load_register(&mut self, reg: Option<register::RiscV>) -> AnySource {
+        reg.map_or(AnySource::Const(Constant::i32(0)), |reg| self.read_register(reg))
     }
 
-    pub fn read_memory(&mut self, src: Source, width: Width, sign_extend: bool) -> Source {
+    pub fn read_memory(&mut self, src: AnySource, width: Width, sign_extend: bool) -> AnySource {
         let base = self.memory_arg.expect("Memory arg wasn't initialized?");
         self.instruction(|dest| Instruction::ReadMem { dest, src, base, width, sign_extend })
     }
 
-    pub fn write_register(&mut self, reg: register::RiscV, val: Source) {
+    pub fn write_register(&mut self, reg: register::RiscV, val: AnySource) {
         self.registers[reg.get() as usize] = Some(val);
         self.registers_written |= 1 << reg.get();
     }
 
-    pub fn write_memory(&mut self, addr: Source, val: Source, width: Width) {
+    pub fn write_memory(&mut self, addr: AnySource, val: AnySource, width: Width) {
         self.instructions.push(Instruction::WriteMem {
             addr,
             base: self.memory_arg.expect("Memory arg wasn't initialized?"),
@@ -126,70 +139,83 @@ impl Context {
         });
     }
 
-    pub fn or(&mut self, src1: Source, src2: Source) -> Source {
+    pub fn or(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
         self.binop(BinOp::Or, src1, src2)
     }
 
-    pub fn sll(&mut self, src1: Source, src2: Source) -> Source {
+    pub fn sll(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
         self.binop(BinOp::Sll, src1, src2)
     }
 
-    pub fn srl(&mut self, src1: Source, src2: Source) -> Source {
+    pub fn srl(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
         self.binop(BinOp::Srl, src1, src2)
     }
 
-    pub fn sra(&mut self, src1: Source, src2: Source) -> Source {
+    pub fn sra(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
         self.binop(BinOp::Sra, src1, src2)
     }
 
-    pub fn xor(&mut self, src1: Source, src2: Source) -> Source {
+    pub fn xor(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
         self.binop(BinOp::Xor, src1, src2)
     }
 
-    pub fn and(&mut self, src1: Source, src2: Source) -> Source {
+    pub fn and(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
         self.binop(BinOp::And, src1, src2)
     }
 
-    pub fn add(&mut self, src1: Source, src2: Source) -> Source {
+    pub fn add(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
         self.binop(BinOp::Add, src1, src2)
     }
 
-    pub fn sub(&mut self, src1: Source, src2: Source) -> Source {
+    pub fn sub(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
         self.binop(BinOp::Sub, src1, src2)
     }
 
-    pub fn cmp(&mut self, src1: Source, src2: Source, mode: CmpKind) -> Source {
+    pub fn cmp(&mut self, src1: AnySource, src2: AnySource, mode: CmpKind) -> TypedSource<BoolTy> {
         if let (Some(src1), Some(src2)) = (src1.constant(), src2.constant()) {
             match (src1, src2) {
                 (Constant::Int(lhs), Constant::Int(rhs)) => {
-                    Source::Const(Constant::Bool(eval::cmp_int(lhs, rhs, mode)))
+                    TypedSource::Const(eval::cmp_int(lhs, rhs, mode))
                 }
                 (src1, src2) => {
                     panic!("can't compare constants of types `{}` and `{}`", src1.ty(), src2.ty())
                 }
             }
         } else {
-            self.instruction(|dest| Instruction::Cmp { dest, src1, src2, kind: mode })
+            self.typed_instruction(|dest| Instruction::Cmp { dest, src1, src2, kind: mode })
         }
     }
 
-    pub fn select(&mut self, cond: Source, if_true: Source, if_false: Source) -> Source {
-        let selected = cond.constant().and_then(|cond| match cond {
-            Constant::Bool(cond) => {
-                eval::partial_select_int(cond, if_true.constant(), if_false.constant())
+    pub fn int_extend(&mut self, src: AnySource, width: Width, signed: bool) -> AnySource {
+        match src {
+            AnySource::Const(src) => {
+                AnySource::Const(Constant::Int(eval::extend_int(width, src, signed)))
             }
-            cond => panic!("expected type `bool`, found {}", cond.ty()),
+            AnySource::Ref(src) => {
+                self.instruction(|dest| Instruction::ExtInt { dest, width, src, signed })
+            }
+        }
+    }
+
+    pub fn select(
+        &mut self,
+        cond: TypedSource<BoolTy>,
+        if_true: AnySource,
+        if_false: AnySource,
+    ) -> AnySource {
+        let selected = cond.constant().and_then(|cond| {
+            eval::partial_select_int(cond, if_true.constant(), if_false.constant())
         });
 
         if let Some(res) = selected {
-            Source::Const(res)
+            AnySource::Const(res)
         } else {
             self.instruction(|dest| Instruction::Select { dest, if_true, if_false, cond })
         }
     }
 
-    pub fn mem_mask(&mut self, address: Source) -> Source {
-        let memory_size = Source::Const(Constant::i32(self.memory_size - 1));
+    pub fn mem_mask(&mut self, address: AnySource) -> AnySource {
+        let memory_size = AnySource::Const(Constant::i32(self.memory_size - 1));
 
         self.and(address, memory_size)
     }
@@ -199,7 +225,7 @@ impl Context {
     }
 
     #[must_use]
-    pub fn ret_with_code(mut self, addr: Source, code: Source) -> Block {
+    pub fn ret_with_code(mut self, addr: AnySource, code: AnySource) -> Block {
         for (idx, src) in self.registers.iter().enumerate().skip(1) {
             let dest = register::RiscV::with_u8(idx as u8).unwrap();
 
@@ -222,8 +248,8 @@ impl Context {
     }
 
     #[must_use]
-    pub fn ret_with_addr(self, addr: Source) -> Block {
-        self.ret_with_code(addr, Source::Const(Constant::i32(0)))
+    pub fn ret_with_addr(self, addr: AnySource) -> Block {
+        self.ret_with_code(addr, AnySource::Const(Constant::i32(0)))
     }
 
     #[must_use]
@@ -246,7 +272,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
                 opcode::IMem::FENCE => ctx.fence(),
                 opcode::IMem::LD(width) => {
                     let imm = imm as i16 as u32;
-                    let imm = Source::Const(Constant::i32(imm));
+                    let imm = AnySource::Const(Constant::i32(imm));
 
                     let src = ctx.load_register(rs1);
                     let offset = ctx.add(src, imm);
@@ -261,7 +287,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
                 // todo: deduplicate with previous
                 opcode::IMem::LDU(width) => {
                     let imm = imm as i16 as u32;
-                    let imm = Source::Const(Constant::i32(imm));
+                    let imm = AnySource::Const(Constant::i32(imm));
 
                     let src = ctx.load_register(rs1);
                     let offset = ctx.add(src, imm);
@@ -279,7 +305,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
         instruction::Instruction::I(instruction::I { opcode, imm, rs1, rd }) => {
             let imm = imm as i16 as u32;
             let src = ctx.load_register(rs1);
-            let imm = Source::Const(Constant::i32(imm));
+            let imm = AnySource::Const(Constant::i32(imm));
 
             let res = match opcode {
                 opcode::I::ADDI => ctx.add(src, imm),
@@ -289,7 +315,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
                 opcode::I::SRLI => ctx.srl(src, imm),
                 opcode::I::SRAI => ctx.sra(src, imm),
                 opcode::I::ORI => ctx.or(src, imm),
-                opcode::I::SICond(cmp_mode) => ctx.cmp(src, imm, cmp_mode.into()),
+                opcode::I::SICond(cmp_mode) => ctx.cmp(src, imm, cmp_mode.into()).upcast(),
             };
 
             if let Some(rd) = rd {
@@ -306,7 +332,10 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
                 opcode::R::ADD => ctx.add(src1, src2),
                 opcode::R::SUB => ctx.sub(src1, src2),
                 opcode::R::SLL => ctx.sll(src1, src2),
-                opcode::R::SCond(cmp) => ctx.cmp(src1, src2, cmp.into()),
+                opcode::R::SCond(cmp) => {
+                    let tmp = ctx.cmp(src1, src2, cmp.into()).upcast();
+                    ctx.int_extend(tmp, Width::DWord, false)
+                }
                 opcode::R::XOR => ctx.xor(src1, src2),
                 opcode::R::SRL => ctx.srl(src1, src2),
                 opcode::R::SRA => ctx.sra(src1, src2),
@@ -328,7 +357,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
         }
         instruction::Instruction::S(instruction::S { width, rs1, rs2, imm }) => {
             let imm = imm as i16 as u32;
-            let imm = Source::Const(Constant::i32(imm));
+            let imm = AnySource::Const(Constant::i32(imm));
 
             let src1 = ctx.load_register(rs1);
             let addr = ctx.add(src1, imm);
@@ -340,7 +369,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
         instruction::Instruction::U(instruction::U { opcode, imm, rd }) => {
             // ensure that the immediate only uses the upper 20 bits.
             let imm = imm & 0xffff_f000;
-            let imm = Source::Const(Constant::i32(imm));
+            let imm = AnySource::Const(Constant::i32(imm));
 
             let res = match opcode {
                 opcode::U::LUI => imm,
@@ -353,12 +382,12 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
         }
     }
 
-    ctx.add_pc(Source::Const(Constant::i32(len)));
+    ctx.add_pc(AnySource::Const(Constant::i32(len)));
 }
 
 #[must_use]
 pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u32) -> Block {
-    let len = Source::Const(Constant::i32(len));
+    let len = AnySource::Const(Constant::i32(len));
 
     match instruction {
         instruction::Instruction::J(instruction::J { opcode: opcode::J::JAL, rd, imm }) => {
@@ -372,7 +401,7 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
                 ctx.write_register(rd, next_pc);
             }
 
-            let imm = Source::Const(Constant::i32(imm));
+            let imm = AnySource::Const(Constant::i32(imm));
 
             ctx.add_pc(imm);
 
@@ -400,15 +429,15 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
             // adding 0 is the same as not adding, so don't bother with a match here.
             if let Some(mut src) = src {
                 if imm != 0 {
-                    let imm = Source::Const(Constant::i32(imm));
+                    let imm = AnySource::Const(Constant::i32(imm));
                     src = ctx.add(src, imm);
                 }
 
-                src = ctx.and(src, Source::Const(Constant::i32(!1)));
+                src = ctx.and(src, AnySource::Const(Constant::i32(!1)));
                 ctx.override_pc(src);
             } else {
-                let imm = Source::Const(Constant::i32(imm));
-                let imm = ctx.and(imm, Source::Const(Constant::i32(!1)));
+                let imm = AnySource::Const(Constant::i32(imm));
+                let imm = ctx.and(imm, AnySource::Const(Constant::i32(!1)));
                 ctx.override_pc(imm);
             }
 
@@ -422,7 +451,7 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
                 opcode::RSys::ECALL => ReturnCode::ECall,
             } as u32;
 
-            let return_code = Source::Const(Constant::i32(return_code));
+            let return_code = AnySource::Const(Constant::i32(return_code));
 
             let pc = ctx.add_pc(len);
 
@@ -430,7 +459,7 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
         }
 
         instruction::Instruction::B(instruction::B { imm, rs1, rs2, cmp_mode }) => {
-            let imm = Source::Const(Constant::i32(imm as i16 as u32));
+            let imm = AnySource::Const(Constant::i32(imm as i16 as u32));
 
             let src1 = ctx.load_register(rs1);
             let src2 = ctx.load_register(rs2);

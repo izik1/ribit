@@ -3,7 +3,8 @@ use std::fmt;
 use ribit_core::{register, Width};
 
 use crate::reference::Reference;
-use crate::{Arg, BinOp, CmpKind, Id, Source, StackIndex, Type};
+use crate::ty::{Bitness, BoolTy};
+use crate::{AnySource, Arg, BinOp, CmpKind, Id, StackIndex, Type, TypedSource};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Instruction {
@@ -11,14 +12,15 @@ pub enum Instruction {
     // A const should never be put on the stack, as you can just reload it.
     WriteStack { dest: StackIndex, src: Reference },
     ReadStack { dest: Id, src: StackIndex },
-    ReadReg { dest: Id, base: Source, src: register::RiscV },
-    WriteReg { dest: register::RiscV, base: Source, src: Source },
-    ReadMem { dest: Id, src: Source, base: Source, width: Width, sign_extend: bool },
-    WriteMem { addr: Source, src: Source, base: Source, width: Width },
-    BinOp { dest: Id, src1: Source, src2: Source, op: BinOp },
-    Cmp { dest: Id, src1: Source, src2: Source, kind: CmpKind },
+    ReadReg { dest: Id, base: AnySource, src: register::RiscV },
+    WriteReg { dest: register::RiscV, base: AnySource, src: AnySource },
+    ReadMem { dest: Id, src: AnySource, base: AnySource, width: Width, sign_extend: bool },
+    WriteMem { addr: AnySource, src: AnySource, base: AnySource, width: Width },
+    BinOp { dest: Id, src1: AnySource, src2: AnySource, op: BinOp },
+    Cmp { dest: Id, src1: AnySource, src2: AnySource, kind: CmpKind },
     // todo: box this
-    Select { dest: Id, cond: Source, if_true: Source, if_false: Source },
+    Select { dest: Id, cond: TypedSource<BoolTy>, if_true: AnySource, if_false: AnySource },
+    ExtInt { dest: Id, width: Width, src: Reference, signed: bool },
     Fence,
 }
 
@@ -50,7 +52,7 @@ impl Instruction {
 
                 assert_eq!(ty, src2.ty());
 
-                ty
+                Type::Boolean
             }
             Instruction::Select { dest: _, cond: _, if_true, if_false } => {
                 let ty = if_true.ty();
@@ -61,6 +63,10 @@ impl Instruction {
             }
 
             Instruction::Fence => Type::Unit,
+            Instruction::ExtInt { dest: _, width, src: source, signed: _ } => {
+                assert!(matches!(source.ty, Type::Int(_) | Type::Boolean));
+                Type::Int(Bitness::from(*width))
+            }
         }
     }
 
@@ -73,7 +79,8 @@ impl Instruction {
             | Self::ReadStack { dest, .. }
             | Self::Cmp { dest, .. }
             | Self::Arg { dest, .. }
-            | Self::BinOp { dest, .. } => Some(*dest),
+            | Self::BinOp { dest, .. }
+            | Self::ExtInt { dest, .. } => Some(*dest),
 
             Self::WriteStack { .. }
             | Self::WriteReg { .. }
@@ -120,6 +127,13 @@ impl fmt::Display for Instruction {
                 write!(f, "{} = select {}, {}, {}", dest, cond, if_true, if_false)
             }
             Self::Fence => write!(f, "fence"),
+            Self::ExtInt { dest, width, src: source, signed } => {
+                let instr = match *signed {
+                    true => "sext",
+                    false => "zext",
+                };
+                write!(f, "{} = {} {} {}", dest, instr, width, source)
+            }
         }
     }
 }

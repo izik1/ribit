@@ -1,5 +1,5 @@
 use crate::ty::{Constant, Int};
-use crate::{BinOp, CmpKind};
+use crate::{BinOp, CmpKind, Bitness};
 
 #[must_use]
 pub fn cmp(src1: u32, src2: u32, mode: CmpKind) -> u32 {
@@ -64,6 +64,30 @@ pub fn partial_select_int(
         if_false
     }
 }
+
+#[must_use]
+pub fn extend_int(width: ribit_core::Width, src: Constant, signed:  bool) -> Int {
+    let target_bitness = Bitness::from(width);
+    let value = match src {
+        Constant::Int(i) => {
+            assert!(target_bitness >= i.0);
+            match signed {
+                true => i.signed() as u32,
+                false => i.unsigned(),
+            }
+        }
+        Constant::Bool(b) => {
+            assert!(target_bitness.to_bits() >= 1);
+            match signed {
+                true => (0_i32 - b as u32 as i32) as u32,
+                false => b as u32,
+            }
+        }
+    };
+    let value = value & (1 << target_bitness.to_bits() - 1);
+    Int(target_bitness, value)
+}
+
 
 #[cfg(test)]
 mod test {

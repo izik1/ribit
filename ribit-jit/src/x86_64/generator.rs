@@ -8,7 +8,9 @@ use rasen::params::reg::{Reg16, Reg32, Reg64, Reg8};
 use rasen::params::Register;
 use ribit_core::{ReturnCode, Width};
 use ribit_ssa as ssa;
+use ribit_ssa::Bitness;
 use ribit_ssa::StackIndex;
+use ssa::Type;
 
 use crate::x86_64::Assembler;
 use crate::Source;
@@ -165,8 +167,8 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                     let if_false = crate::Source::from_ssa_src(if_false, allocs)
                         .expect("if_false not allocated!?");
 
-                    let cond =
-                        crate::Source::from_ssa_src(cond, allocs).expect("cond not allocated!?");
+                    let cond = crate::Source::from_ssa_src(cond.upcast(), allocs)
+                        .expect("cond not allocated!?");
 
                     // fixme: handle cond being const. It's actually quite trivial
                     let cond = cond.reg().expect("cond should be a register!");
@@ -190,6 +192,36 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                     let src = *allocs.get(&src.id).expect("src not allocated!?");
 
                     self.stream.mov_mem_reg(Mem32(memory::stack(*dest, true)), Reg32(src))
+                }
+
+                &ssa::Instruction::ExtInt { dest, width, src, signed } => {
+                    let width = Bitness::from(width);
+                    let dest = *allocs.get(&dest).expect("dest not allocated!?");
+
+                    let src_width = match src.ty {
+                        Type::Int(bitness) => bitness.to_bits(),
+                        Type::Boolean => 1,
+                        Type::Unit => panic!("unexpected `()` type"),
+                    };
+
+                    let src = *allocs.get(&src.id).expect("src not allocated!?");
+
+                    // todo: `mov{sx,zx}
+
+                    match signed {
+                        true if width.to_bits() != src_width => {
+                            let m = 32 - src_width;
+                            if dest != src {
+                                self.stream.mov_reg_reg(Reg32(dest), Reg32(src))?;
+                            }
+
+                            self.stream.shl_reg_imm8(Reg32(dest), m)?;
+                            self.stream.shr_reg_imm8(Reg32(dest), m)
+                        }
+                        _ if dest != src => self.stream.mov_reg_reg(Reg32(dest), Reg32(src)),
+                        // accidental nop.
+                        _ => Ok(()),
+                    }
                 }
             }?;
         }

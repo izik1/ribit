@@ -1,4 +1,4 @@
-use crate::{Block, Instruction, Source};
+use crate::{Block, Instruction, AnySource};
 
 /// Moves register writes to be as close to their computations as possible.
 pub fn run(block: &mut Block) {
@@ -7,7 +7,7 @@ pub fn run(block: &mut Block) {
 
     for instr in &block.instructions {
         match instr {
-            Instruction::WriteReg { dest, src: Source::Ref(r), base } => {
+            Instruction::WriteReg { dest, src: AnySource::Ref(r), base } => {
                 stores.push((*dest, *r, *base));
             }
 
@@ -23,7 +23,7 @@ pub fn run(block: &mut Block) {
             // insert _after_ the instruction we just looked at
             instrs.insert(
                 idx + 1,
-                Instruction::WriteReg { dest: store.0, src: Source::Ref(store.1), base: store.2 },
+                Instruction::WriteReg { dest: store.0, src: AnySource::Ref(store.1), base: store.2 },
             );
         }
     }

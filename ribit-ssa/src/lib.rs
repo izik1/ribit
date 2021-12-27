@@ -24,7 +24,8 @@ mod ty;
 pub use block::{Block, BlockDisplay};
 pub use id::{Id, IdAllocator};
 pub use instruction::Instruction;
-pub use ty::{Constant, Type};
+use ty::ConstTy;
+pub use ty::{Bitness, Constant, Type};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, PartialOrd, Ord)]
 pub struct StackIndex(pub u8);
@@ -82,13 +83,84 @@ impl fmt::Display for CmpKind {
     }
 }
 
+/// Like source, but for specific types.
+///
+/// Such as `Int` or `bool`.
+#[derive(PartialEq, Eq)]
+pub enum TypedSource<T: ConstTy> {
+    /// A constant of type `T`
+    Const(T::Const),
+    /// A reference to a value of type `T`
+    Ref(Id),
+}
+
+impl<T: ConstTy> Copy for TypedSource<T> where T::Const: Copy {}
+
+impl<T: ConstTy> Clone for TypedSource<T>
+where
+    T::Const: Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Self::Const(arg0) => Self::Const(arg0.clone()),
+            Self::Ref(arg0) => Self::Ref(arg0.clone()),
+        }
+    }
+}
+
+impl<T: ConstTy> TypedSource<T> {
+    #[must_use]
+    pub fn constant(self) -> Option<T::Const> {
+        match self {
+            Self::Const(v) => Some(v),
+            Self::Ref(_) => None,
+        }
+    }
+}
+
+impl<T: ConstTy> TypedSource<T>
+where
+    T::Const: Into<Constant>,
+{
+    pub fn upcast(self) -> AnySource {
+        match self {
+            Self::Const(konst) => AnySource::Const(konst.into()),
+            Self::Ref(id) => AnySource::Ref(Reference { ty: T::TY, id }),
+        }
+    }
+}
+
+impl<T: ConstTy> fmt::Display for TypedSource<T>
+where
+    T::Const: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Const(v) => v.fmt(f),
+            Self::Ref(r) => r.fmt(f),
+        }
+    }
+}
+
+impl<T: ConstTy> fmt::Debug for TypedSource<T>
+where
+    T::Const: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Const(arg0) => f.debug_tuple("Const").field(arg0).finish(),
+            Self::Ref(arg0) => f.debug_tuple("Ref").field(arg0).finish(),
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
-pub enum Source {
+pub enum AnySource {
     Const(Constant),
     Ref(Reference),
 }
 
-impl Source {
+impl AnySource {
     #[must_use]
     pub fn constant(self) -> Option<Constant> {
         match self {
@@ -108,13 +180,13 @@ impl Source {
     #[must_use]
     pub fn ty(self) -> Type {
         match self {
-            Source::Const(konst) => konst.ty(),
-            Source::Ref(r) => r.ty,
+            AnySource::Const(konst) => konst.ty(),
+            AnySource::Ref(r) => r.ty,
         }
     }
 }
 
-impl fmt::Display for Source {
+impl fmt::Display for AnySource {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Const(v) => v.fmt(f),
@@ -158,7 +230,7 @@ pub enum Arg {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Terminator {
-    Ret { addr: Source, code: Source },
+    Ret { addr: AnySource, code: AnySource },
 }
 
 impl fmt::Display for Terminator {
@@ -169,9 +241,16 @@ impl fmt::Display for Terminator {
     }
 }
 
-pub fn update_reference(src: &mut Source, old: Id, new: Id) {
+pub fn update_reference(src: &mut AnySource, old: Id, new: Id) {
     match src {
-        Source::Ref(r) if r.id == old => r.id = new,
+        AnySource::Ref(r) if r.id == old => r.id = new,
+        _ => {}
+    }
+}
+
+pub fn update_typed_reference<T: ConstTy>(src: &mut TypedSource<T>, old: Id, new: Id) {
+    match src {
+        TypedSource::Ref(r) if *r == old => *r = new,
         _ => {}
     }
 }
@@ -210,9 +289,15 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
             }
 
             Instruction::Select { cond, if_true, if_false, dest: _ } => {
-                update_reference(cond, old, new);
+                update_typed_reference(cond, old, new);
                 update_reference(if_true, old, new);
                 update_reference(if_false, old, new);
+            }
+
+            Instruction::ExtInt { src, .. } => {
+                if src.id == old {
+                    src.id = new;
+                }
             }
         }
 

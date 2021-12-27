@@ -37,17 +37,17 @@ pub enum Source {
 
 impl Source {
     #[must_use]
-    pub fn from_ssa_src(src: ssa::Source, map: &HashMap<ssa::Id, Register>) -> Option<Self> {
+    pub fn from_ssa_src(src: ssa::AnySource, map: &HashMap<ssa::Id, Register>) -> Option<Self> {
         match src {
-            ssa::Source::Const(Constant::Int(i)) => {
+            ssa::AnySource::Const(Constant::Int(i)) => {
                 assert_eq!(i.bits(), 32);
                 Some(Source::Val(i.unsigned()))
             }
-            ssa::Source::Const(Constant::Bool(i)) => {
+            ssa::AnySource::Const(Constant::Bool(i)) => {
                 // fixme: should we panic here?
                 Some(Source::Val(i as u32))
             }
-            ssa::Source::Ref(r) => map.get(&r.id).copied().map(Self::Register),
+            ssa::AnySource::Ref(r) => map.get(&r.id).copied().map(Self::Register),
         }
     }
 
