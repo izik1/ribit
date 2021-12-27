@@ -4,6 +4,7 @@
     clippy::cast_sign_loss,
     clippy::match_bool
 )]
+#![warn(clippy::must_use_candidate, clippy::clone_on_copy)]
 
 #[macro_use]
 extern crate static_assertions;

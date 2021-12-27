@@ -20,6 +20,7 @@ pub enum Pass {
     RegisterWritebackShrinking,
 }
 
+#[derive(Default)]
 pub struct PassManager {
     pub passes: Vec<Pass>,
 }
@@ -27,7 +28,7 @@ pub struct PassManager {
 impl PassManager {
     #[must_use]
     pub fn new() -> Self {
-        Self { passes: Vec::new() }
+        Self::default()
     }
 
     // Theoretically the best for most situations where optimized output is desired.

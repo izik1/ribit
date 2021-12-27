@@ -90,7 +90,7 @@ pub fn extend_int(width: ribit_core::Width, src: Constant, signed: bool) -> Int 
             }
         }
     };
-    let value = value & (1 << target_bitness.to_bits() - 1);
+    let value = value & (1 << (target_bitness.to_bits() - 1));
     Int(target_bitness, value)
 }
 

@@ -5,11 +5,11 @@
     clippy::cast_sign_loss,
     clippy::match_bool
 )]
+#![warn(clippy::must_use_candidate, clippy::clone_on_copy)]
 
 use std::fmt;
-use std::marker::PhantomData;
 
-use reference::Reference;
+use reference::{Reference, TypedRef};
 use ribit_core::opcode;
 
 pub mod analysis;
@@ -84,33 +84,6 @@ impl fmt::Display for CmpKind {
     }
 }
 
-#[derive(Eq, PartialEq, Copy, Clone)]
-pub struct TypedRef<T> {
-    pub id: Id,
-    _phantom: PhantomData<fn(T) -> Type>,
-}
-
-impl<T: ConstTy> TypedRef<T> {
-    pub fn new(id: Id) -> Self {
-        Self { id, _phantom: PhantomData }
-    }
-}
-
-impl<T: ConstTy> fmt::Debug for TypedRef<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TypedRef").field("id", &self.id).field("ty", &T::TY).finish()
-    }
-}
-
-impl<T: ConstTy> fmt::Display for TypedRef<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if f.alternate() {
-            write!(f, "{} ", T::TY)?;
-        }
-
-        write!(f, "{}", self.id)
-    }
-}
 /// Like source, but for specific types.
 ///
 /// Such as `Int` or `bool`.
@@ -131,7 +104,7 @@ where
     fn clone(&self) -> Self {
         match self {
             Self::Const(arg0) => Self::Const(arg0.clone()),
-            Self::Ref(arg0) => Self::Ref(arg0.clone()),
+            Self::Ref(arg0) => Self::Ref(*arg0),
         }
     }
 }

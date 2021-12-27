@@ -10,6 +10,7 @@ impl IdAllocator {
         Self { next_id: Id(0) }
     }
 
+    #[must_use = "ignoring the return of this function will leak an ID slot and is almost never what you want"]
     pub fn allocate(&mut self) -> Id {
         let id_num = self.next_id.0;
 

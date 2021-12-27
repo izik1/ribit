@@ -12,6 +12,7 @@ impl Bitness {
     pub const B16: Self = Self(Width::Word);
     pub const B32: Self = Self(Width::DWord);
 
+    #[must_use]
     pub fn new(bits: u8) -> Option<Bitness> {
         let bits = NonZeroU8::new(bits)?;
 
@@ -26,10 +27,12 @@ impl Bitness {
         Some(Self(width))
     }
 
+    #[must_use]
     pub fn to_width(self) -> Width {
         self.0
     }
 
+    #[must_use]
     pub fn to_bits(self) -> u8 {
         match self.0 {
             Width::Byte => 8,

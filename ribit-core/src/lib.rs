@@ -4,6 +4,9 @@
 //   comment explaining how it follows the safety contract
 #![deny(unsafe_code)]
 
+#![allow(clippy::match_bool)]
+#![warn(clippy::must_use_candidate, clippy::clone_on_copy)]
+
 use std::fmt;
 
 pub mod disassemble;

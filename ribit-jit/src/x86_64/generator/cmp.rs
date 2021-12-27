@@ -170,8 +170,7 @@ pub fn set_bool_conditional(
     let cmp = bool_cmp(src1, src2, 0, 1, mode);
     let xor = match cmp {
         CmpValue::Const(_) => false,
-        CmpValue::Test(r, _) => r != dest,
-        CmpValue::CmpImm(r, _, _) => r != dest,
+        CmpValue::Test(r, _) | CmpValue::CmpImm(r, _, _) => r != dest,
         CmpValue::CmpReg(r1, r2) => r1 != dest && r2 != dest,
     };
 
