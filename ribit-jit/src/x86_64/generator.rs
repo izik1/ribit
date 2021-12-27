@@ -176,11 +176,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                     let if_false = crate::Source::from_ssa_src(if_false, allocs)
                         .expect("if_false not allocated!?");
 
-                    let cond = crate::Source::from_ssa_src(cond.upcast(), allocs)
-                        .expect("cond not allocated!?");
-
-                    // fixme: handle cond being const. It's actually quite trivial
-                    let cond = cond.reg().expect("cond should be a register!");
+                    let cond = *allocs.get(&cond.id).expect("cond not allocated!?");
 
                     let clobber_reg = clobbers.get(&idx).and_then(|regs| regs.get(0)).copied();
                     cmp::select(self, dest, cond, if_true, if_false, clobber_reg)

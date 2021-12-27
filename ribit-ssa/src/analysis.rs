@@ -2,8 +2,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 
-use crate::ty::ConstTy;
-use crate::{AnySource, Block, Id, Instruction, StackIndex, Terminator, TypedSource};
+use crate::{AnySource, Block, Id, Instruction, StackIndex, Terminator};
 
 #[inline]
 fn update_source<F: FnMut(&mut Lifetimes, Id, usize)>(
@@ -14,18 +13,6 @@ fn update_source<F: FnMut(&mut Lifetimes, Id, usize)>(
 ) {
     if let AnySource::Ref(r) = source {
         update(lifetimes, r.id, idx);
-    }
-}
-
-#[inline]
-fn update_typed_source<T: ConstTy, F: FnMut(&mut Lifetimes, Id, usize)>(
-    lifetimes: &mut Lifetimes,
-    source: &TypedSource<T>,
-    idx: usize,
-    update: &mut F,
-) {
-    if let TypedSource::Ref(r) = source {
-        update(lifetimes, *r, idx);
     }
 }
 
@@ -83,7 +70,7 @@ fn lifetime_instruction<F: FnMut(&mut Lifetimes, Id, usize)>(
 
         Instruction::Select { dest, cond, if_true, if_false } => {
             update(lifetimes, *dest, idx);
-            update_typed_source(lifetimes, cond, idx, &mut update);
+            update(lifetimes, cond.id, idx);
             update_source(lifetimes, if_true, idx, &mut update);
             update_source(lifetimes, if_false, idx, &mut update);
         }

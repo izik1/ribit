@@ -13,7 +13,7 @@ mod test {
     use ribit_core::{instruction, opcode, register, Width};
 
     use crate::lower;
-    use crate::test::{max_fn, MEM_SIZE};
+    use crate::test::{max_fn, min_fn, MEM_SIZE};
 
     #[test]
     fn jal_basic_const_prop() {
@@ -123,6 +123,32 @@ mod test {
             %8 = x(%0)1
             %9 = and %8, fffffffe
             ret 00000000, %9"#]]
+        .assert_eq(&block.display_instructions().to_string())
+    }
+
+    #[test]
+    fn min() {
+        let mut block = min_fn();
+
+        super::fold_and_prop_consts(&mut block);
+        super::dead_instruction_elimination(&mut block);
+        super::register_writeback_shrinking(&mut block);
+
+        expect![[r#"
+            %0 = args[0]
+            %2 = x(%0)10
+            %3 = x(%0)11
+            %4 = cmp UL %2, %3
+            %5 = zext dword %4
+            %6 = sub 00000000, %5
+            x(%0)12 = %6
+            %7 = xor %2, %3
+            %8 = and %7, %6
+            %9 = xor %8, %3
+            x(%0)10 = %9
+            %10 = x(%0)1
+            %11 = and %10, fffffffe
+            ret 00000000, %11"#]]
         .assert_eq(&block.display_instructions().to_string())
     }
 

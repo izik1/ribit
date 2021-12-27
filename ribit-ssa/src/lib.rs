@@ -7,6 +7,7 @@
 )]
 
 use std::fmt;
+use std::marker::PhantomData;
 
 use reference::Reference;
 use ribit_core::opcode;
@@ -83,6 +84,33 @@ impl fmt::Display for CmpKind {
     }
 }
 
+#[derive(Eq, PartialEq, Copy, Clone)]
+pub struct TypedRef<T> {
+    pub id: Id,
+    _phantom: PhantomData<fn(T) -> Type>,
+}
+
+impl<T: ConstTy> TypedRef<T> {
+    pub fn new(id: Id) -> Self {
+        Self { id, _phantom: PhantomData }
+    }
+}
+
+impl<T: ConstTy> fmt::Debug for TypedRef<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TypedRef").field("id", &self.id).field("ty", &T::TY).finish()
+    }
+}
+
+impl<T: ConstTy> fmt::Display for TypedRef<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if f.alternate() {
+            write!(f, "{} ", T::TY)?;
+        }
+
+        write!(f, "{}", self.id)
+    }
+}
 /// Like source, but for specific types.
 ///
 /// Such as `Int` or `bool`.
@@ -114,6 +142,14 @@ impl<T: ConstTy> TypedSource<T> {
         match self {
             Self::Const(v) => Some(v),
             Self::Ref(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub fn reference(self) -> Option<TypedRef<T>> {
+        match self {
+            Self::Ref(it) => Some(TypedRef::new(it)),
+            Self::Const(_) => None,
         }
     }
 }
@@ -309,7 +345,10 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
             }
 
             Instruction::Select { cond, if_true, if_false, dest: _ } => {
-                update_typed_reference(cond, old, new);
+                if cond.id == old {
+                    cond.id = new;
+                }
+
                 update_reference(if_true, old, new);
                 update_reference(if_false, old, new);
             }
@@ -332,6 +371,7 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
 
 #[cfg(test)]
 mod test {
+    use ribit_core::opcode::Cmp;
     use ribit_core::{opcode, register};
 
     use crate::{lower, Block};
@@ -383,6 +423,92 @@ mod test {
                 Some(register::RiscV::X11),
                 Some(register::RiscV::X10),
                 opcode::R::ADD,
+            )),
+            4,
+        );
+
+        lower::terminal(
+            ctx,
+            instruction::Instruction::IJump(instruction::IJump::new(
+                0,
+                Some(register::RiscV::X1),
+                None,
+                opcode::IJump::JALR,
+            )),
+            2,
+        )
+    }
+
+    pub fn min_fn() -> Block {
+        use ribit_core::instruction;
+
+        let mut ctx = lower::Context::new(1024, MEM_SIZE);
+        // fn min(x: u32, y: u32) -> u32 {
+        //     let tmp0 = (x < y) as u32;
+        //     let tmp1 = (0 - tmp0 as i32) as u32;
+        //     let tmp2 = x ^ y;
+        //     let tmp3 = tmp2 & tmp1;
+        //     y ^ tmp3
+        // }
+        // X10 -> x
+        // X11 -> y
+
+        // `let tmp0 = (x < y) as u32`
+        lower::non_terminal(
+            &mut ctx,
+            instruction::Instruction::R(instruction::R::new(
+                Some(register::RiscV::X10),
+                Some(register::RiscV::X11),
+                Some(register::RiscV::X12),
+                opcode::R::SCond(Cmp::Ltu),
+            )),
+            4,
+        );
+
+        // `let tmp1 = (0 - tmp0 as i32) as u32`
+        lower::non_terminal(
+            &mut ctx,
+            instruction::Instruction::R(instruction::R::new(
+                None,
+                Some(register::RiscV::X12),
+                Some(register::RiscV::X12),
+                opcode::R::SUB,
+            )),
+            4,
+        );
+
+        // `let tmp2 = x ^ y;`
+        lower::non_terminal(
+            &mut ctx,
+            instruction::Instruction::R(instruction::R::new(
+                Some(register::RiscV::X10),
+                Some(register::RiscV::X11),
+                Some(register::RiscV::X10),
+                opcode::R::XOR,
+            )),
+            4,
+        );
+
+        // `let tmp3 = tmp2 & tmp1;`
+        lower::non_terminal(
+            &mut ctx,
+            instruction::Instruction::R(instruction::R::new(
+                Some(register::RiscV::X10),
+                Some(register::RiscV::X12),
+                Some(register::RiscV::X10),
+                opcode::R::AND,
+            )),
+            4,
+        );
+
+        // `y ^ tmp3`
+        lower::non_terminal(
+            &mut ctx,
+            instruction::Instruction::R(instruction::R::new(
+                Some(register::RiscV::X10),
+                Some(register::RiscV::X11),
+                Some(register::RiscV::X10),
+                opcode::R::XOR,
             )),
             4,
         );

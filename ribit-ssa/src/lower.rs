@@ -6,7 +6,7 @@ use ribit_core::{instruction, opcode, register, Width};
 use super::{AnySource, BinOp, CmpKind, Id, Instruction};
 use crate::reference::Reference;
 use crate::ty::{Bitness, BoolTy, ConstTy, Constant, Int};
-use crate::{eval, Arg, Block, CommutativeBinOp, IdAllocator, Terminator, TypedSource};
+use crate::{eval, Arg, Block, CommutativeBinOp, IdAllocator, Terminator, TypedRef, TypedSource};
 
 pub struct Context {
     id_allocator: IdAllocator,
@@ -235,14 +235,15 @@ impl Context {
         if_true: AnySource,
         if_false: AnySource,
     ) -> AnySource {
-        let selected = cond.constant().and_then(|cond| {
-            eval::partial_select_int(cond, if_true.constant(), if_false.constant())
-        });
-
-        if let Some(res) = selected {
-            AnySource::Const(res)
-        } else {
-            self.instruction(|dest| Instruction::Select { dest, if_true, if_false, cond })
+        match cond {
+            TypedSource::Const(false) => if_false,
+            TypedSource::Const(true) => if_true,
+            TypedSource::Ref(id) => self.instruction(|dest| Instruction::Select {
+                dest,
+                if_true,
+                if_false,
+                cond: TypedRef::new(id),
+            }),
         }
     }
 

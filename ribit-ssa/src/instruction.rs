@@ -4,7 +4,7 @@ use ribit_core::{register, Width};
 
 use crate::reference::Reference;
 use crate::ty::{Bitness, BoolTy};
-use crate::{AnySource, Arg, BinOp, CmpKind, CommutativeBinOp, Id, StackIndex, Type, TypedSource};
+use crate::{AnySource, Arg, BinOp, CmpKind, CommutativeBinOp, Id, StackIndex, Type, TypedRef};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Instruction {
@@ -20,7 +20,7 @@ pub enum Instruction {
     CommutativeBinOp { dest: Id, src1: Reference, src2: AnySource, op: CommutativeBinOp },
     Cmp { dest: Id, src1: AnySource, src2: AnySource, kind: CmpKind },
     // todo: box this
-    Select { dest: Id, cond: TypedSource<BoolTy>, if_true: AnySource, if_false: AnySource },
+    Select { dest: Id, cond: TypedRef<BoolTy>, if_true: AnySource, if_false: AnySource },
     ExtInt { dest: Id, width: Width, src: Reference, signed: bool },
     Fence,
 }

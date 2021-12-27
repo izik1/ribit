@@ -1,16 +1,13 @@
 use std::collections::HashMap;
 
 use crate::ty::{ConstTy, Constant};
-use crate::{eval, AnySource, Block, Id, Instruction, Terminator, TypedSource};
+use crate::{eval, AnySource, Block, Id, Instruction, Terminator, TypedRef};
 
-fn typed_const_id_lookup<T: ConstTy>(
+fn typed_const_ref_lookup<T: ConstTy>(
     consts: &HashMap<Id, Constant>,
-    src: TypedSource<T>,
+    src: TypedRef<T>,
 ) -> Option<T::Const> {
-    match src {
-        TypedSource::Ref(it) => consts.get(&it).copied().and_then(T::downcast),
-        TypedSource::Const(_) => None,
-    }
+    consts.get(&src.id).copied().and_then(T::downcast)
 }
 
 fn const_id_lookup(consts: &HashMap<Id, Constant>, src: AnySource) -> Option<Constant> {
@@ -20,15 +17,6 @@ fn const_id_lookup(consts: &HashMap<Id, Constant>, src: AnySource) -> Option<Con
 fn const_prop(consts: &HashMap<Id, Constant>, src: &mut AnySource) {
     if let Some(v) = const_id_lookup(consts, *src) {
         *src = AnySource::Const(v);
-    }
-}
-
-fn typed_const_prop<T: ConstTy>(consts: &HashMap<Id, Constant>, src: &mut TypedSource<T>)
-where
-    T::Const: Copy,
-{
-    if let Some(v) = typed_const_id_lookup(consts, *src) {
-        *src = TypedSource::Const(v);
     }
 }
 
@@ -145,15 +133,17 @@ fn run_instruction(
         }
 
         Instruction::Select { dest, cond, if_true, if_false } => {
-            // todo: const prop doesn't play nice with this.
-            typed_const_prop(consts, cond);
             const_prop(consts, if_true);
             const_prop(consts, if_false);
 
-            let cond = cond.constant()?;
+            let konst = typed_const_ref_lookup(consts, *cond)?;
 
-            eval::partial_select_int(cond, if_true.constant(), if_false.constant())
-                .map(|res| (*dest, res))
+            let taken = match konst {
+                true => *if_true,
+                false => *if_false,
+            };
+
+            taken.constant().map(|c| (*dest, c))
         }
 
         Instruction::ExtInt { dest, width, src, signed } => {
