@@ -43,6 +43,10 @@ impl Source {
                 assert_eq!(i.bits(), 32);
                 Some(Source::Val(i.unsigned()))
             }
+            ssa::Source::Const(Constant::Bool(i)) => {
+                // fixme: should we panic here?
+                Some(Source::Val(i as u32))
+            }
             ssa::Source::Ref(r) => map.get(&r.id).copied().map(Self::Register),
         }
     }

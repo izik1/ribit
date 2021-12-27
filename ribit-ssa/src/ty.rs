@@ -10,7 +10,7 @@ pub enum Type {
     /// Unit type, `()` in Rust, `void` in C
     Unit,
     // basically just an int1
-    // Boolean,
+    Boolean,
 }
 
 impl Type {
@@ -24,6 +24,7 @@ impl fmt::Display for Type {
         match self {
             Self::Int(b) => write!(f, "i{}", b),
             Type::Unit => f.write_str("()"),
+            Type::Boolean => f.write_str("bool"),
         }
     }
 }
@@ -31,6 +32,7 @@ impl fmt::Display for Type {
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum Constant {
     Int(Int),
+    Bool(bool),
 }
 
 impl Constant {
@@ -53,6 +55,7 @@ impl Constant {
     pub const fn ty(self) -> Type {
         match self {
             Constant::Int(it) => it.ty(),
+            Constant::Bool(_) => Type::Boolean,
         }
     }
 }
@@ -60,7 +63,8 @@ impl Constant {
 impl fmt::Display for Constant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Constant::Int(i) => <Int as fmt::LowerHex>::fmt(i, f),
+            Constant::Int(it) => <Int as fmt::LowerHex>::fmt(it, f),
+            Constant::Bool(it) => it.fmt(f),
         }
     }
 }

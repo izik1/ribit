@@ -54,6 +54,9 @@ fn run_instruction(
                 (Constant::Int(lhs), Constant::Int(rhs)) => {
                     panic!("mismatched integral bitness: ({} != {})", lhs.bits(), rhs.bits())
                 }
+                (lhs, rhs) => {
+                    panic!("can't compare types of `{}` and `{}`", lhs.ty(), rhs.ty())
+                }
             };
 
             Some((*dest, res))
@@ -71,12 +74,16 @@ fn run_instruction(
 
             let result = match (lhs, rhs) {
                 (Constant::Int(lhs), Constant::Int(rhs)) if lhs.bits() == rhs.bits() => {
-                    Constant::Int(eval::cmp_int(lhs, rhs, *kind))
+                    Constant::Bool(eval::cmp_int(lhs, rhs, *kind))
                 }
 
                 (Constant::Int(lhs), Constant::Int(rhs)) => {
                     panic!("mismatched integral bitness: ({} != {})", lhs.bits(), rhs.bits())
                 }
+                (Constant::Bool(_lhs), Constant::Bool(_rhs)) => {
+                    todo!("cmp between bools?")
+                }
+                (lhs, rhs) => panic!("mismatched types: ({} != {})", lhs.ty(), rhs.ty()),
             };
 
             Some((*dest, result))
@@ -89,7 +96,12 @@ fn run_instruction(
 
             let cond = cond.constant()?;
 
-            let Constant::Int(cond) = cond;
+            let cond = match cond {
+                Constant::Bool(b) => b,
+                cond @ Constant::Int(_) => {
+                    panic!("expected boolean constant, found, {}", cond.ty())
+                }
+            };
 
             eval::partial_select_int(cond, if_true.constant(), if_false.constant())
                 .map(|res| (*dest, res))

@@ -73,7 +73,7 @@ impl Context {
                     Source::Const(Constant::i32(eval::binop(lhs, rhs, op)))
                 }
 
-                (Constant::Int(lhs), Constant::Int(rhs)) => {
+                (lhs, rhs) => {
                     panic!("binop between unsupported types: ({},{})", lhs.ty(), rhs.ty())
                 }
             }
@@ -162,7 +162,10 @@ impl Context {
         if let (Some(src1), Some(src2)) = (src1.constant(), src2.constant()) {
             match (src1, src2) {
                 (Constant::Int(lhs), Constant::Int(rhs)) => {
-                    Source::Const(Constant::Int(eval::cmp_int(lhs, rhs, mode)))
+                    Source::Const(Constant::Bool(eval::cmp_int(lhs, rhs, mode)))
+                }
+                (src1, src2) => {
+                    panic!("can't compare constants of types `{}` and `{}`", src1.ty(), src2.ty())
                 }
             }
         } else {
@@ -172,9 +175,10 @@ impl Context {
 
     pub fn select(&mut self, cond: Source, if_true: Source, if_false: Source) -> Source {
         let selected = cond.constant().and_then(|cond| match cond {
-            Constant::Int(cond) => {
+            Constant::Bool(cond) => {
                 eval::partial_select_int(cond, if_true.constant(), if_false.constant())
             }
+            cond => panic!("expected type `bool`, found {}", cond.ty()),
         });
 
         if let Some(res) = selected {
