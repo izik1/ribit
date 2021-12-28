@@ -5,42 +5,39 @@
     clippy::match_bool
 )]
 
-use std::num::NonZeroU8;
-
-pub mod compressed;
-
 use ribit_core::instruction::{self, Instruction};
 use ribit_core::{opcode, register, Width};
 
+pub mod compressed;
 mod error;
 mod from_instruction;
 pub use error::{CompressedDecodeError, DecodeError, Extension};
 
 #[inline]
-fn decode_register(instruction: u32) -> Option<register::RiscV> {
-    NonZeroU8::new((instruction as u8) & 0b1_1111).and_then(register::RiscV::new)
+const fn decode_register(instruction: u32) -> Option<register::RiscV> {
+    register::RiscV::with_u8((instruction as u8) & 0b1_1111)
 }
 
 #[must_use]
-pub fn decode_rs(instruction: u32) -> (Option<register::RiscV>, Option<register::RiscV>) {
+fn decode_rs(instruction: u32) -> (Option<register::RiscV>, Option<register::RiscV>) {
     let rs1 = decode_register(instruction >> 15);
     let rs2 = decode_register(instruction >> 20);
     (rs1, rs2)
 }
 
 #[must_use]
-pub fn decode_rd(instruction: u32) -> Option<register::RiscV> {
+fn decode_rd(instruction: u32) -> Option<register::RiscV> {
     decode_register(instruction >> 7)
 }
 
 #[must_use]
-pub const fn sign_extend(value: u16, data_bits: u8) -> u16 {
+const fn sign_extend(value: u16, data_bits: u8) -> u16 {
     let mask = 16 - data_bits;
     (((value << mask) as i16) >> mask) as u16
 }
 
 #[must_use]
-pub const fn sign_extend_32(value: u32, data_bits: u8) -> u32 {
+const fn sign_extend_32(value: u32, data_bits: u8) -> u32 {
     let mask = 32 - data_bits;
     (((value << mask) as i32) >> mask) as u32
 }

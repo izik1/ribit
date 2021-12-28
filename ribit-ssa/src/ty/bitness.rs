@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::fmt;
 use std::num::NonZeroU8;
 
@@ -50,7 +51,7 @@ impl From<Width> for Bitness {
 
 impl fmt::Display for Bitness {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_bits())
+        self.to_bits().fmt(f)
     }
 }
 
@@ -61,13 +62,13 @@ impl fmt::Debug for Bitness {
 }
 
 impl PartialOrd for Bitness {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl Ord for Bitness {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         self.to_bits().cmp(&other.to_bits())
     }
 }

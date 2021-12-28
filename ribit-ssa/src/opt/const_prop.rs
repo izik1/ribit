@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::ty::{ConstTy, Constant};
 use crate::{eval, AnySource, Block, Id, Instruction, SourcePair, Terminator, TypedRef};
 
+#[must_use]
 fn typed_const_ref_lookup<T: ConstTy>(
     consts: &HashMap<Id, Constant>,
     src: TypedRef<T>,
@@ -10,6 +11,7 @@ fn typed_const_ref_lookup<T: ConstTy>(
     consts.get(&src.id).copied().and_then(T::downcast)
 }
 
+#[must_use]
 fn lookup(consts: &HashMap<Id, Constant>, src: AnySource) -> AnySource {
     match src {
         AnySource::Const(c) => AnySource::Const(c),
@@ -49,18 +51,19 @@ fn run_instruction(
             *src2 = lookup(consts, *src2);
 
             let lhs = lookup(consts, AnySource::Ref(*src1)).constant()?;
+            let rhs = {
+                // have to indiana jones this stuff around...
+                // potentially confusing note: if we return early,
+                // this change happens, but if we don't, we ignore it.
+                let src2 = std::mem::replace(src2, AnySource::Const(lhs));
 
-            // have to indiana jones this stuff around...
-            // potentially confusing note: if we return early,
-            // this change happens, but if we don't, we ignore it.
-            let old_src2 = std::mem::replace(src2, AnySource::Const(lhs));
-
-            let rhs = match old_src2 {
-                AnySource::Ref(r) => {
-                    *src1 = r;
-                    return None;
+                match src2 {
+                    AnySource::Ref(r) => {
+                        *src1 = r;
+                        return None;
+                    }
+                    AnySource::Const(konst) => konst,
                 }
-                AnySource::Const(konst) => konst,
             };
 
             let res = match (lhs, rhs) {
@@ -70,9 +73,6 @@ fn run_instruction(
                     Constant::i32(eval::commutative_binop(lhs.1, rhs.1, *op))
                 }
 
-                (Constant::Int(lhs), Constant::Int(rhs)) => {
-                    panic!("mismatched integral bitness: ({} != {})", lhs.bits(), rhs.bits())
-                }
                 (lhs, rhs) => {
                     panic!("can't compare types of `{}` and `{}`", lhs.ty(), rhs.ty())
                 }
