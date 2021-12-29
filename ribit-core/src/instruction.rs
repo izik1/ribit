@@ -3,6 +3,7 @@ use crate::{opcode, Width};
 
 // todo: decide on visibility of fields
 
+#[derive(Debug)]
 pub struct Info {
     pub instruction: Instruction,
     pub len: u32,

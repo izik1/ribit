@@ -1,11 +1,12 @@
 [workspace]
+members = ["ribit-*"]
 
 [package]
-name = "ribit"
-description = "A Risc-V 32i-mc JIT"
-version = "0.1.0"
 authors = ["Skyler Ross <orangesnowfox@gmail.com>"]
+description = "A Risc-V 32i-mc JIT"
 edition = "2018"
+name = "ribit"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -19,8 +20,8 @@ version = "0.4.3"
 
 [dependencies.env_logger]
 default-features = false
-version = "0.9.0"
 features = ["termcolor", "atty", "humantime"]
+version = "0.9.0"
 
 [dependencies.ribit-core]
 path = "ribit-core"

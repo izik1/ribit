@@ -161,6 +161,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ribit-asm"
+version = "0.1.0"
+dependencies = [
+ "expect-test",
+ "ribit-core",
+]
+
+[[package]]
 name = "ribit-core"
 version = "0.1.0"
 dependencies = [
@@ -174,6 +182,10 @@ dependencies = [
  "log",
  "ribit-core",
 ]
+
+[[package]]
+name = "ribit-encode"
+version = "0.1.0"
 
 [[package]]
 name = "ribit-jit"

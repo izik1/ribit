@@ -61,19 +61,19 @@ impl<'a> fmt::Display for FmtInstruction<'a> {
             Instruction::I(instruction::I { rd, rs1, imm, opcode }) => {
                 let rs1 = WrapRegister(*rs1);
                 let rd = WrapRegister(*rd);
-                write!(f, "{} {}, {}, {:04x}", opcode, rd, rs1, imm)
+                write!(f, "{} {}, {}, {:03x}", opcode, rd, rs1, imm & 0xfff)
             }
 
             Instruction::IJump(instruction::IJump { rd, rs1, imm, opcode }) => {
                 let rs1 = WrapRegister(*rs1);
                 let rd = WrapRegister(*rd);
-                write!(f, "{} {}, {:04x}({})", opcode, rd, imm, rs1)
+                write!(f, "{} {}, {:03x}({})", opcode, rd, imm & 0xfff, rs1)
             }
 
             Instruction::IMem(instruction::IMem { rd, rs1, imm, opcode }) => {
                 let rs1 = WrapRegister(*rs1);
                 let rd = WrapRegister(*rd);
-                write!(f, "{} {}, {:04x}({})", opcode, rd, imm, rs1)
+                write!(f, "{} {}, {:03x}({})", opcode, rd, imm & 0xfff, rs1)
             }
 
             Instruction::S(instruction::S { imm, rs1, rs2, width }) => {
@@ -81,9 +81,9 @@ impl<'a> fmt::Display for FmtInstruction<'a> {
                 let rs2 = WrapRegister(*rs2);
 
                 match width {
-                    Width::Byte => write!(f, "SB {}, {}({:04x})", rs2, rs1, imm),
-                    Width::Word => write!(f, "SH {}, {}({:04x})", rs2, rs1, imm),
-                    Width::DWord => write!(f, "SW {}, {}({:04x})", rs2, rs1, imm),
+                    Width::Byte => write!(f, "SB {}, {:03x}({})", rs2, imm & 0xfff, rs1),
+                    Width::Word => write!(f, "SH {}, {:03x}({})", rs2, imm & 0xfff, rs1),
+                    Width::DWord => write!(f, "SW {}, {:03x}({})", rs2, imm & 0xfff, rs1),
                 }
             }
             Instruction::B(instruction::B { rs1, rs2, imm, cmp_mode }) => {

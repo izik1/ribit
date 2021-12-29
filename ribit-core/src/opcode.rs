@@ -118,7 +118,7 @@ impl I {
             I::SRAI => "SRAI",
             I::SICond(Cmp::Lt) => "SLTI",
             I::SICond(Cmp::Ltu) => "SLTIU",
-            // todo: log a warning and return the string anyway.
+            // todo: log a warning and return the string
             I::SICond(Cmp::Eq) => panic!("invalid instruction: SEQI"),
             I::SICond(Cmp::Ne) => panic!("invalid instruction: SNEI"),
             I::SICond(Cmp::Ge) => panic!("invalid instruction: SGEI"),

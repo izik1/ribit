@@ -3,7 +3,6 @@
 // When unsafe code is used, it *must* be documented with a `safety`
 //   comment explaining how it follows the safety contract
 #![deny(unsafe_code)]
-
 #![allow(clippy::match_bool)]
 #![warn(clippy::must_use_candidate, clippy::clone_on_copy)]
 
@@ -36,9 +35,20 @@ pub struct DisplayDeferSlice<'a, T: std::fmt::Display>(pub &'a [T]);
 
 impl<'a, T: std::fmt::Display> std::fmt::Display for DisplayDeferSlice<'a, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if let Some((first, rest)) = self.0.split_first() {
+        DisplayDeferIter(self.0).fmt(f)
+    }
+}
+
+pub struct DisplayDeferIter<I: IntoIterator<Item = T> + Copy, T: std::fmt::Display>(pub I);
+
+impl<I: IntoIterator<Item = T> + Copy, T: std::fmt::Display> std::fmt::Display
+    for DisplayDeferIter<I, T>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut iter = self.0.into_iter();
+        if let Some(first) = iter.next() {
             write!(f, "{}", first)?;
-            for item in rest {
+            for item in iter {
                 write!(f, "\n{}", item)?;
             }
         }
