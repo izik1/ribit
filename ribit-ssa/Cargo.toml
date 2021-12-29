@@ -16,3 +16,6 @@ expect-test = "1.2.1"
 
 [dev-dependencies.ribit-decode]
 path = "../ribit-decode"
+
+[dev-dependencies.ribit-asm]
+path = "../ribit-asm"

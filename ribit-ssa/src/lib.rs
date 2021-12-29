@@ -397,78 +397,47 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
 
 #[cfg(test)]
 mod test {
-    use ribit_core::opcode::Cmp;
-    use ribit_core::{opcode, register};
-
     use crate::{lower, Block};
 
     pub const MEM_SIZE: u32 = 0x1000000;
 
-    pub fn max_fn() -> Block {
-        use ribit_core::instruction;
+    pub(crate) fn assemble_block(block: &str) -> Block {
+        let output = ribit_asm::tokenize(block, true);
+        for error in &output.errors {
+            eprintln!("error: {}", error);
+        }
+
+        if !output.errors.is_empty() {
+            panic!("failing due to previous error(s)");
+        }
+
+        let mut instructions = output.instructions;
 
         let mut ctx = lower::Context::new(1024, MEM_SIZE);
 
-        lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::R(instruction::R::new(
-                Some(register::RiscV::X10),
-                Some(register::RiscV::X11),
-                Some(register::RiscV::X11),
-                opcode::R::ADD,
-            )),
-            4,
-        );
+        let last = instructions.remove(instructions.len() - 1);
 
-        lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::I(instruction::I::new(
-                31,
-                Some(register::RiscV::X11),
-                Some(register::RiscV::X12),
-                opcode::I::SRLI,
-            )),
-            4,
-        );
+        for instruction in instructions {
+            lower::non_terminal(&mut ctx, instruction.instruction, instruction.len);
+        }
 
-        lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::R(instruction::R::new(
-                Some(register::RiscV::X11),
-                Some(register::RiscV::X12),
-                Some(register::RiscV::X11),
-                opcode::R::AND,
-            )),
-            4,
-        );
+        lower::terminal(ctx, last.instruction, last.len)
+    }
 
-        lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::R(instruction::R::new(
-                Some(register::RiscV::X10),
-                Some(register::RiscV::X11),
-                Some(register::RiscV::X10),
-                opcode::R::ADD,
-            )),
-            4,
-        );
-
-        lower::terminal(
-            ctx,
-            instruction::Instruction::IJump(instruction::IJump::new(
-                0,
-                Some(register::RiscV::X1),
-                None,
-                opcode::IJump::JALR,
-            )),
-            2,
+    pub fn max_fn() -> Block {
+        // todo: psudeos: `ret`
+        assemble_block(
+            r#"
+                ADD x11, x10, x11
+                SRLI x12, x11, 31
+                AND x11, x11, x12
+                ADD x10, x10, x11
+                JALR x0, 0(x1)
+            "#,
         )
     }
 
     pub fn min_fn() -> Block {
-        use ribit_core::instruction;
-
-        let mut ctx = lower::Context::new(1024, MEM_SIZE);
         // fn min(x: u32, y: u32) -> u32 {
         //     let tmp0 = (x < y) as u32;
         //     let tmp1 = (0 - tmp0 as i32) as u32;
@@ -476,78 +445,17 @@ mod test {
         //     let tmp3 = tmp2 & tmp1;
         //     y ^ tmp3
         // }
-        // X10 -> x
-        // X11 -> y
 
-        // `let tmp0 = (x < y) as u32`
-        lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::R(instruction::R::new(
-                Some(register::RiscV::X10),
-                Some(register::RiscV::X11),
-                Some(register::RiscV::X12),
-                opcode::R::SCond(Cmp::Ltu),
-            )),
-            4,
-        );
-
-        // `let tmp1 = (0 - tmp0 as i32) as u32`
-        lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::R(instruction::R::new(
-                None,
-                Some(register::RiscV::X12),
-                Some(register::RiscV::X12),
-                opcode::R::SUB,
-            )),
-            4,
-        );
-
-        // `let tmp2 = x ^ y;`
-        lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::R(instruction::R::new(
-                Some(register::RiscV::X10),
-                Some(register::RiscV::X11),
-                Some(register::RiscV::X10),
-                opcode::R::XOR,
-            )),
-            4,
-        );
-
-        // `let tmp3 = tmp2 & tmp1;`
-        lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::R(instruction::R::new(
-                Some(register::RiscV::X10),
-                Some(register::RiscV::X12),
-                Some(register::RiscV::X10),
-                opcode::R::AND,
-            )),
-            4,
-        );
-
-        // `y ^ tmp3`
-        lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::R(instruction::R::new(
-                Some(register::RiscV::X10),
-                Some(register::RiscV::X11),
-                Some(register::RiscV::X10),
-                opcode::R::XOR,
-            )),
-            4,
-        );
-
-        lower::terminal(
-            ctx,
-            instruction::Instruction::IJump(instruction::IJump::new(
-                0,
-                Some(register::RiscV::X1),
-                None,
-                opcode::IJump::JALR,
-            )),
-            2,
+        // todo: psudeos: `neg`, `ret`
+        assemble_block(
+            r#"
+                SLTU x12, x10, x11
+                SUB x12, x0, x12
+                XOR x10, x10, x11
+                AND x10, x10, x12
+                XOR x10, x10, x11
+                JALR x0, 0(x1)
+            "#,
         )
     }
 }

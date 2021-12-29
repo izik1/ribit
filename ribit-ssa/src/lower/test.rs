@@ -1,5 +1,4 @@
 use expect_test::expect;
-use ribit_core::opcode::Cmp;
 use ribit_core::{instruction, opcode, register, Width};
 
 use super::Context;
@@ -292,62 +291,30 @@ fn mem_read_write() {
 
 #[test]
 fn addi_no_src() {
-    let mut ctx = Context::new(0, MEM_SIZE);
-    super::non_terminal(
-        &mut ctx,
-        instruction::Instruction::I(instruction::I::new(
-            50,
-            None,
-            Some(register::RiscV::X2),
-            opcode::I::ADDI,
-        )),
-        4,
-    );
-
-    let block = super::terminal(
-        ctx,
-        instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
-        4,
+    let block = crate::test::assemble_block(
+        r#"
+            ADDI x2, x0, 50
+            EBREAK
+        "#,
     );
 
     expect![[r#"
         %0 = args[0]
         %1 = args[1]
         x(%0)2 = 00000032
-        ret 00000001, 00000008"#]]
+        ret 00000001, 00000408"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
 /// ensure results of slt[u] can be used in other instructions
 #[test]
 fn cmp_add() {
-    let mut ctx = Context::new(0, MEM_SIZE);
-    super::non_terminal(
-        &mut ctx,
-        instruction::Instruction::R(instruction::R::new(
-            Some(register::RiscV::X2),
-            Some(register::RiscV::X3),
-            Some(register::RiscV::X2),
-            opcode::R::SCond(Cmp::Lt),
-        )),
-        4,
-    );
-
-    super::non_terminal(
-        &mut ctx,
-        instruction::Instruction::R(instruction::R::new(
-            Some(register::RiscV::X2),
-            Some(register::RiscV::X4),
-            Some(register::RiscV::X2),
-            opcode::R::ADD,
-        )),
-        4,
-    );
-
-    let block = super::terminal(
-        ctx,
-        instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
-        4,
+    let block = crate::test::assemble_block(
+        r#"
+            SLT x2, x2, x3
+            ADD x2, x2, x4
+            EBREAK
+        "#,
     );
 
     expect![[r#"
@@ -360,7 +327,7 @@ fn cmp_add() {
         %6 = x(%0)4
         %7 = add %5, %6
         x(%0)2 = %7
-        ret 00000001, 0000000c"#]]
+        ret 00000001, 0000040c"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
