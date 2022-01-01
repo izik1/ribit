@@ -4,7 +4,7 @@ mod test;
 use ribit_core::{instruction, opcode, register, Width};
 
 use super::{AnySource, BinOp, CmpKind, Id, Instruction};
-use crate::instruction::Select;
+use crate::instruction::{ExtInt, Select};
 use crate::reference::Reference;
 use crate::ty::{Bitness, BoolTy, ConstTy, Constant, Int};
 use crate::{
@@ -234,7 +234,7 @@ impl Context {
                 AnySource::Const(Constant::Int(eval::extend_int(width, src, signed)))
             }
             AnySource::Ref(src) => {
-                self.instruction(|dest| Instruction::ExtInt { dest, width, src, signed })
+                self.instruction(|dest| Instruction::ExtInt(ExtInt { dest, width, src, signed }))
             }
         }
     }

@@ -94,10 +94,10 @@ pub fn run(block: &mut Block) {
                     mark_live(&mut live_ids, it.if_false);
                 }
             }
-            Instruction::ExtInt { dest, width: _, src, signed: _ } => {
-                if live_ids[dest.0 as usize] {
+            Instruction::ExtInt(it) => {
+                if live_ids[it.dest.0 as usize] {
                     live_instruction_count += 1;
-                    mark_id_live(&mut live_ids, src.id);
+                    mark_id_live(&mut live_ids, it.src.id);
                 }
             }
         }
@@ -105,10 +105,9 @@ pub fn run(block: &mut Block) {
 
     let mut instructions = Vec::with_capacity(live_instruction_count);
 
-    for instr in block.instructions.iter().filter(|it| match it.id() {
-        Some(id) => live_ids[id.0 as usize],
-        None => true,
-    }) {
+    for instr in
+        block.instructions.iter().filter(|it| it.id().map_or(true, |id| live_ids[id.0 as usize]))
+    {
         instructions.push(instr.clone());
     }
 

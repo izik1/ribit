@@ -81,9 +81,9 @@ fn lifetime_instruction<F: FnMut(&mut Lifetimes, Id, usize)>(
             update_source(lifetimes, &it.if_true, idx, &mut update);
             update_source(lifetimes, &it.if_false, idx, &mut update);
         }
-        Instruction::ExtInt { dest, src, .. } => {
-            update(lifetimes, *dest, idx);
-            update(lifetimes, src.id, idx);
+        Instruction::ExtInt(it) => {
+            update(lifetimes, it.dest, idx);
+            update(lifetimes, it.src.id, idx);
         }
     }
 }

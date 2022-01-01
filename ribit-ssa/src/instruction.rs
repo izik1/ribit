@@ -37,9 +37,37 @@ impl Select {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ExtInt {
+    pub dest: Id,
+    pub width: Width,
+    pub src: Reference,
+    pub signed: bool,
+}
+
+impl ExtInt {
+    pub fn ty(&self) -> Type {
+        assert!(matches!(self.src.ty, Type::Int(_) | Type::Boolean));
+        Type::Int(Bitness::from(self.width))
+    }
+
+    pub fn id(&self) -> Id {
+        self.dest
+    }
+}
+
+impl fmt::Display for ExtInt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let instr = match self.signed {
+            true => "sext",
+            false => "zext",
+        };
+        write!(f, "{} = {} {} {}", self.dest, instr, self.width, self.src)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Instruction {
     Arg { dest: Id, src: Arg },
-    // A const should never be put on the stack, as you can just reload it.
     WriteStack { dest: StackIndex, src: Reference },
     ReadStack { dest: Id, src: StackIndex },
     ReadReg { dest: Id, base: AnySource, src: register::RiscV },
@@ -51,7 +79,7 @@ pub enum Instruction {
     CommutativeBinOp { dest: Id, src1: Reference, src2: AnySource, op: CommutativeBinOp },
     // todo: box this
     Select(Select),
-    ExtInt { dest: Id, width: Width, src: Reference, signed: bool },
+    ExtInt(ExtInt),
     Fence,
 }
 
@@ -99,10 +127,7 @@ impl Instruction {
             Instruction::Select(it) => it.ty(),
 
             Instruction::Fence => Type::Unit,
-            Instruction::ExtInt { dest: _, width, src: source, signed: _ } => {
-                assert!(matches!(source.ty, Type::Int(_) | Type::Boolean));
-                Type::Int(Bitness::from(*width))
-            }
+            Instruction::ExtInt(it) => it.ty(),
         }
     }
 
@@ -115,10 +140,10 @@ impl Instruction {
             | Self::Cmp { dest, .. }
             | Self::Arg { dest, .. }
             | Self::CommutativeBinOp { dest, .. }
-            | Self::BinOp { dest, .. }
-            | Self::ExtInt { dest, .. } => Some(*dest),
+            | Self::BinOp { dest, .. } => Some(*dest),
 
             Self::Select(it) => Some(it.id()),
+            Self::ExtInt(it) => Some(it.id()),
 
             Self::WriteStack { .. }
             | Self::WriteReg { .. }
@@ -173,13 +198,7 @@ impl fmt::Display for Instruction {
 
             Self::Select(it) => it.fmt(f),
             Self::Fence => write!(f, "fence"),
-            Self::ExtInt { dest, width, src: source, signed } => {
-                let instr = match *signed {
-                    true => "sext",
-                    false => "zext",
-                };
-                write!(f, "{} = {} {} {}", dest, instr, width, source)
-            }
+            Self::ExtInt(it) => it.fmt(f),
         }
     }
 }

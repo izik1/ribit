@@ -17,7 +17,7 @@ pub mod analysis;
 mod block;
 pub mod eval;
 mod id;
-mod instruction;
+pub mod instruction;
 pub mod lower;
 pub mod opt;
 pub mod reference;
@@ -387,9 +387,9 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
                 update_reference(&mut it.if_false, old, new);
             }
 
-            Instruction::ExtInt { src, .. } => {
-                if src.id == old {
-                    src.id = new;
+            Instruction::ExtInt(it) => {
+                if it.src.id == old {
+                    it.src.id = new;
                 }
             }
         }

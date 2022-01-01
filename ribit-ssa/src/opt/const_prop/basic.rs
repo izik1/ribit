@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::{eval, AnySource, Block, Constant, Id, Instruction, SourcePair, Terminator};
+use crate::{
+    eval, instruction, AnySource, Block, Constant, Id, Instruction, SourcePair, Terminator,
+};
 
 use super::{lookup, typed_const_ref_lookup};
 
@@ -127,26 +129,28 @@ fn run_instruction(
             Some((*dest, result))
         }
 
-        Instruction::Select(it) => {
-            it.if_true = lookup(consts, it.if_true);
-            it.if_false = lookup(consts, it.if_false);
-
-            let konst = typed_const_ref_lookup(consts, it.cond)?;
-
-            let taken = match konst {
-                true => it.if_true,
-                false => it.if_false,
-            };
-
-            taken.constant().map(|c| (it.id(), c))
-        }
-
-        Instruction::ExtInt { dest, width, src, signed } => {
-            let src = lookup(consts, AnySource::Ref(*src)).constant()?;
-
-            Some((*dest, Constant::Int(eval::extend_int(*width, src, *signed))))
-        }
+        Instruction::Select(it) => select(consts, it),
+        Instruction::ExtInt(it) => ext_int(consts, it),
     }
+}
+
+fn ext_int(consts: &HashMap<Id, Constant>, it: &mut instruction::ExtInt) -> Option<(Id, Constant)> {
+    let src = lookup(consts, AnySource::Ref(it.src)).constant()?;
+    Some((it.dest, Constant::Int(eval::extend_int(it.width, src, it.signed))))
+}
+
+fn select(consts: &HashMap<Id, Constant>, it: &mut instruction::Select) -> Option<(Id, Constant)> {
+    it.if_true = lookup(consts, it.if_true);
+    it.if_false = lookup(consts, it.if_false);
+
+    let konst = typed_const_ref_lookup(consts, it.cond)?;
+
+    let taken = match konst {
+        true => it.if_true,
+        false => it.if_false,
+    };
+
+    taken.constant().map(|c| (it.id(), c))
 }
 
 pub fn run(block: &mut Block) {
