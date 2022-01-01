@@ -13,6 +13,7 @@ fn run_instruction(
         | Instruction::Arg { .. }
         | Instruction::ReadStack { .. }
         | Instruction::WriteStack { .. } => None,
+
         Instruction::ReadReg { base, .. } => {
             *base = lookup(consts, *base);
             None

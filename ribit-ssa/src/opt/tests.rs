@@ -36,18 +36,17 @@ fn mem_read_write_all_opts() {
     super::register_writeback_shrinking(&mut block);
 
     expect![[r#"
-            %0 = args[0]
-            %1 = args[1]
-            %2 = x(%0)1
-            %3 = add %2, 00000000
-            %4 = and %3, 00ffffff
-            %5 = signed dword m(%1)%4
-            %6 = add %5, 00000064
-            x(%0)2 = %6
-            %7 = add %6, 00000032
-            %8 = and %7, 00ffffff
-            m(%1)%8 = dword %2
-            ret 00000001, 00000410"#]]
+        %0 = args[0]
+        %1 = args[1]
+        %2 = x(%0)1
+        %3 = and %2, 00ffffff
+        %4 = signed dword m(%1)%3
+        %5 = add %4, 00000064
+        x(%0)2 = %5
+        %6 = add %5, 00000032
+        %7 = and %6, 00ffffff
+        m(%1)%7 = dword %2
+        ret 00000001, 00000410"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
@@ -121,19 +120,17 @@ fn max_opt_bf_bb_1() {
     // todo: C-constprop (add %n, 0) instructions
 
     expect![[r#"
-            %0 = args[0]
-            %1 = args[1]
-            %2 = x(%0)2
-            %3 = add %2, 00000000
-            %4 = and %3, 00ffffff
-            %5 = x(%0)11
-            m(%1)%4 = byte %5
-            %6 = x(%0)12
-            %7 = add %6, 00000000
-            x(%0)2 = %7
-            x(%0)1 = 00000410
-            x(%0)6 = 00000408
-            ret 00000000, 000004be"#]]
+        %0 = args[0]
+        %1 = args[1]
+        %2 = x(%0)2
+        %3 = and %2, 00ffffff
+        %4 = x(%0)11
+        m(%1)%3 = byte %4
+        %5 = x(%0)12
+        x(%0)2 = %5
+        x(%0)1 = 00000410
+        x(%0)6 = 00000408
+        ret 00000000, 000004be"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 

@@ -1,5 +1,68 @@
+use crate::reference::Reference;
 use crate::ty::{Constant, Int};
-use crate::{BinOp, Bitness, CmpKind, CommutativeBinOp};
+use crate::{AnySource, BinOp, Bitness, CmpKind, CommutativeBinOp};
+
+pub fn commutative_identity(
+    lhs: Reference,
+    rhs: AnySource,
+    op: CommutativeBinOp,
+) -> Option<Reference> {
+    assert_eq!(lhs.ty, rhs.ty());
+
+    match (rhs, op) {
+        (AnySource::Const(Constant::Int(i)), CommutativeBinOp::And) if i.signed() == -1 => {
+            Some(lhs)
+        }
+
+        (AnySource::Const(Constant::Bool(true)), CommutativeBinOp::And) => Some(lhs),
+        (AnySource::Const(Constant::Bool(false)), CommutativeBinOp::Xor | CommutativeBinOp::Or) => {
+            Some(lhs)
+        }
+
+        (
+            AnySource::Const(Constant::Int(i)),
+            CommutativeBinOp::Xor | CommutativeBinOp::Add | CommutativeBinOp::Or,
+        ) if i.unsigned() == 0 => Some(lhs),
+
+        (AnySource::Ref(rhs), CommutativeBinOp::And)
+        | (AnySource::Ref(rhs), CommutativeBinOp::Or)
+            if lhs.id == rhs.id =>
+        {
+            Some(lhs)
+        }
+
+        _ => None,
+    }
+}
+
+pub fn commutative_absorb(
+    lhs: Reference,
+    rhs: AnySource,
+    op: CommutativeBinOp,
+) -> Option<Constant> {
+    let c = match (rhs, op) {
+        (AnySource::Const(Constant::Int(i)), CommutativeBinOp::And) if i.unsigned() == 0 => {
+            Constant::Int(i)
+        }
+
+        (AnySource::Const(Constant::Int(i)), CommutativeBinOp::Or) if i.signed() == -1 => {
+            Constant::Int(i)
+        }
+
+        (AnySource::Const(Constant::Bool(false)), CommutativeBinOp::And) => (Constant::Bool(false)),
+        (AnySource::Const(Constant::Bool(true)), CommutativeBinOp::Or) => (Constant::Bool(true)),
+
+        (AnySource::Ref(rhs), CommutativeBinOp::Xor) if (lhs.id == rhs.id) => match lhs.ty {
+            crate::Type::Int(b) => Constant::Int(Int(b, 0)),
+            crate::Type::Unit => panic!(),
+            crate::Type::Boolean => Constant::Bool(false),
+        },
+
+        _ => return None,
+    };
+
+    Some(c)
+}
 
 #[must_use]
 pub fn cmp(src1: u32, src2: u32, mode: CmpKind) -> u32 {

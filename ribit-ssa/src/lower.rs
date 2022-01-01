@@ -86,28 +86,30 @@ impl Context {
     ) -> AnySource {
         assert_eq!(src1.ty(), src2.ty());
 
-        match (src1, src2) {
+        let (src1, src2) = match (src1, src2) {
             (AnySource::Const(src1), AnySource::Const(src2)) => match (src1, src2) {
                 (Constant::Int(Int(Bitness::B32, lhs)), Constant::Int(Int(Bitness::B32, rhs))) => {
-                    AnySource::Const(Constant::i32(eval::commutative_binop(lhs, rhs, op)))
+                    return AnySource::Const(Constant::i32(eval::commutative_binop(lhs, rhs, op)))
                 }
 
                 (lhs, rhs) => {
                     panic!("binop between unsupported types: ({},{})", lhs.ty(), rhs.ty())
                 }
             },
-            (AnySource::Const(c), AnySource::Ref(r)) | (AnySource::Ref(r), AnySource::Const(c)) => {
-                self.instruction(|dest| Instruction::CommutativeBinOp {
-                    dest,
-                    src1: r,
-                    src2: AnySource::Const(c),
-                    op,
-                })
-            }
-            (AnySource::Ref(src1), src2 @ AnySource::Ref(_)) => {
-                self.instruction(|dest| Instruction::CommutativeBinOp { dest, src1, src2, op })
-            }
+            (c @ AnySource::Const(_), AnySource::Ref(r))
+            | (AnySource::Ref(r), c @ AnySource::Const(_)) => (r, c),
+            (AnySource::Ref(src1), src2 @ AnySource::Ref(_)) => (src1, src2),
+        };
+
+        let res = eval::commutative_absorb(src1, src2, op)
+            .map(AnySource::Const)
+            .or_else(|| eval::commutative_identity(src1, src2, op).map(AnySource::Ref));
+
+        if let Some(it) = res {
+            return it;
         }
+
+        self.instruction(|dest| Instruction::CommutativeBinOp { dest, src1, src2, op })
     }
 
     pub fn binop(&mut self, op: BinOp, src1: AnySource, src2: AnySource) -> AnySource {
