@@ -77,149 +77,91 @@ fn jalr_bit() {
 
 #[test]
 fn jalr_pc() {
-    let ctx = Context::new(48, MEM_SIZE);
-
-    let block = super::terminal(
-        ctx,
-        instruction::Instruction::IJump(instruction::IJump {
-            imm: 2046,
-            rd: Some(register::RiscV::X4),
-            rs1: Some(register::RiscV::X1),
-            opcode: opcode::IJump::JALR,
-        }),
-        4,
-    );
+    let block = crate::test::assemble_block("JALR x4, 1023(x1)");
 
     expect![[r#"
         %0 = args[0]
         %1 = args[1]
         %2 = x(%0)1
-        %3 = add %2, 000007fe
+        %3 = add %2, 000003ff
         %4 = and %3, fffffffe
-        x(%0)4 = 00000034
+        x(%0)4 = 00000404
         ret 00000000, %4"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
 fn jal_basic() {
-    let ctx = Context::new(0, MEM_SIZE);
-
-    let block = super::terminal(
-        ctx,
-        instruction::Instruction::J(instruction::J {
-            imm: 4096,
-            rd: Some(register::RiscV::X4),
-            opcode: opcode::J::JAL,
-        }),
-        4,
-    );
+    let block = crate::test::assemble_block("JAL x4, 2048");
 
     expect![[r#"
         %0 = args[0]
         %1 = args[1]
-        x(%0)4 = 00000004
-        ret 00000000, 00001000"#]]
+        x(%0)4 = 00000404
+        ret 00000000, 00001400"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
 fn sys_break() {
-    let ctx = Context::new(0, MEM_SIZE);
-
-    let block = super::terminal(
-        ctx,
-        instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
-        4,
-    );
+    let block = crate::test::assemble_block("EBREAK");
 
     expect![[r#"
         %0 = args[0]
         %1 = args[1]
-        ret 00000001, 00000004"#]]
+        ret 00000001, 00000404"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
 fn addi_nop() {
-    let mut ctx = Context::new(0, MEM_SIZE);
-    super::non_terminal(
-        &mut ctx,
-        instruction::Instruction::I(instruction::I::new(0, None, None, opcode::I::ADDI)),
-        4,
-    );
-
-    let block = super::terminal(
-        ctx,
-        instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
-        4,
+    // todo: nop psudeo
+    let block = crate::test::assemble_block(
+        r#"
+            ADDI x0, x0, 0
+            EBREAK
+        "#,
     );
 
     expect![[r#"
         %0 = args[0]
         %1 = args[1]
-        ret 00000001, 00000008"#]]
+        ret 00000001, 00000408"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
 fn branch_0_0_eq() {
-    let ctx = Context::new(0, MEM_SIZE);
-    let block = super::terminal(
-        ctx,
-        instruction::Instruction::B(instruction::B::new(1024, None, None, opcode::Cmp::Eq)),
-        4,
-    );
+    let block = crate::test::assemble_block(r#"BEQ x0, 512(x0)"#);
 
     expect![[r#"
         %0 = args[0]
         %1 = args[1]
-        ret 00000000, 00000400"#]]
+        ret 00000000, 00000800"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
 fn branch_0_x1_eq() {
-    let ctx = Context::new(0, MEM_SIZE);
-    let block = super::terminal(
-        ctx,
-        instruction::Instruction::B(instruction::B::new(
-            1024,
-            None,
-            Some(register::RiscV::X1),
-            opcode::Cmp::Eq,
-        )),
-        4,
-    );
+    let block = crate::test::assemble_block(r#"BEQ x0, 512(x1)"#);
 
     expect![[r#"
         %0 = args[0]
         %1 = args[1]
         %2 = x(%0)1
         %3 = cmp EQ 00000000, %2
-        %4 = select %3, 00000400, 00000004
+        %4 = select %3, 00000800, 00000404
         ret 00000000, %4"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
 fn addi_no_dest() {
-    let mut ctx = Context::new(0, MEM_SIZE);
-    super::non_terminal(
-        &mut ctx,
-        instruction::Instruction::I(instruction::I::new(
-            50,
-            Some(register::RiscV::X1),
-            None,
-            opcode::I::ADDI,
-        )),
-        4,
-    );
-
-    let block = super::terminal(
-        ctx,
-        instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
-        4,
+    let block = crate::test::assemble_block(
+        r#"
+            ADDI x0, x1, 50
+            EBREAK
+        "#,
     );
 
     expect![[r#"
@@ -227,50 +169,19 @@ fn addi_no_dest() {
         %1 = args[1]
         %2 = x(%0)1
         %3 = add %2, 00000032
-        ret 00000001, 00000008"#]]
+        ret 00000001, 00000408"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
 fn mem_read_write() {
-    let mut ctx = Context::new(0, MEM_SIZE);
-    super::non_terminal(
-        &mut ctx,
-        instruction::Instruction::IMem(instruction::IMem::new(
-            0,
-            Some(register::RiscV::X1),
-            Some(register::RiscV::X2),
-            opcode::IMem::LD(Width::DWord),
-        )),
-        4,
-    );
-
-    super::non_terminal(
-        &mut ctx,
-        instruction::Instruction::I(instruction::I::new(
-            100,
-            Some(register::RiscV::X2),
-            Some(register::RiscV::X2),
-            opcode::I::ADDI,
-        )),
-        4,
-    );
-
-    super::non_terminal(
-        &mut ctx,
-        instruction::Instruction::S(instruction::S::new(
-            50,
-            Some(register::RiscV::X2),
-            Some(register::RiscV::X1),
-            Width::DWord,
-        )),
-        4,
-    );
-
-    let block = super::terminal(
-        ctx,
-        instruction::Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK)),
-        4,
+    let block = crate::test::assemble_block(
+        r#"
+            LW x2, 0(x1)
+            ADDI x2, x2, 100
+            SW x2, 50(x1)
+            EBREAK
+        "#,
     );
 
     expect![[r#"
@@ -285,7 +196,7 @@ fn mem_read_write() {
         %8 = and %7, 00ffffff
         m(%1)%8 = dword %2
         x(%0)2 = %6
-        ret 00000001, 00000010"#]]
+        ret 00000001, 00000410"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
