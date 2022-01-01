@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::mem;
 
 use rasen::params::Register;
-use ribit_ssa::{Block, Id, Instruction, Terminator, AnySource};
+use ribit_ssa::{AnySource, Block, Id, Instruction, Terminator};
 
 /// Counts the clobbers required to execute the instruction (optimally)
 ///
@@ -80,7 +80,7 @@ pub fn count_clobbers_for_terminal(
 pub fn legalise(block: &mut Block, allocs: &HashMap<Id, Register>) {
     for instruction in &mut block.instructions {
         match instruction {
-            Instruction::CommutativeBinOp { dest, src1, src2, op: _} => {
+            Instruction::CommutativeBinOp { dest, src1, src2, op: _ } => {
                 let src2 = match src2 {
                     AnySource::Const(_) => continue,
                     AnySource::Ref(r) => r,
@@ -90,7 +90,7 @@ pub fn legalise(block: &mut Block, allocs: &HashMap<Id, Register>) {
                 let src_reg_2 = allocs.get(&src2.id);
                 let dest_reg = allocs.get(dest);
 
-                if src_reg_1 != dest_reg && src_reg_2 == dest_reg  {
+                if src_reg_1 != dest_reg && src_reg_2 == dest_reg {
                     mem::swap(src1, src2);
                 }
             }

@@ -1,5 +1,5 @@
 use expect_test::expect;
-use ribit_core::{instruction, opcode, register, Width};
+use ribit_core::{instruction, opcode, register};
 
 use super::Context;
 use crate::test::MEM_SIZE;
