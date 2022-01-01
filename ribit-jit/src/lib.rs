@@ -52,32 +52,16 @@ impl Source {
         }
     }
 
+    #[inline]
     #[must_use]
-    pub fn val(self) -> Option<u32> {
-        match self {
-            Self::Val(v) => Some(v),
-            Self::Register(_) => None,
-        }
-    }
-
-    #[must_use]
-    pub fn reg(self) -> Option<Register> {
-        match self {
-            Self::Register(reg) => Some(reg),
-            Self::Val(_) => None,
-        }
+    pub(crate) fn is_reg(self) -> bool {
+        matches!(self, Self::Register(_))
     }
 
     #[inline]
     #[must_use]
-    pub fn is_reg(self) -> bool {
-        self.reg().is_some()
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn is_val(self) -> bool {
-        self.val().is_some()
+    pub(crate) fn is_val(self) -> bool {
+        matches!(self, Self::Val(_))
     }
 }
 
@@ -87,7 +71,7 @@ mod test {
     use std::fmt;
 
     use rasen::params::Register;
-    use ribit_core::{instruction, opcode, register};
+    use ribit_ssa::Block;
 
     pub struct ShowAllocs<'a> {
         pub allocs: &'a HashMap<ribit_ssa::Id, Register>,
@@ -157,63 +141,39 @@ mod test {
         }
     }
 
-    // fixme: dedup with `ribit_ssa`'s version
-    pub fn max_fn() -> ribit_ssa::Block {
+    pub(crate) fn assemble_block(block: &str) -> Block {
+        let output = ribit_asm::tokenize(block, true);
+        for error in &output.errors {
+            eprintln!("error: {}", error);
+        }
+
+        if !output.errors.is_empty() {
+            panic!("failing due to previous error(s)");
+        }
+
+        let mut instructions = output.instructions;
+
         let mut ctx = ribit_ssa::lower::Context::new(1024, crate::MEMORY_SIZE);
 
-        ribit_ssa::lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::R(instruction::R::new(
-                Some(register::RiscV::X10),
-                Some(register::RiscV::X11),
-                Some(register::RiscV::X11),
-                opcode::R::ADD,
-            )),
-            4,
-        );
+        let last = instructions.remove(instructions.len() - 1);
 
-        ribit_ssa::lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::I(instruction::I::new(
-                31,
-                Some(register::RiscV::X11),
-                Some(register::RiscV::X12),
-                opcode::I::SRLI,
-            )),
-            4,
-        );
+        for instruction in instructions {
+            ribit_ssa::lower::non_terminal(&mut ctx, instruction.instruction, instruction.len);
+        }
 
-        ribit_ssa::lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::R(instruction::R::new(
-                Some(register::RiscV::X11),
-                Some(register::RiscV::X12),
-                Some(register::RiscV::X11),
-                opcode::R::AND,
-            )),
-            4,
-        );
+        ribit_ssa::lower::terminal(ctx, last.instruction, last.len)
+    }
 
-        ribit_ssa::lower::non_terminal(
-            &mut ctx,
-            instruction::Instruction::R(instruction::R::new(
-                Some(register::RiscV::X10),
-                Some(register::RiscV::X11),
-                Some(register::RiscV::X10),
-                opcode::R::ADD,
-            )),
-            4,
-        );
-
-        ribit_ssa::lower::terminal(
-            ctx,
-            instruction::Instruction::IJump(instruction::IJump::new(
-                0,
-                Some(register::RiscV::X1),
-                None,
-                opcode::IJump::JALR,
-            )),
-            2,
+    pub fn max_fn() -> Block {
+        // todo: psudeos: `ret`
+        assemble_block(
+            r#"
+                ADD x11, x10, x11
+                SRLI x12, x11, 31
+                AND x11, x11, x12
+                ADD x10, x10, x11
+                JALR x0, 0(x1)
+            "#,
         )
     }
 }

@@ -40,14 +40,14 @@ pub fn select(
             let clobber_reg =
                 clobber_reg.expect("todo: handle clobber not existing here (via branches)");
             builder.stream.mov_reg_imm(clobber_reg, Imm32(v))?;
-            (clobber_reg, if_true.val().is_some())
+            (clobber_reg, if_true.is_val())
         }
 
         // we don't need to clobber here, since we can `mov dest, v` and then `cmov{n}e` the other one
         (Source::Register(r), Source::Val(v)) | (Source::Val(v), Source::Register(r)) => {
             // todo: optimize by checking for 0 and doing a xor if `dest != cond` (involves skipping the above `test` instr.)
             builder.stream.mov_reg_imm(dest, Imm32(v))?;
-            (r, if_true.reg().is_some())
+            (r, if_true.is_reg())
         }
 
         (Source::Register(if_true), Source::Register(if_false)) => {

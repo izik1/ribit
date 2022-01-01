@@ -8,24 +8,24 @@ use super::{parse_general_purpose_register, parse_immediate, sign_extend, test_l
 
 pub(super) fn r_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
     let opcode = match op {
-        "ADD" => (opcode::R::ADD),
-        "SUB" => (opcode::R::SUB),
-        "SLL" => (opcode::R::SLL),
-        "SLT" => (opcode::R::SCond(Cmp::Lt)),
-        "SLTU" => (opcode::R::SCond(Cmp::Ltu)),
-        "XOR" => (opcode::R::XOR),
-        "SRL" => (opcode::R::SRL),
-        "SRA" => (opcode::R::SRA),
-        "OR" => (opcode::R::OR),
-        "AND" => (opcode::R::AND),
-        "MUL" => (opcode::R::MUL),
-        "MULH" => (opcode::R::MULH),
-        "MULHSU" => (opcode::R::MULHSU),
-        "MULHU" => (opcode::R::MULHU),
-        "DIV" => (opcode::R::DIV),
-        "DIVU" => (opcode::R::DIVU),
-        "REM" => (opcode::R::REM),
-        "REMU" => (opcode::R::REMU),
+        "add" | "ADD" => (opcode::R::ADD),
+        "sub" | "SUB" => (opcode::R::SUB),
+        "sll" | "SLL" => (opcode::R::SLL),
+        "slt" | "SLT" => (opcode::R::SCond(Cmp::Lt)),
+        "sltu" | "SLTU" => (opcode::R::SCond(Cmp::Ltu)),
+        "xor" | "XOR" => (opcode::R::XOR),
+        "srl" | "SRL" => (opcode::R::SRL),
+        "sra" | "SRA" => (opcode::R::SRA),
+        "or" | "OR" => (opcode::R::OR),
+        "and" | "AND" => (opcode::R::AND),
+        "mul" | "MUL" => (opcode::R::MUL),
+        "mulh" | "MULH" => (opcode::R::MULH),
+        "mulhsu" | "MULHSU" => (opcode::R::MULHSU),
+        "mulhu" | "MULHU" => (opcode::R::MULHU),
+        "div" | "DIV" => (opcode::R::DIV),
+        "divu" | "DIVU" => (opcode::R::DIVU),
+        "rem" | "REM" => (opcode::R::REM),
+        "remu" | "REMU" => (opcode::R::REMU),
         _ => return false,
     };
 
@@ -87,15 +87,15 @@ fn r_args(
 
 pub(super) fn i_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
     let opcode = match op {
-        "ADDI" => opcode::I::ADDI,
-        "SLTI" => opcode::I::SICond(Cmp::Lt),
-        "SLTIU" => opcode::I::SICond(Cmp::Ltu),
-        "XORI" => opcode::I::XORI,
-        "ORI" => opcode::I::ORI,
-        "ANDI" => opcode::I::ANDI,
-        "SLLI" => opcode::I::SLLI,
-        "SRLI" => opcode::I::SRLI,
-        "SRAI" => opcode::I::SRAI,
+        "addi" | "ADDI" => opcode::I::ADDI,
+        "slti" | "SLTI" => opcode::I::SICond(Cmp::Lt),
+        "sltiu" | "SLTIU" => opcode::I::SICond(Cmp::Ltu),
+        "xori" | "XORI" => opcode::I::XORI,
+        "ori" | "ORI" => opcode::I::ORI,
+        "andi" | "ANDI" => opcode::I::ANDI,
+        "slli" | "SLLI" => opcode::I::SLLI,
+        "srli" | "SRLI" => opcode::I::SRLI,
+        "srai" | "SRAI" => opcode::I::SRAI,
         _ => return false,
     };
 
@@ -157,7 +157,7 @@ fn i_args(
 
 pub(super) fn ijump_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
     let opcode = match op {
-        "JALR" => opcode::IJump::JALR,
+        "jalr" | "JALR" => opcode::IJump::JALR,
         _ => return false,
     };
 
@@ -173,12 +173,12 @@ pub(super) fn ijump_32(context: &mut ParseContext, op: &str, full_op: &str, args
 
 pub(super) fn imem_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
     let opcode = match op {
-        "FENCE" => opcode::IMem::FENCE,
-        "LB" => opcode::IMem::LD(Width::Byte),
-        "LH" => opcode::IMem::LD(Width::Word),
-        "LW" => opcode::IMem::LD(Width::DWord),
-        "LBU" => opcode::IMem::LDU(Width::Byte),
-        "LHU" => opcode::IMem::LDU(Width::Word),
+        "fence" | "FENCE" => opcode::IMem::FENCE,
+        "lb" | "LB" => opcode::IMem::LD(Width::Byte),
+        "lh" | "LH" => opcode::IMem::LD(Width::Word),
+        "lw" | "LW" => opcode::IMem::LD(Width::DWord),
+        "lbu" | "LBU" => opcode::IMem::LDU(Width::Byte),
+        "lhu" | "LHU" => opcode::IMem::LDU(Width::Word),
         _ => return false,
     };
 
@@ -205,9 +205,9 @@ pub(super) fn imem_32(context: &mut ParseContext, op: &str, full_op: &str, args:
 
 pub(super) fn s_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
     let width = match op {
-        "SB" => Width::Byte,
-        "SH" => Width::Word,
-        "SW" => Width::DWord,
+        "sb" | "SB" => Width::Byte,
+        "sh" | "SH" => Width::Word,
+        "sw" | "SW" => Width::DWord,
         _ => return false,
     };
 
@@ -223,12 +223,12 @@ pub(super) fn s_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
 
 pub(super) fn b_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
     let cmp = match op {
-        "BEQ" => Cmp::Eq,
-        "BNE" => Cmp::Ne,
-        "BLT" => Cmp::Lt,
-        "BLTU" => Cmp::Ltu,
-        "BGE" => Cmp::Ge,
-        "BGEU" => Cmp::Geu,
+        "beq" | "BEQ" => Cmp::Eq,
+        "bne" | "BNE" => Cmp::Ne,
+        "blt" | "BLT" => Cmp::Lt,
+        "bltu" | "BLTU" => Cmp::Ltu,
+        "bge" | "BGE" => Cmp::Ge,
+        "bgeu" | "BGEU" => Cmp::Geu,
         _ => return false,
     };
 
@@ -309,8 +309,8 @@ fn rir_args(
 
 pub(super) fn u_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
     let opcode = match op {
-        "LUI" => opcode::U::LUI,
-        "AUIPC" => opcode::U::AUIPC,
+        "lui" | "LUI" => opcode::U::LUI,
+        "auipc" | "AUIPC" => opcode::U::AUIPC,
         _ => return false,
     };
 
@@ -326,7 +326,7 @@ pub(super) fn u_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
 
 pub(super) fn j_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
     let opcode = match op {
-        "JAL" => opcode::J::JAL,
+        "jal" | "JAL" => opcode::J::JAL,
         _ => return false,
     };
 
@@ -381,8 +381,8 @@ fn ri_args(
 
 pub(super) fn sys_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
     let opcode = match op {
-        "EBREAK" => opcode::RSys::EBREAK,
-        "ECALL" => opcode::RSys::ECALL,
+        "ebreak" | "EBREAK" => opcode::RSys::EBREAK,
+        "ecall" | "ECALL" => opcode::RSys::ECALL,
         _ => return false,
     };
 

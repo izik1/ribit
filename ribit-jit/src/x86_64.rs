@@ -137,10 +137,10 @@ mod test {
         ctx.execute_basic_block(&mut pc, &mut regs, &mut memory);
         assert_eq!(pc, 4096);
 
-        for idx in 0..regs.len() {
+        for (idx, reg) in regs.iter().copied().enumerate() {
             match idx {
-                0 => assert_eq!(regs[idx], 0),
-                _ => assert_eq!(regs[idx], 0xaaaaaaaa),
+                0 => assert_eq!(reg, 0),
+                _ => assert_eq!(reg, 0xaaaaaaaa),
             }
         }
     }

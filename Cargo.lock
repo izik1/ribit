@@ -196,6 +196,7 @@ dependencies = [
  "memmap2",
  "rasen",
  "raw-cpuid",
+ "ribit-asm",
  "ribit-core",
  "ribit-ssa",
  "static_assertions",

@@ -17,7 +17,9 @@ pub fn commutative_binop(
 ) -> io::Result<()> {
     // legalization will always put src1 (if either) into dest, so, src2 can't be dest here.
     // *unless* src1 == src2
-    debug_assert!(src2.reg() != Some(dest) || Some(src1) == src2.reg());
+    if let Source::Register(src2) = src2 {
+        debug_assert!(src2 != dest || src1 == src2);
+    }
 
     let dest = Reg32(dest);
     let src1 = Reg32(src1);
