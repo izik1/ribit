@@ -4,88 +4,17 @@ use std::fmt;
 
 use crate::{AnySource, Block, Id, Instruction, StackIndex, Terminator};
 
-#[inline]
-fn update_source<F: FnMut(&mut Lifetimes, Id, usize)>(
-    lifetimes: &mut Lifetimes,
-    source: &AnySource,
-    idx: usize,
-    update: &mut F,
-) {
-    if let AnySource::Ref(r) = source {
-        update(lifetimes, r.id, idx);
-    }
-}
-
 fn lifetime_instruction<F: FnMut(&mut Lifetimes, Id, usize)>(
     instr: &Instruction,
     idx: usize,
     lifetimes: &mut Lifetimes,
     mut update: F,
 ) {
-    match instr {
-        Instruction::Fence => {}
-
-        Instruction::BinOp { dest, src, .. } | Instruction::Cmp { dest, src, .. } => {
-            update(lifetimes, *dest, idx);
-            match *src {
-                crate::SourcePair::RefRef(lhs, rhs) => {
-                    update(lifetimes, lhs.id, idx);
-                    update(lifetimes, rhs.id, idx);
-                }
-                crate::SourcePair::RefConst(it, _) | crate::SourcePair::ConstRef(_, it) => {
-                    update(lifetimes, it.id, idx)
-                }
-            }
-        }
-
-        Instruction::CommutativeBinOp { dest, src1, src2, .. } => {
-            update(lifetimes, *dest, idx);
-            update(lifetimes, src1.id, idx);
-            update_source(lifetimes, src2, idx, &mut update);
-        }
-
-        Instruction::ReadReg { dest, base, .. } => {
-            update(lifetimes, *dest, idx);
-            update_source(lifetimes, base, idx, &mut update);
-        }
-
-        Instruction::Arg { dest, .. } | Instruction::ReadStack { dest, .. } => {
-            update(lifetimes, *dest, idx);
-        }
-
-        Instruction::WriteStack { dest: _, src } => {
-            update(lifetimes, src.id, idx);
-        }
-
-        Instruction::WriteReg { src, base, .. } => {
-            update_source(lifetimes, base, idx, &mut update);
-            update_source(lifetimes, src, idx, &mut update);
-        }
-
-        Instruction::ReadMem { dest, src, base, .. } => {
-            update(lifetimes, *dest, idx);
-
-            update_source(lifetimes, base, idx, &mut update);
-            update_source(lifetimes, src, idx, &mut update);
-        }
-
-        Instruction::WriteMem { addr, src, base, .. } => {
-            update_source(lifetimes, base, idx, &mut update);
-            update_source(lifetimes, addr, idx, &mut update);
-            update_source(lifetimes, src, idx, &mut update);
-        }
-
-        Instruction::Select(it) => {
-            update(lifetimes, it.dest, idx);
-            update(lifetimes, it.cond.id, idx);
-            update_source(lifetimes, &it.if_true, idx, &mut update);
-            update_source(lifetimes, &it.if_false, idx, &mut update);
-        }
-        Instruction::ExtInt(it) => {
-            update(lifetimes, it.dest, idx);
-            update(lifetimes, it.src.id, idx);
-        }
+    if let Some(id) = instr.id() {
+        update(lifetimes, id, idx);
     }
+
+    instr.visit_arg_ids(|id| update(lifetimes, id, idx));
 }
 
 fn lifetime_terminator<F: FnMut(&mut Lifetimes, Id, usize)>(
@@ -96,8 +25,13 @@ fn lifetime_terminator<F: FnMut(&mut Lifetimes, Id, usize)>(
 ) {
     match term {
         Terminator::Ret { addr, code } => {
-            update_source(lifetimes, addr, idx, &mut update);
-            update_source(lifetimes, code, idx, &mut update);
+            if let AnySource::Ref(r) = addr {
+                update(lifetimes, r.id, idx);
+            }
+
+            if let AnySource::Ref(r) = code {
+                update(lifetimes, r.id, idx);
+            }
         }
     }
 }

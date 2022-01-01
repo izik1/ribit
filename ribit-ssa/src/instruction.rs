@@ -84,6 +84,70 @@ pub enum Instruction {
 }
 
 impl Instruction {
+    pub fn visit_arg_ids<F: FnMut(Id)>(&self, mut visit: F) {
+        match self {
+            Instruction::Arg { .. } | Instruction::ReadStack { .. } | Instruction::Fence => {}
+            Instruction::ReadReg { base, .. } => {
+                if let AnySource::Ref(it) = base {
+                    visit(it.id)
+                }
+            }
+            Instruction::WriteReg { base, src, .. } | Instruction::ReadMem { base, src, .. } => {
+                if let AnySource::Ref(base) = base {
+                    visit(base.id)
+                }
+
+                if let AnySource::Ref(src) = src {
+                    visit(src.id)
+                }
+            }
+
+            Instruction::WriteMem { addr, src, base, .. } => {
+                if let AnySource::Ref(it) = addr {
+                    visit(it.id)
+                }
+
+                if let AnySource::Ref(it) = src {
+                    visit(it.id)
+                }
+
+                if let AnySource::Ref(it) = base {
+                    visit(it.id)
+                }
+            }
+
+            Instruction::BinOp { src, .. } | Instruction::Cmp { src, .. } => match src {
+                SourcePair::RefRef(l, r) => {
+                    visit(l.id);
+                    visit(r.id);
+                }
+                SourcePair::RefConst(it, _) | SourcePair::ConstRef(_, it) => visit(it.id),
+            },
+            
+            Instruction::CommutativeBinOp { src1, src2, .. } => {
+                visit(src1.id);
+
+                if let AnySource::Ref(it) = src2 {
+                    visit(it.id)
+                }
+            }
+
+            Instruction::Select(it) => {
+                visit(it.cond.id);
+                if let AnySource::Ref(it) = it.if_true {
+                    visit(it.id)
+                }
+
+                if let AnySource::Ref(it) = it.if_false {
+                    visit(it.id)
+                }
+            }
+
+            Instruction::WriteStack { src, .. } => visit(src.id),
+            Instruction::ExtInt(it) => visit(it.src.id),
+        }
+    }
+
     #[must_use]
     pub fn ty(&self) -> Type {
         match self {
