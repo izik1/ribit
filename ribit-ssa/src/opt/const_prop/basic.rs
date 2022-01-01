@@ -156,7 +156,7 @@ fn select(consts: &HashMap<Id, Constant>, it: &mut instruction::Select) -> Optio
 pub fn run(block: &mut Block) {
     let mut consts = HashMap::new();
     for instruction in &mut block.instructions {
-        if let Some((dest, val)) = run_instruction(&mut consts, instruction) {
+        if let Some((dest, val)) = run_instruction(&consts, instruction) {
             consts.insert(dest, val);
         }
     }

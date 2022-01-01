@@ -100,7 +100,7 @@ pub fn legalise(block: &mut Block, allocs: &HashMap<Id, Register>) {
             Instruction::Cmp { dest: _, src: _, kind: _ } => {}
             Instruction::Select(_) => {}
             Instruction::Fence => {}
-            Instruction::ExtInt { .. } => {}
+            Instruction::ExtInt(_) => {}
             Instruction::BinOp { .. } => {}
         }
     }

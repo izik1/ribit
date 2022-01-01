@@ -23,6 +23,7 @@ impl fmt::Display for Select {
 }
 
 impl Select {
+    #[must_use]
     pub fn ty(&self) -> Type {
         let ty = self.if_true.ty();
 
@@ -31,6 +32,7 @@ impl Select {
         ty
     }
 
+    #[must_use]
     pub fn id(&self) -> Id {
         self.dest
     }
@@ -45,11 +47,13 @@ pub struct ExtInt {
 }
 
 impl ExtInt {
+    #[must_use]
     pub fn ty(&self) -> Type {
         assert!(matches!(self.src.ty, Type::Int(_) | Type::Boolean));
         Type::Int(Bitness::from(self.width))
     }
 
+    #[must_use]
     pub fn id(&self) -> Id {
         self.dest
     }
@@ -123,7 +127,7 @@ impl Instruction {
                 }
                 SourcePair::RefConst(it, _) | SourcePair::ConstRef(_, it) => visit(it.id),
             },
-            
+
             Instruction::CommutativeBinOp { src1, src2, .. } => {
                 visit(src1.id);
 

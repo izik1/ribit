@@ -2,6 +2,7 @@ use crate::reference::Reference;
 use crate::ty::{Constant, Int};
 use crate::{AnySource, BinOp, Bitness, CmpKind, CommutativeBinOp};
 
+#[must_use]
 pub fn commutative_identity(
     lhs: Reference,
     rhs: AnySource,
@@ -35,6 +36,7 @@ pub fn commutative_identity(
     }
 }
 
+#[must_use]
 pub fn commutative_absorb(
     lhs: Reference,
     rhs: AnySource,

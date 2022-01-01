@@ -1,4 +1,4 @@
-use crate::{AnySource, Block, Id, Instruction, Terminator};
+use crate::{AnySource, Block, Id, Terminator};
 
 fn mark_live(live_instructions: &mut [bool; 0x1_0000], src: AnySource) {
     if let AnySource::Ref(r) = src {

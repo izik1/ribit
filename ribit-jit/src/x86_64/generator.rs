@@ -201,7 +201,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                     self.stream.mov_mem_reg(Mem32(memory::stack(*dest, true)), Reg32(src))
                 }
 
-                ssa::Instruction::ExtInt(it) => self.ext_int(it, allocs)?,
+                ssa::Instruction::ExtInt(it) => self.ext_int(it, allocs),
             }?;
         }
 
@@ -212,7 +212,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
         &mut self,
         it: &instruction::ExtInt,
         allocs: &HashMap<ssa::Id, Register>,
-    ) -> Result<Result<(), io::Error>, io::Error> {
+    ) -> Result<(), io::Error> {
         let width = Bitness::from(it.width);
         let dest = *allocs.get(&it.dest).expect("dest not allocated!?");
         let src_width = match it.src.ty {
@@ -221,7 +221,8 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
             Type::Unit => panic!("unexpected `()` type"),
         };
         let src = *allocs.get(&it.src.id).expect("src not allocated!?");
-        Ok(match it.signed {
+
+        match it.signed {
             true if width.to_bits() != src_width => {
                 let m = 32 - src_width;
                 if dest != src {
@@ -234,7 +235,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
             _ if dest != src => self.stream.mov_reg_reg(Reg32(dest), Reg32(src)),
             // accidental nop.
             _ => Ok(()),
-        })
+        }
     }
 
     pub fn complete(
@@ -337,10 +338,8 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
     }
 
     fn mov_zax_imm64(&mut self, imm: u64) -> io::Result<()> {
-        if imm == 0 {
-            self.stream.xor_reg_reg(Reg32::ZAX, Reg32::ZAX)
-        } else if let Ok(imm) = u32::try_from(imm) {
-            self.stream.mov_reg_imm(Reg32::ZAX, Imm32(imm))
+        if let Ok(imm) = u32::try_from(imm) {
+            self.mov_r32_imm32(Register::Zax, imm)
         } else {
             self.stream.mov_reg_imm64(Register::Zax, imm)
         }
