@@ -9,6 +9,34 @@ use crate::{
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Select {
+    pub dest: Id,
+    pub cond: TypedRef<BoolTy>,
+    pub if_true: AnySource,
+    pub if_false: AnySource,
+}
+
+impl fmt::Display for Select {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} = select {}, {}, {}", self.dest, self.cond, self.if_true, self.if_false)
+    }
+}
+
+impl Select {
+    pub fn ty(&self) -> Type {
+        let ty = self.if_true.ty();
+
+        assert_eq!(ty, self.if_false.ty());
+
+        ty
+    }
+
+    pub fn id(&self) -> Id {
+        self.dest
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Instruction {
     Arg { dest: Id, src: Arg },
     // A const should never be put on the stack, as you can just reload it.
@@ -22,10 +50,11 @@ pub enum Instruction {
     Cmp { dest: Id, src: SourcePair, kind: CmpKind },
     CommutativeBinOp { dest: Id, src1: Reference, src2: AnySource, op: CommutativeBinOp },
     // todo: box this
-    Select { dest: Id, cond: TypedRef<BoolTy>, if_true: AnySource, if_false: AnySource },
+    Select(Select),
     ExtInt { dest: Id, width: Width, src: Reference, signed: bool },
     Fence,
 }
+
 impl Instruction {
     #[must_use]
     pub fn ty(&self) -> Type {
@@ -66,13 +95,8 @@ impl Instruction {
 
                 Type::Boolean
             }
-            Instruction::Select { dest: _, cond: _, if_true, if_false } => {
-                let ty = if_true.ty();
 
-                assert_eq!(ty, if_false.ty());
-
-                ty
-            }
+            Instruction::Select(it) => it.ty(),
 
             Instruction::Fence => Type::Unit,
             Instruction::ExtInt { dest: _, width, src: source, signed: _ } => {
@@ -85,8 +109,7 @@ impl Instruction {
     #[must_use]
     pub fn id(&self) -> Option<Id> {
         match self {
-            Self::Select { dest, .. }
-            | Self::ReadReg { dest, .. }
+            Self::ReadReg { dest, .. }
             | Self::ReadMem { dest, .. }
             | Self::ReadStack { dest, .. }
             | Self::Cmp { dest, .. }
@@ -94,6 +117,8 @@ impl Instruction {
             | Self::CommutativeBinOp { dest, .. }
             | Self::BinOp { dest, .. }
             | Self::ExtInt { dest, .. } => Some(*dest),
+
+            Self::Select(it) => Some(it.id()),
 
             Self::WriteStack { .. }
             | Self::WriteReg { .. }
@@ -146,9 +171,7 @@ impl fmt::Display for Instruction {
                 write!(f, "{} = cmp {} {}, {}", dest, kind, src.lhs(), src.rhs())
             }
 
-            Self::Select { dest, cond, if_true, if_false } => {
-                write!(f, "{} = select {}, {}, {}", dest, cond, if_true, if_false)
-            }
+            Self::Select(it) => it.fmt(f),
             Self::Fence => write!(f, "fence"),
             Self::ExtInt { dest, width, src: source, signed } => {
                 let instr = match *signed {

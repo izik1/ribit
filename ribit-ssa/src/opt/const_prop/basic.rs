@@ -127,18 +127,18 @@ fn run_instruction(
             Some((*dest, result))
         }
 
-        Instruction::Select { dest, cond, if_true, if_false } => {
-            *if_true = lookup(consts, *if_true);
-            *if_false = lookup(consts, *if_false);
+        Instruction::Select(it) => {
+            it.if_true = lookup(consts, it.if_true);
+            it.if_false = lookup(consts, it.if_false);
 
-            let konst = typed_const_ref_lookup(consts, *cond)?;
+            let konst = typed_const_ref_lookup(consts, it.cond)?;
 
             let taken = match konst {
-                true => *if_true,
-                false => *if_false,
+                true => it.if_true,
+                false => it.if_false,
             };
 
-            taken.constant().map(|c| (*dest, c))
+            taken.constant().map(|c| (it.id(), c))
         }
 
         Instruction::ExtInt { dest, width, src, signed } => {

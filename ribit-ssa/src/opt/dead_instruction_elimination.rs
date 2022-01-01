@@ -85,13 +85,13 @@ pub fn run(block: &mut Block) {
                 }
             }
 
-            Instruction::Select { dest, cond, if_true, if_false } => {
-                if live_ids[dest.0 as usize] {
+            Instruction::Select(it) => {
+                if live_ids[it.id().0 as usize] {
                     live_instruction_count += 1;
-                    mark_id_live(&mut live_ids, cond.id);
+                    mark_id_live(&mut live_ids, it.cond.id);
 
-                    mark_live(&mut live_ids, *if_true);
-                    mark_live(&mut live_ids, *if_false);
+                    mark_live(&mut live_ids, it.if_true);
+                    mark_live(&mut live_ids, it.if_false);
                 }
             }
             Instruction::ExtInt { dest, width: _, src, signed: _ } => {

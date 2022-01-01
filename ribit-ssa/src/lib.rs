@@ -194,6 +194,14 @@ impl AnySource {
             AnySource::Ref(r) => r.ty,
         }
     }
+
+    #[must_use]
+    pub fn downcast<T: ConstTy>(self) -> Option<TypedSource<T>> {
+        match self {
+            AnySource::Const(c) => T::downcast(c).map(TypedSource::Const),
+            AnySource::Ref(r) => (r.ty == T::TY).then(|| TypedSource::Ref(r.id)),
+        }
+    }
 }
 
 impl fmt::Display for AnySource {
@@ -370,13 +378,13 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
                 update_reference(src, old, new);
             }
 
-            Instruction::Select { cond, if_true, if_false, dest: _ } => {
-                if cond.id == old {
-                    cond.id = new;
+            Instruction::Select(it) => {
+                if it.cond.id == old {
+                    it.cond.id = new;
                 }
 
-                update_reference(if_true, old, new);
-                update_reference(if_false, old, new);
+                update_reference(&mut it.if_true, old, new);
+                update_reference(&mut it.if_false, old, new);
             }
 
             Instruction::ExtInt { src, .. } => {

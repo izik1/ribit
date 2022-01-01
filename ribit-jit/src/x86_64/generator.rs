@@ -169,16 +169,16 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
 
                 // todo(perf): split into `dest = if cond { if_true } else { <undefined> }; dest = if !cond { if_false } else { dest }
                 //  iff: `is_true` & `is_false` are both `Source::Val` and `cond` is not.
-                &ssa::Instruction::Select { dest, cond, if_true, if_false } => {
-                    let dest = *allocs.get(&dest).expect("dest not allocated!?");
+                ssa::Instruction::Select(it) => {
+                    let dest = *allocs.get(&it.dest).expect("dest not allocated!?");
 
-                    let if_true = crate::Source::from_ssa_src(if_true, allocs)
+                    let if_true = crate::Source::from_ssa_src(it.if_true, allocs)
                         .expect("if_true not allocated!?");
 
-                    let if_false = crate::Source::from_ssa_src(if_false, allocs)
+                    let if_false = crate::Source::from_ssa_src(it.if_false, allocs)
                         .expect("if_false not allocated!?");
 
-                    let cond = *allocs.get(&cond.id).expect("cond not allocated!?");
+                    let cond = *allocs.get(&it.cond.id).expect("cond not allocated!?");
 
                     let clobber_reg = clobbers.get(&idx).and_then(|regs| regs.get(0)).copied();
                     cmp::select(self, dest, cond, if_true, if_false, clobber_reg)

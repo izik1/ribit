@@ -28,17 +28,12 @@ pub fn count_clobbers_for(instr: &Instruction, allocs: &HashMap<Id, Register>) -
         // and dest, 0x0000_0001
         // However, there are frequently more efficent code paths than that.
         | Instruction::Cmp { .. } => 0,
-        Instruction::Select {
-            dest,
-            cond: _,
-            if_true,
-            if_false,
-        } => {
-            match (if_true.reference(), if_false.reference()) {
+        Instruction::Select(it) => {
+            match (it.if_true.reference(), it.if_false.reference()) {
                 // both sources are consts, so we need a clobber register (otherwise we have no way of loading the number without branching)
                 (None, None) => 1,
                 // one of the sources is the same as the dest, so we need a clobber to store `dest` as a temporary
-                (Some(r), None) | (None, Some(r)) if allocs[&r.id] == allocs[dest] => 1,
+                (Some(r), None) | (None, Some(r)) if allocs[&r.id] == allocs[&it.dest] => 1,
                 // no source is the same as dest, so we can avoid a clobber by loading the const into dest _first_.
                 (Some(_), None) | (None, Some(_)) => 0,
                 // both registers are already allocated, so we definitely _don't_ need a clobber.
@@ -103,7 +98,7 @@ pub fn legalise(block: &mut Block, allocs: &HashMap<Id, Register>) {
             Instruction::ReadMem { dest: _, src: _, base: _, width: _, sign_extend: _ } => {}
             Instruction::WriteMem { addr: _, src: _, base: _, width: _ } => {}
             Instruction::Cmp { dest: _, src: _, kind: _ } => {}
-            Instruction::Select { dest: _, cond: _, if_true: _, if_false: _ } => {}
+            Instruction::Select(_) => {}
             Instruction::Fence => {}
             Instruction::ExtInt { .. } => {}
             Instruction::BinOp { .. } => {}

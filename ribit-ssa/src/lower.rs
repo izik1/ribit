@@ -4,6 +4,7 @@ mod test;
 use ribit_core::{instruction, opcode, register, Width};
 
 use super::{AnySource, BinOp, CmpKind, Id, Instruction};
+use crate::instruction::Select;
 use crate::reference::Reference;
 use crate::ty::{Bitness, BoolTy, ConstTy, Constant, Int};
 use crate::{
@@ -247,11 +248,8 @@ impl Context {
         match cond {
             TypedSource::Const(false) => if_false,
             TypedSource::Const(true) => if_true,
-            TypedSource::Ref(id) => self.instruction(|dest| Instruction::Select {
-                dest,
-                if_true,
-                if_false,
-                cond: TypedRef::new(id),
+            TypedSource::Ref(id) => self.instruction(|dest| {
+                Instruction::Select(Select { dest, if_true, if_false, cond: TypedRef::new(id) })
             }),
         }
     }
