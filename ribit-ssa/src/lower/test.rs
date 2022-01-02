@@ -2,7 +2,7 @@ use expect_test::expect;
 use ribit_core::{instruction, opcode, register};
 
 use super::Context;
-use crate::test::MEM_SIZE;
+use crate::tests::MEM_SIZE;
 use crate::{AnySource, Arg, Constant, Id, Instruction, Terminator};
 
 #[test]
@@ -77,7 +77,7 @@ fn jalr_bit() {
 
 #[test]
 fn jalr_pc() {
-    let block = crate::test::assemble_block("JALR x4, 1023(x1)");
+    let block = crate::tests::assemble_block("JALR x4, 1023(x1)");
 
     expect![[r#"
         %0 = args[0]
@@ -92,7 +92,7 @@ fn jalr_pc() {
 
 #[test]
 fn jal_basic() {
-    let block = crate::test::assemble_block("JAL x4, 2048");
+    let block = crate::tests::assemble_block("JAL x4, 2048");
 
     expect![[r#"
         %0 = args[0]
@@ -104,7 +104,7 @@ fn jal_basic() {
 
 #[test]
 fn sys_break() {
-    let block = crate::test::assemble_block("EBREAK");
+    let block = crate::tests::assemble_block("EBREAK");
 
     expect![[r#"
         %0 = args[0]
@@ -116,7 +116,7 @@ fn sys_break() {
 #[test]
 fn addi_nop() {
     // todo: nop psudeo
-    let block = crate::test::assemble_block(
+    let block = crate::tests::assemble_block(
         r#"
             ADDI x0, x0, 0
             EBREAK
@@ -132,7 +132,7 @@ fn addi_nop() {
 
 #[test]
 fn branch_0_0_eq() {
-    let block = crate::test::assemble_block(r#"BEQ x0, 512(x0)"#);
+    let block = crate::tests::assemble_block(r#"BEQ x0, 512(x0)"#);
 
     expect![[r#"
         %0 = args[0]
@@ -143,7 +143,7 @@ fn branch_0_0_eq() {
 
 #[test]
 fn branch_0_x1_eq() {
-    let block = crate::test::assemble_block(r#"BEQ x0, 512(x1)"#);
+    let block = crate::tests::assemble_block(r#"BEQ x0, 512(x1)"#);
 
     expect![[r#"
         %0 = args[0]
@@ -157,7 +157,7 @@ fn branch_0_x1_eq() {
 
 #[test]
 fn addi_no_dest() {
-    let block = crate::test::assemble_block(
+    let block = crate::tests::assemble_block(
         r#"
             ADDI x0, x1, 50
             EBREAK
@@ -175,7 +175,7 @@ fn addi_no_dest() {
 
 #[test]
 fn mem_read_write() {
-    let block = crate::test::assemble_block(
+    let block = crate::tests::assemble_block(
         r#"
             LW x2, 0(x1)
             ADDI x2, x2, 100
@@ -201,7 +201,7 @@ fn mem_read_write() {
 
 #[test]
 fn addi_no_src() {
-    let block = crate::test::assemble_block(
+    let block = crate::tests::assemble_block(
         r#"
             ADDI x2, x0, 50
             EBREAK
@@ -219,7 +219,7 @@ fn addi_no_src() {
 /// ensure results of slt[u] can be used in other instructions
 #[test]
 fn cmp_add() {
-    let block = crate::test::assemble_block(
+    let block = crate::tests::assemble_block(
         r#"
             SLT x2, x2, x3
             ADD x2, x2, x4

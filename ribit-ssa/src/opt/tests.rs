@@ -1,6 +1,6 @@
 use expect_test::expect;
 
-use crate::test::{assemble_block, max_fn, min_fn};
+use crate::tests::{assemble_block, max_fn, min_fn};
 
 #[test]
 fn jal_basic_const_prop() {

@@ -16,7 +16,7 @@
 
   outputs = { self, nixpkgs, utils, rust-overlay, ... }:
     let
-      rustChannel = "stable";
+      rustChannel = "nightly";
       rustVersion = "latest";
     in
     utils.lib.eachDefaultSystem

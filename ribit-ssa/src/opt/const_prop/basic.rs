@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
+use super::{lookup, typed_const_ref_lookup};
 use crate::{
     eval, instruction, AnySource, Block, Constant, Id, Instruction, SourcePair, Terminator,
 };
-
-use super::{lookup, typed_const_ref_lookup};
 
 fn run_instruction(
     consts: &HashMap<Id, Constant>,

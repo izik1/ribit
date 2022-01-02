@@ -3,71 +3,13 @@ use std::fmt;
 use ribit_core::{register, Width};
 
 use crate::reference::Reference;
-use crate::ty::{Bitness, BoolTy};
-use crate::{
-    AnySource, Arg, BinOp, CmpKind, CommutativeBinOp, Id, SourcePair, StackIndex, Type, TypedRef,
-};
+use crate::{AnySource, Arg, BinOp, CmpKind, CommutativeBinOp, Id, SourcePair, StackIndex, Type};
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Select {
-    pub dest: Id,
-    pub cond: TypedRef<BoolTy>,
-    pub if_true: AnySource,
-    pub if_false: AnySource,
-}
+mod ext_int;
+mod select;
 
-impl fmt::Display for Select {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} = select {}, {}, {}", self.dest, self.cond, self.if_true, self.if_false)
-    }
-}
-
-impl Select {
-    #[must_use]
-    pub fn ty(&self) -> Type {
-        let ty = self.if_true.ty();
-
-        assert_eq!(ty, self.if_false.ty());
-
-        ty
-    }
-
-    #[must_use]
-    pub fn id(&self) -> Id {
-        self.dest
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ExtInt {
-    pub dest: Id,
-    pub width: Width,
-    pub src: Reference,
-    pub signed: bool,
-}
-
-impl ExtInt {
-    #[must_use]
-    pub fn ty(&self) -> Type {
-        assert!(matches!(self.src.ty, Type::Int(_) | Type::Boolean));
-        Type::Int(Bitness::from(self.width))
-    }
-
-    #[must_use]
-    pub fn id(&self) -> Id {
-        self.dest
-    }
-}
-
-impl fmt::Display for ExtInt {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let instr = match self.signed {
-            true => "sext",
-            false => "zext",
-        };
-        write!(f, "{} = {} {} {}", self.dest, instr, self.width, self.src)
-    }
-}
+pub use ext_int::ExtInt;
+pub use select::Select;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Instruction {

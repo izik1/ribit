@@ -19,8 +19,8 @@ pub fn count_clobbers_for(instr: &Instruction, allocs: &HashMap<Id, Register>) -
         | Instruction::WriteMem { .. }
         | Instruction::Fence
         | Instruction::ExtInt { .. }
-        | Instruction::BinOp {.. } 
-        | Instruction::CommutativeBinOp {.. } 
+        | Instruction::BinOp { .. }
+        | Instruction::CommutativeBinOp {.. }
         // note: although slightly complicated, this can indeed be done without any branching
         // in even the worst cases, by doing the following:
         // <comparision>
@@ -62,11 +62,7 @@ pub fn count_clobbers_for_terminal(
                 .or_else(|| code.reference())
                 .map_or(false, |r| allocs[&r.id] == Register::Zax);
 
-            if register_count == 1 && zax_used {
-                2
-            } else {
-                0
-            }
+            if register_count == 1 && zax_used { 2 } else { 0 }
         }
     }
 }

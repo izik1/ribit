@@ -233,7 +233,7 @@ mod test {
 
     use super::ShowLifetimes;
     use crate::opt;
-    use crate::test::{max_fn, MEM_SIZE};
+    use crate::tests::{max_fn, MEM_SIZE};
 
     #[test]
     fn dead_reads_give_valid_lifetimes() {

@@ -8,9 +8,7 @@ use rasen::params::reg::{Reg16, Reg32, Reg64, Reg8};
 use rasen::params::Register;
 use ribit_core::{ReturnCode, Width};
 use ribit_ssa as ssa;
-use ssa::Bitness;
-use ssa::StackIndex;
-use ssa::{instruction, Type};
+use ssa::{instruction, Bitness, StackIndex, Type};
 
 use crate::x86_64::Assembler;
 use crate::Source;

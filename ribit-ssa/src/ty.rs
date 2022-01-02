@@ -148,11 +148,7 @@ impl Int {
 
 impl fmt::Display for Int {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if f.sign_minus() {
-            self.signed().fmt(f)
-        } else {
-            self.unsigned().fmt(f)
-        }
+        if f.sign_minus() { self.signed().fmt(f) } else { self.unsigned().fmt(f) }
     }
 }
 

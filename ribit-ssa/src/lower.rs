@@ -90,7 +90,7 @@ impl Context {
         let (src1, src2) = match (src1, src2) {
             (AnySource::Const(src1), AnySource::Const(src2)) => match (src1, src2) {
                 (Constant::Int(Int(Bitness::B32, lhs)), Constant::Int(Int(Bitness::B32, rhs))) => {
-                    return AnySource::Const(Constant::i32(eval::commutative_binop(lhs, rhs, op)))
+                    return AnySource::Const(Constant::i32(eval::commutative_binop(lhs, rhs, op)));
                 }
 
                 (lhs, rhs) => {
@@ -212,7 +212,7 @@ impl Context {
     pub fn cmp(&mut self, src1: AnySource, src2: AnySource, mode: CmpKind) -> TypedSource<BoolTy> {
         let consts = match SourcePair::try_from((src1, src2)) {
             Ok(src) => {
-                return self.typed_instruction(|dest| Instruction::Cmp { dest, src, kind: mode })
+                return self.typed_instruction(|dest| Instruction::Cmp { dest, src, kind: mode });
             }
             Err(consts) => consts,
         };

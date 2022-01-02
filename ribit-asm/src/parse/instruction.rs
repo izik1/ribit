@@ -2,9 +2,10 @@ use ribit_core::instruction::{self, Instruction};
 use ribit_core::opcode::{self, Cmp};
 use ribit_core::{register, Width};
 
-use super::{sign_extend_32, ParseContext};
-
-use super::{parse_general_purpose_register, parse_immediate, sign_extend, test_len};
+use super::{
+    parse_general_purpose_register, parse_immediate, sign_extend, sign_extend_32, test_len,
+    ParseContext,
+};
 
 pub(super) fn r_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
     let opcode = match op {

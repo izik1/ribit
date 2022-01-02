@@ -11,8 +11,7 @@ use std::convert::TryInto;
 
 use goblin::elf::program_header::PT_LOAD;
 use goblin::elf32;
-use goblin::elf32::sym::Symtab;
-use goblin::elf32::sym::STB_GLOBAL;
+use goblin::elf32::sym::{Symtab, STB_GLOBAL};
 use goblin::strtab::Strtab;
 
 struct TestAddrs {
