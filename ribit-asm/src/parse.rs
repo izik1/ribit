@@ -1,4 +1,5 @@
-use ribit_core::register;
+use ribit_core::instruction::Instruction;
+use ribit_core::{opcode, register, Width};
 
 mod instruction;
 
@@ -79,22 +80,13 @@ fn tokenize_instruction(context: &mut ParseContext, line: &str) {
     let args = args;
 
     let instruction_matched = match has_compressed {
-        true => parse_compressed(context, op, full_op, &args),
+        true => instruction::compressed(context, op, full_op, &args),
         false => parse_32(context, op, full_op, &args),
     };
 
     if !instruction_matched {
         context.errors.push(format!("Unknown instruction `{}`", full_op));
     }
-}
-
-fn parse_compressed(
-    _context: &mut ParseContext,
-    _op: &str,
-    _full_op: &str,
-    _args: &[&str],
-) -> bool {
-    false
 }
 
 fn parse_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
@@ -161,6 +153,16 @@ fn parse_general_purpose_register(register: &str) -> Result<Option<register::Ris
     // todo: abi names.
 
     Err(format!("Unexpected register name `{}`", register))
+}
+fn parse_compressed_register(register: &str) -> Result<Option<register::RiscV>, String> {
+    let res = parse_general_purpose_register(register)?;
+
+    let register = res.map_or(0, |it| it.get());
+    if register < 8 || register >= 16 {
+        return Err(format!("register out of range: `{}` (x8..x16)", register));
+    }
+
+    Ok(res)
 }
 
 fn parse_immediate(src: &str, bits: u8) -> Result<u32, String> {

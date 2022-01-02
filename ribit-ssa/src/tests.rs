@@ -2,7 +2,7 @@ use crate::{lower, Block};
 
 pub const MEM_SIZE: u32 = 0x1000000;
 
-pub(crate) fn assemble_block(block: &str) -> Block {
+pub(crate) fn assemble_block_with_context(mut context: lower::Context, block: &str) -> Block {
     let output = ribit_asm::tokenize(block, true);
     for error in &output.errors {
         eprintln!("error: {}", error);
@@ -14,15 +14,17 @@ pub(crate) fn assemble_block(block: &str) -> Block {
 
     let mut instructions = output.instructions;
 
-    let mut ctx = lower::Context::new(1024, MEM_SIZE);
-
     let last = instructions.remove(instructions.len() - 1);
 
     for instruction in instructions {
-        lower::non_terminal(&mut ctx, instruction.instruction, instruction.len);
+        lower::non_terminal(&mut context, instruction.instruction, instruction.len);
     }
 
-    lower::terminal(ctx, last.instruction, last.len)
+    lower::terminal(context, last.instruction, last.len)
+}
+
+pub(crate) fn assemble_block(block: &str) -> Block {
+    assemble_block_with_context(lower::Context::new(1024, MEM_SIZE), block)
 }
 
 pub fn max_fn() -> Block {

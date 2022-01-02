@@ -16,6 +16,8 @@
 
   outputs = { self, nixpkgs, utils, rust-overlay, ... }:
     let
+      # note: we need to build on stable too, just not sure how to actually *have* 
+      # nightly available for `cargo +nightly fmt`.
       rustChannel = "nightly";
       rustVersion = "latest";
     in

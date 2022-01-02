@@ -3,8 +3,8 @@ use ribit_core::opcode::{self, Cmp};
 use ribit_core::{register, Width};
 
 use super::{
-    parse_general_purpose_register, parse_immediate, sign_extend, sign_extend_32, test_len,
-    ParseContext,
+    parse_compressed_register, parse_general_purpose_register, parse_immediate, sign_extend,
+    sign_extend_32, test_len, ParseContext,
 };
 
 pub(super) fn r_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
@@ -308,6 +308,68 @@ fn rir_args(
     (!has_error).then(|| (r1, imm, r2))
 }
 
+pub(super) fn rir_args_16(
+    context: &mut ParseContext,
+    full_op: &str,
+    args: &[&str],
+    immediate_width: u8,
+    sign_extend_imm: bool,
+) -> Option<(Option<register::RiscV>, u16, Option<register::RiscV>)> {
+    let mut has_error = test_len(context, full_op, 2, args.len());
+
+    let r1 = match args.get(0) {
+        Some(reg) => match parse_compressed_register(reg) {
+            Ok(it) => it,
+            Err(e) => {
+                has_error = true;
+                context.errors.push(e);
+                None
+            }
+        },
+        None => None,
+    };
+
+    let (imm, r2) = match args.get(1) {
+        Some(it) => {
+            match it.split_once('(').and_then(|(imm, r)| r.strip_suffix(')').map(|r| (imm, r))) {
+                Some((imm, r2)) => {
+                    let imm = match parse_immediate(imm, immediate_width) {
+                        Ok(it) if sign_extend_imm => sign_extend(it as u16, immediate_width),
+                        Ok(it) => it as u16,
+                        Err(e) => {
+                            has_error = true;
+                            context.errors.push(e);
+                            0
+                        }
+                    };
+
+                    let r2 = match parse_compressed_register(r2) {
+                        Ok(it) => it,
+                        Err(e) => {
+                            has_error = true;
+                            context.errors.push(e);
+                            None
+                        }
+                    };
+
+                    (imm, r2)
+                }
+                None => {
+                    has_error = true;
+                    context
+                        .errors
+                        .push(format!("expected an arg in the format 0(x16), found `{}`", it));
+
+                    (0, None)
+                }
+            }
+        }
+        None => (0, None),
+    };
+
+    (!has_error).then(|| (r1, imm, r2))
+}
+
 pub(super) fn u_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
     let opcode = match op {
         "lui" | "LUI" => opcode::U::LUI,
@@ -315,7 +377,7 @@ pub(super) fn u_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
         _ => return false,
     };
 
-    if let Some((rd, imm)) = ri_args(context, full_op, &args) {
+    if let Some((rd, imm)) = ri_args(context, full_op, &args, 20) {
         context.instructions.push(instruction::Info {
             instruction: Instruction::U(instruction::U::new(imm << 12, rd, opcode)),
             len: 4,
@@ -331,7 +393,7 @@ pub(super) fn j_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
         _ => return false,
     };
 
-    if let Some((rd, imm)) = ri_args(context, full_op, &args) {
+    if let Some((rd, imm)) = ri_args(context, full_op, &args, 20) {
         let imm = match context.supports_compressed {
             true => imm << 1,
             false => imm << 2,
@@ -350,6 +412,7 @@ fn ri_args(
     context: &mut ParseContext,
     full_op: &str,
     args: &[&str],
+    imm_bits: u8,
 ) -> Option<(Option<register::RiscV>, u32)> {
     let mut has_error = test_len(context, full_op, 2, args.len());
 
@@ -366,8 +429,8 @@ fn ri_args(
     };
 
     let imm = match args.get(1) {
-        Some(it) => match parse_immediate(it, 20) {
-            Ok(it) => sign_extend_32(it, 20),
+        Some(it) => match parse_immediate(it, imm_bits) {
+            Ok(it) => sign_extend_32(it, imm_bits),
             Err(e) => {
                 has_error = true;
                 context.errors.push(e);
@@ -395,4 +458,114 @@ pub(super) fn sys_32(context: &mut ParseContext, op: &str, full_op: &str, args: 
     }
 
     true
+}
+
+fn compressed_jump(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
+    let rd = match op {
+        "j" | "J" => None,
+        "jal" | "JAL" => Some(register::RiscV::X1),
+        _ => return false,
+    };
+
+    if let Some(imm) = compressed_jump_args(context, full_op, args) {
+        context.instructions.push(instruction::Info {
+            instruction: Instruction::J(instruction::J::new(imm << 1, rd, opcode::J::JAL)),
+            len: 2,
+        });
+    }
+
+    true
+}
+
+pub(super) fn compressed(
+    context: &mut ParseContext,
+    op: &str,
+    full_op: &str,
+    args: &[&str],
+) -> bool {
+    if !context.supports_compressed {
+        context.errors.push(format!(
+            "`{}` is not a valid opcode (hint: compressed instructions aren't enabled)",
+            full_op
+        ));
+        return true;
+    }
+
+    if compressed_jump(context, op, full_op, args) {
+        return true;
+    }
+
+    match op {
+        // "lwsp" | "LWSP" => {}
+        "lw" | "LW" => {
+            if let Some((rd, imm, rs1)) = rir_args_16(context, full_op, args, 5, false) {
+                let imm = imm << 2;
+
+                context.instructions.push(instruction::Info {
+                    instruction: Instruction::IMem(instruction::IMem::new(
+                        imm,
+                        rs1,
+                        rd,
+                        opcode::IMem::LD(Width::DWord),
+                    )),
+                    len: 2,
+                })
+            }
+        }
+
+        "nop" | "NOP" => {
+            if !test_len(context, full_op, 0, args.len()) {
+                context.instructions.push(instruction::Info {
+                    instruction: Instruction::I(instruction::I::new(
+                        0,
+                        None,
+                        None,
+                        opcode::I::ADDI,
+                    )),
+                    len: 2,
+                })
+            }
+        }
+
+        "li" | "LI" => {
+            if let Some((rd, imm)) = ri_args(context, full_op, &args, 6) {
+                if rd.is_none() {
+                    context.errors.push(format!("`x0` is not a valid register for `{}`", op));
+                    return true;
+                }
+
+                let imm = imm as u16;
+                context.instructions.push(instruction::Info {
+                    instruction: Instruction::I(instruction::I::new(
+                        imm,
+                        None,
+                        rd,
+                        opcode::I::ADDI,
+                    )),
+                    len: 2,
+                });
+            }
+        }
+        _ => return false,
+    };
+
+    true
+}
+
+fn compressed_jump_args(context: &mut ParseContext, full_op: &str, args: &[&str]) -> Option<u32> {
+    let mut has_error = test_len(context, full_op, 1, args.len());
+
+    let imm = match args.get(0) {
+        Some(it) => match parse_immediate(it, 10) {
+            Ok(it) => sign_extend_32(it, 10),
+            Err(e) => {
+                has_error = true;
+                context.errors.push(e);
+                0
+            }
+        },
+        None => 0,
+    };
+
+    (!has_error).then(|| imm)
 }
