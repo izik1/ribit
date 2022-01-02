@@ -240,159 +240,159 @@ mod test {
         let mut block = crate::tests::assemble_block_with_context(
             crate::lower::Context::new(0x10000, MEM_SIZE),
             r#"
-                LUI x1, 0xfeedc
-                ADDI x1, x1, 0xead
-                LUI x2, 0xff76e
-                ADDI x2, x2, 0xf56
-                LUI x3, 0x7fbb7
-                ADDI x3, x3, 0xfab
-                LUI x4, 0xbfddb
-                ADDI x4, x4, 0x7d5
-                AUIPC x5, 0
-                ADDI x5, x5, 0xd8
-                AUIPC x6, 2
-                ADDI x6, x6, 0xfd8
-                LUI x7, 0xb7fbb
-                ADDI x7, x7, 0x6fa
-                LUI x8, 0x5bfde
-                ADDI x8, x8, 0xb7d
-                LUI x9, 0xadfef
-                ADDI x9, x9, 0xdbe
-                LUI x10, 0x56ff7
-                ADDI x10, x10, 0x6df
-                LUI x11, 0xab7fc
-                ADDI x11, x11, 0xb6f
-                LUI x12, 0xd5bfe
-                ADDI x12, x12, 0xdb7
-                LUI x13, 0xeadff
-                ADDI x13, x13, 0xedb
-                LUI x14, 0xf56ff
-                ADDI x14, x14, 0x76d
-                LUI x15, 0xfab80
-                ADDI x15, x15, 0xbb6
-                LUI x16, 0x7d5c0
-                ADDI x16, x16, 0xddb
-                LUI x17, 0xbeae0
-                ADDI x17, x17, 0xeed
-                LUI x18, 0xdf570
-                ADDI x18, x18, 0xf76
-                LUI x19, 0x6fab8
-                ADDI x19, x19, 0xfbb
-                LUI x20, 0xb7d5c
-                ADDI x20, x20, 0xfdd
-                LUI x21, 0xdbeae
-                ADDI x21, x21, 0xfee
-                LUI x22, 0x6df57
-                ADDI x22, x22, 0xff7
-                LUI x23, 0xb6fab
-                ADDI x23, x23, 0x7fb
-                LUI x24, 0xdb7d6
-                ADDI x24, x24, 0xbfd
-                LUI x25, 0xedbeb
-                ADDI x25, x25, 0xdfe
-                LUI x26, 0x76df5
-                ADDI x26, x26, 0x6ff
-                LUI x27, 0xbb6fb
-                ADDI x27, x27, 0xb7f
-                LUI x28, 0xddb7d
-                ADDI x28, x28, 0x5bf
-                LUI x29, 0xeedbf
-                ADDI x29, x29, 0xadf
-                LUI x30, 0xf76df
-                ADDI x30, x30, 0x56f
-                LUI x31, 0xfbb70
-                ADDI x31, x31, 0xab7
-                AUIPC x1, 2                
-                ADDI x1, x1, 0x10c
-                AUIPC x12, 2
-                ADDI x12, x12, 0xed0
-                C.LW x12, 0xc(x12)
-                C.NOP
-                C.NOP
-                SW x12, 0(x1)
-                AUIPC x10, 2
-                ADDI x10, x10, 0xeee
-                C.LW x11, 0(x10)
-                C.NOP
-                C.NOP
-                SW x11, 4(x1)
-                AUIPC x9, 2
-                ADDI x9, x9, 3800
-                C.LW x14, 1(x9)
-                C.NOP
-                C.NOP
-                SW x14, 8(x1)
-                AUIPC x15, 2
-                ADDI x15, x15, 3778
-                C.LW x13, 2(x15)
-                C.NOP
-                C.NOP
-                SW x13, 12(x1)
-                AUIPC x14, 2
-                ADDI x14, x14, 3752
-                C.LW x10, 4(x14)
-                C.NOP
-                C.NOP
-                SW x10, 16(x1)
-                AUIPC x8, 2
-                ADDI x8, x8, 3718
-                C.LW x15, 8(x8)
-                C.NOP
-                C.NOP
-                SW x15, 20(x1)
-                AUIPC x11, 2
-                ADDI x11, x11, 3668
-                C.LW x8, 16(x11)
-                C.NOP
-                C.NOP
-                SW x8, 24(x1)
-                AUIPC x13, 2
-                ADDI x13, x13, 3594
-                C.LW x9, 30(x13)
-                C.NOP
-                C.NOP
-                SW x9, 28(x1)
-                AUIPC x11, 2
-                ADDI x11, x11, 3580
-                C.LW x10, 29(x11)
-                C.NOP
-                C.NOP
-                SW x10, 32(x1)
-                AUIPC x11, 2
-                ADDI x11, x11, 3570
-                C.LW x10, 27(x11)
-                C.NOP
-                C.NOP
-                SW x10, 36(x1)
-                AUIPC x11, 2
-                ADDI x11, x11, 3568
-                C.LW x10, 23(x11)
-                C.NOP
-                C.NOP
-                SW x10, 40(x1)
-                AUIPC x11, 2
-                ADDI x11, x11, 3582
-                C.LW x10, 15(x11)
-                C.NOP
-                C.NOP
-                SW x10, 44(x1)
-                AUIPC x11, 2
-                ADDI x11, x11, 3540
-                C.LW x10, 21(x11)
-                C.NOP
-                C.NOP
-                SW x10, 0x30(x1)
-                AUIPC x11, 2
-                ADDI x11, x11, 3566
-                C.LW x10, 10(x11)
-                C.NOP
-                C.NOP
-                SW x10, 0x34(x1)
-                ADDI x0, x0, 0
-                C.LI x1, 1
-                AUIPC x30, 1
-                SW x1, 0xdfe(x30)
-                C.J -4
+                lui x1, 0xfeedc
+                addi x1, x1, 0xead
+                lui x2, 0xff76e
+                addi x2, x2, 0xf56
+                lui x3, 0x7fbb7
+                addi x3, x3, 0xfab
+                lui x4, 0xbfddb
+                addi x4, x4, 0x7d5
+                auipc x5, 0
+                addi x5, x5, 0xd8
+                auipc x6, 2
+                addi x6, x6, 0xfd8
+                lui x7, 0xb7fbb
+                addi x7, x7, 0x6fa
+                lui x8, 0x5bfde
+                addi x8, x8, 0xb7d
+                lui x9, 0xadfef
+                addi x9, x9, 0xdbe
+                lui x10, 0x56ff7
+                addi x10, x10, 0x6df
+                lui x11, 0xab7fc
+                addi x11, x11, 0xb6f
+                lui x12, 0xd5bfe
+                addi x12, x12, 0xdb7
+                lui x13, 0xeadff
+                addi x13, x13, 0xedb
+                lui x14, 0xf56ff
+                addi x14, x14, 0x76d
+                lui x15, 0xfab80
+                addi x15, x15, 0xbb6
+                lui x16, 0x7d5c0
+                addi x16, x16, 0xddb
+                lui x17, 0xbeae0
+                addi x17, x17, 0xeed
+                lui x18, 0xdf570
+                addi x18, x18, 0xf76
+                lui x19, 0x6fab8
+                addi x19, x19, 0xfbb
+                lui x20, 0xb7d5c
+                addi x20, x20, 0xfdd
+                lui x21, 0xdbeae
+                addi x21, x21, 0xfee
+                lui x22, 0x6df57
+                addi x22, x22, 0xff7
+                lui x23, 0xb6fab
+                addi x23, x23, 0x7fb
+                lui x24, 0xdb7d6
+                addi x24, x24, 0xbfd
+                lui x25, 0xedbeb
+                addi x25, x25, 0xdfe
+                lui x26, 0x76df5
+                addi x26, x26, 0x6ff
+                lui x27, 0xbb6fb
+                addi x27, x27, 0xb7f
+                lui x28, 0xddb7d
+                addi x28, x28, 0x5bf
+                lui x29, 0xeedbf
+                addi x29, x29, 0xadf
+                lui x30, 0xf76df
+                addi x30, x30, 0x56f
+                lui x31, 0xfbb70
+                addi x31, x31, 0xab7
+                auipc x1, 2                
+                addi x1, x1, 0x10c
+                auipc x12, 2
+                addi x12, x12, 0xed0
+                c.lw x12, 0xc(x12)
+                c.nop
+                c.nop
+                sw x12, 0(x1)
+                auipc x10, 2
+                addi x10, x10, 0xeee
+                c.lw x11, 0(x10)
+                c.nop
+                c.nop
+                sw x11, 4(x1)
+                auipc x9, 2
+                addi x9, x9, 3800
+                c.lw x14, 1(x9)
+                c.nop
+                c.nop
+                sw x14, 8(x1)
+                auipc x15, 2
+                addi x15, x15, 3778
+                c.lw x13, 2(x15)
+                c.nop
+                c.nop
+                sw x13, 12(x1)
+                auipc x14, 2
+                addi x14, x14, 3752
+                c.lw x10, 4(x14)
+                c.nop
+                c.nop
+                sw x10, 16(x1)
+                auipc x8, 2
+                addi x8, x8, 3718
+                c.lw x15, 8(x8)
+                c.nop
+                c.nop
+                sw x15, 20(x1)
+                auipc x11, 2
+                addi x11, x11, 3668
+                c.lw x8, 16(x11)
+                c.nop
+                c.nop
+                sw x8, 24(x1)
+                auipc x13, 2
+                addi x13, x13, 3594
+                c.lw x9, 30(x13)
+                c.nop
+                c.nop
+                sw x9, 28(x1)
+                auipc x11, 2
+                addi x11, x11, 3580
+                c.lw x10, 29(x11)
+                c.nop
+                c.nop
+                sw x10, 32(x1)
+                auipc x11, 2
+                addi x11, x11, 3570
+                c.lw x10, 27(x11)
+                c.nop
+                c.nop
+                sw x10, 36(x1)
+                auipc x11, 2
+                addi x11, x11, 3568
+                c.lw x10, 23(x11)
+                c.nop
+                c.nop
+                sw x10, 40(x1)
+                auipc x11, 2
+                addi x11, x11, 3582
+                c.lw x10, 15(x11)
+                c.nop
+                c.nop
+                sw x10, 44(x1)
+                auipc x11, 2
+                addi x11, x11, 3540
+                c.lw x10, 21(x11)
+                c.nop
+                c.nop
+                sw x10, 0x30(x1)
+                auipc x11, 2
+                addi x11, x11, 3566
+                c.lw x10, 10(x11)
+                c.nop
+                c.nop
+                sw x10, 0x34(x1)
+                addi x0, x0, 0
+                c.li x1, 1
+                auipc x30, 1
+                sw x1, 0xdfe(x30)
+                c.j -4
             "#,
         );
 

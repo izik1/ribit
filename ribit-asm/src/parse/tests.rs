@@ -200,9 +200,11 @@ fn j_32() {
     assert_instructions(
         r#"
             JAL x1, 0xd
+            JAL x1, -0x1
         "#,
         expect![[r#"
-            JAL x1, 0000001a
+            JAL x1, 0000d
+            JAL x1, fffff
         "#]],
     )
 }

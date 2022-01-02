@@ -6,7 +6,7 @@ use crate::tests::{assemble_block, max_fn, min_fn};
 fn jal_basic_const_prop() {
     let mut block = assemble_block(
         r#"
-            JAL x4, 2048
+            jal x4, 2048
         "#,
     );
 
@@ -24,10 +24,10 @@ fn jal_basic_const_prop() {
 fn mem_read_write_all_opts() {
     let mut block = assemble_block(
         r#"
-            LW x2, 0(x1)
-            ADDI x2, x2, 100
-            SW x2, 50(x1)
-            EBREAK
+            lw x2, 0(x1)
+            addi x2, x2, 100
+            sw x2, 50(x1)
+            ebreak
         "#,
     );
 
@@ -106,10 +106,10 @@ fn max_opt_bf_bb_1() {
     // todo: psudeo instructions (`mv`, `call`)
     let mut block = assemble_block(
         r#"
-            SB x2, 0(x11)
-            ADDI x2, x12, 0
-            AUIPC x6, 0
-            JALR x1, 182(x6)
+            sb x2, 0(x11)
+            addi x2, x12, 0
+            auipc x6, 0
+            jalr x1, 182(x6)
         "#,
     );
 
@@ -138,7 +138,7 @@ fn max_opt_bf_bb_1() {
 fn jal_basic_die() {
     let mut block = assemble_block(
         r#"
-            JAL x4, 2048
+            jal x4, 2048
         "#,
     );
 

@@ -527,6 +527,20 @@ pub(super) fn compressed(
             }
         }
 
+        "ret" | "RET" => {
+            if !test_len(context, full_op, 0, args.len()) {
+                context.instructions.push(instruction::Info {
+                    instruction: Instruction::IJump(instruction::IJump::new(
+                        0,
+                        Some(register::RiscV::X1),
+                        None,
+                        opcode::IJump::JALR,
+                    )),
+                    len: 2,
+                })
+            }
+        }
+
         "li" | "LI" => {
             if let Some((rd, imm)) = ri_args(context, full_op, &args, 6) {
                 if rd.is_none() {

@@ -77,7 +77,7 @@ fn jalr_bit() {
 
 #[test]
 fn jalr_pc() {
-    let block = crate::tests::assemble_block("JALR x4, 1023(x1)");
+    let block = crate::tests::assemble_block("jalr x4, 1023(x1)");
 
     expect![[r#"
         %0 = args[0]
@@ -104,7 +104,7 @@ fn jal_basic() {
 
 #[test]
 fn sys_break() {
-    let block = crate::tests::assemble_block("EBREAK");
+    let block = crate::tests::assemble_block("ebreak");
 
     expect![[r#"
         %0 = args[0]
@@ -115,24 +115,23 @@ fn sys_break() {
 
 #[test]
 fn addi_nop() {
-    // todo: nop psudeo
     let block = crate::tests::assemble_block(
         r#"
-            ADDI x0, x0, 0
-            EBREAK
+            c.nop
+            ebreak
         "#,
     );
 
     expect![[r#"
         %0 = args[0]
         %1 = args[1]
-        ret 00000001, 00000408"#]]
+        ret 00000001, 00000406"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
 #[test]
 fn branch_0_0_eq() {
-    let block = crate::tests::assemble_block(r#"BEQ x0, 512(x0)"#);
+    let block = crate::tests::assemble_block(r#"beq x0, 512(x0)"#);
 
     expect![[r#"
         %0 = args[0]
@@ -143,7 +142,7 @@ fn branch_0_0_eq() {
 
 #[test]
 fn branch_0_x1_eq() {
-    let block = crate::tests::assemble_block(r#"BEQ x0, 512(x1)"#);
+    let block = crate::tests::assemble_block(r#"beq x0, 512(x1)"#);
 
     expect![[r#"
         %0 = args[0]
@@ -159,8 +158,8 @@ fn branch_0_x1_eq() {
 fn addi_no_dest() {
     let block = crate::tests::assemble_block(
         r#"
-            ADDI x0, x1, 50
-            EBREAK
+            addi x0, x1, 50
+            ebreak
         "#,
     );
 
@@ -178,9 +177,9 @@ fn mem_read_write() {
     let block = crate::tests::assemble_block(
         r#"
             LW x2, 0(x1)
-            ADDI x2, x2, 100
+            addi x2, x2, 100
             SW x2, 50(x1)
-            EBREAK
+            ebreak
         "#,
     );
 
@@ -203,8 +202,8 @@ fn mem_read_write() {
 fn addi_no_src() {
     let block = crate::tests::assemble_block(
         r#"
-            ADDI x2, x0, 50
-            EBREAK
+            addi x2, x0, 50
+            ebreak
         "#,
     );
 
@@ -223,7 +222,7 @@ fn cmp_add() {
         r#"
             SLT x2, x2, x3
             ADD x2, x2, x4
-            EBREAK
+            ebreak
         "#,
     );
 

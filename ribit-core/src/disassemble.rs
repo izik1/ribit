@@ -105,9 +105,9 @@ impl<'a> fmt::Display for FmtInstruction<'a> {
                 write!(f, "{} {}, {:05x}", opcode, rd, imm >> 12)
             }
 
-            Instruction::J(instruction::J { imm, rd, opcode }) => {
-                let rd = WrapRegister(*rd);
-                write!(f, "{} {}, {:08x}", opcode, rd, imm)
+            &Instruction::J(instruction::J { imm, rd, opcode }) => {
+                let rd = WrapRegister(rd);
+                write!(f, "{} {}, {:05x}", opcode, rd, (imm as i32 >> 1) & 0xfffff)
             }
 
             Instruction::Sys(instruction::Sys { opcode }) => opcode.fmt(f),

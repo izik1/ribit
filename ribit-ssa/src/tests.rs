@@ -28,14 +28,13 @@ pub(crate) fn assemble_block(block: &str) -> Block {
 }
 
 pub fn max_fn() -> Block {
-    // todo: psudeos: `ret`
     assemble_block(
         r#"
-                ADD x11, x10, x11
-                SRLI x12, x11, 31
-                AND x11, x11, x12
-                ADD x10, x10, x11
-                JALR x0, 0(x1)
+                add x11, x10, x11
+                srli x12, x11, 31
+                and x11, x11, x12
+                add x10, x10, x11
+                c.ret
             "#,
     )
 }
@@ -49,15 +48,15 @@ pub fn min_fn() -> Block {
     //     y ^ tmp3
     // }
 
-    // todo: psudeos: `neg`, `ret`
+    // todo: psudeos: `neg`
     assemble_block(
         r#"
-                SLTU x12, x10, x11
-                SUB x12, x0, x12
-                XOR x10, x10, x11
-                AND x10, x10, x12
-                XOR x10, x10, x11
-                JALR x0, 0(x1)
+                sltu x12, x10, x11
+                sub x12, x0, x12
+                xor x10, x10, x11
+                and x10, x10, x12
+                xor x10, x10, x11
+                c.ret
             "#,
     )
 }
