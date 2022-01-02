@@ -171,9 +171,6 @@ dependencies = [
 [[package]]
 name = "ribit-core"
 version = "0.1.0"
-dependencies = [
- "log",
-]
 
 [[package]]
 name = "ribit-decode"
@@ -207,7 +204,6 @@ name = "ribit-ssa"
 version = "0.1.0"
 dependencies = [
  "expect-test",
- "log",
  "ribit-asm",
  "ribit-core",
  "ribit-decode",

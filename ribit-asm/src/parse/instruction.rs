@@ -212,7 +212,7 @@ pub(super) fn s_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
         _ => return false,
     };
 
-    if let Some((rs1, imm, rs2)) = rir_args(context, full_op, &args, 12) {
+    if let Some((rs2, imm, rs1)) = rir_args(context, full_op, &args, 12) {
         context.instructions.push(instruction::Info {
             instruction: Instruction::S(instruction::S::new(imm, rs1, rs2, width)),
             len: 4,

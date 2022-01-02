@@ -2,7 +2,7 @@
 # only `name` and `description` below.
 
 {
-  description = "dependent-testing";
+  description = "ribit";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";

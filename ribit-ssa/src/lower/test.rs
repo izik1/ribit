@@ -191,9 +191,9 @@ fn mem_read_write() {
         %3 = and %2, 00ffffff
         %4 = signed dword m(%1)%3
         %5 = add %4, 00000064
-        %6 = add %5, 00000032
+        %6 = add %2, 00000032
         %7 = and %6, 00ffffff
-        m(%1)%7 = dword %2
+        m(%1)%7 = dword %5
         x(%0)2 = %5
         ret 00000001, 00000410"#]]
     .assert_eq(&block.display_instructions().to_string())

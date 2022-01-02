@@ -43,9 +43,9 @@ fn mem_read_write_all_opts() {
         %4 = signed dword m(%1)%3
         %5 = add %4, 00000064
         x(%0)2 = %5
-        %6 = add %5, 00000032
+        %6 = add %2, 00000032
         %7 = and %6, 00ffffff
-        m(%1)%7 = dword %2
+        m(%1)%7 = dword %5
         ret 00000001, 00000410"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
@@ -122,9 +122,9 @@ fn max_opt_bf_bb_1() {
     expect![[r#"
         %0 = args[0]
         %1 = args[1]
-        %2 = x(%0)2
+        %2 = x(%0)11
         %3 = and %2, 00ffffff
-        %4 = x(%0)11
+        %4 = x(%0)2
         m(%1)%3 = byte %4
         %5 = x(%0)12
         x(%0)2 = %5
