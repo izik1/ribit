@@ -1,5 +1,4 @@
-use ribit_core::instruction::Instruction;
-use ribit_core::{opcode, register, Width};
+use ribit_core::register;
 
 mod instruction;
 
