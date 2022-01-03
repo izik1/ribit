@@ -13,7 +13,7 @@ fn jalr_link_eq_src() {
         r"
             auipc x17, 0
             addi x17, x17, 285
-            jalr x17, 0x7f80(x17)
+            jalr x17, 0xf00(x17)
         ",
     );
 
