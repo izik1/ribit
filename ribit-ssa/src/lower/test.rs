@@ -3,42 +3,18 @@ use ribit_core::{instruction, opcode, register};
 
 use super::Context;
 use crate::tests::MEM_SIZE;
-use crate::{AnySource, Arg, Constant, Id, Instruction, Terminator};
+use crate::{AnySource, Constant};
 
+/// ensure register writes get placed *after* register reads, but *before* return.
 #[test]
 fn jalr_link_eq_src() {
-    let mut ctx = Context::new(0x1012c, MEM_SIZE);
-
-    super::non_terminal(
-        &mut ctx,
-        instruction::Instruction::U(instruction::U::new(
-            0,
-            Some(register::RiscV::X17),
-            opcode::U::AUIPC,
-        )),
-        4,
-    );
-
-    super::non_terminal(
-        &mut ctx,
-        instruction::Instruction::I(instruction::I::new(
-            285,
-            Some(register::RiscV::X17),
-            Some(register::RiscV::X17),
-            opcode::I::ADDI,
-        )),
-        4,
-    );
-
-    let block = super::terminal(
-        ctx,
-        instruction::Instruction::IJump(instruction::IJump::new(
-            65279,
-            Some(register::RiscV::X17),
-            Some(register::RiscV::X17),
-            opcode::IJump::JALR,
-        )),
-        4,
+    let block = crate::tests::assemble_block_with_context(
+        Context::new(0x1012c, MEM_SIZE),
+        r"
+            auipc x17, 0
+            addi x17, x17, 285
+            jalr x17, 0x7f80(x17)
+        ",
     );
 
     expect![[r#"
@@ -53,6 +29,7 @@ fn jalr_link_eq_src() {
 fn jalr_bit() {
     let ctx = Context::new(48, MEM_SIZE);
 
+    // note that `imm` here is talking about a literal byte value, this is an *impossible* instruction.
     let block = super::terminal(
         ctx,
         instruction::Instruction::IJump(instruction::IJump {
@@ -92,7 +69,7 @@ fn jalr_pc() {
 
 #[test]
 fn jal_basic() {
-    let block = crate::tests::assemble_block("JAL x4, 2048");
+    let block = crate::tests::assemble_block("jal x4, 2048");
 
     expect![[r#"
         %0 = args[0]
@@ -176,9 +153,9 @@ fn addi_no_dest() {
 fn mem_read_write() {
     let block = crate::tests::assemble_block(
         r#"
-            LW x2, 0(x1)
+            lw x2, 0(x1)
             addi x2, x2, 100
-            SW x2, 50(x1)
+            sw x2, 50(x1)
             ebreak
         "#,
     );
@@ -220,8 +197,8 @@ fn addi_no_src() {
 fn cmp_add() {
     let block = crate::tests::assemble_block(
         r#"
-            SLT x2, x2, x3
-            ADD x2, x2, x4
+            slt x2, x2, x3
+            add x2, x2, x4
             ebreak
         "#,
     );
@@ -242,25 +219,15 @@ fn cmp_add() {
 
 #[test]
 fn empty() {
-    const START_PC: u32 = 0xfefe_fefe;
-
-    let ctx = super::Context::new(START_PC, MEM_SIZE);
+    let ctx = super::Context::new(0xfefe_fefe, MEM_SIZE);
 
     let block = ctx.ret();
 
-    assert_eq!(block.instructions.len(), 2);
-
-    assert_eq!(block.instructions[0], Instruction::Arg { src: Arg::Register, dest: Id(0) });
-
-    assert_eq!(block.instructions[1], Instruction::Arg { src: Arg::Memory, dest: Id(1) });
-
-    assert_eq!(
-        block.terminator,
-        Terminator::Ret {
-            addr: AnySource::Const(Constant::i32(START_PC)),
-            code: AnySource::Const(Constant::i32(0))
-        }
-    );
+    expect![[r#"
+        %0 = args[0]
+        %1 = args[1]
+        ret 00000000, fefefefe"#]]
+    .assert_eq(&block.display_instructions().to_string());
 }
 
 #[test]
@@ -272,31 +239,13 @@ fn reads_register() {
     ctx.read_register(register::RiscV::X1);
     let block = ctx.ret();
 
-    assert_eq!(block.instructions.len(), 4);
-
-    assert_eq!(block.instructions[0], Instruction::Arg { dest: Id(0), src: Arg::Register });
-
-    assert_eq!(block.instructions[1], Instruction::Arg { dest: Id(1), src: Arg::Memory });
-
-    let reg_arg = block.arg_ref(Arg::Register).unwrap();
-
-    assert_eq!(
-        block.instructions[2],
-        Instruction::ReadReg { dest: Id(2), src: register::RiscV::X1, base: reg_arg.into() }
-    );
-
-    assert_eq!(
-        block.instructions[3],
-        Instruction::ReadReg { dest: Id(3), src: register::RiscV::X2, base: reg_arg.into() }
-    );
-
-    assert_eq!(
-        block.terminator,
-        Terminator::Ret {
-            addr: AnySource::Const(Constant::i32(0)),
-            code: AnySource::Const(Constant::i32(0))
-        }
-    );
+    expect![[r#"
+        %0 = args[0]
+        %1 = args[1]
+        %2 = x(%0)1
+        %3 = x(%0)2
+        ret 00000000, 00000000"#]]
+    .assert_eq(&block.display_instructions().to_string());
 }
 
 #[test]
@@ -306,20 +255,10 @@ fn writes_register() {
     ctx.write_register(register::RiscV::X2, AnySource::Const(Constant::i32(0)));
     let block = ctx.ret();
 
-    assert_eq!(block.instructions.len(), 3);
-
-    assert_eq!(block.instructions[0], Instruction::Arg { src: Arg::Register, dest: Id(0) });
-
-    assert_eq!(block.instructions[1], Instruction::Arg { src: Arg::Memory, dest: Id(1) });
-
-    let reg_arg = block.arg_ref(Arg::Register).unwrap();
-
-    assert_eq!(
-        block.instructions[2],
-        Instruction::WriteReg {
-            dest: register::RiscV::X2,
-            src: AnySource::Const(Constant::i32(0)),
-            base: reg_arg.into(),
-        }
-    );
+    expect![[r#"
+        %0 = args[0]
+        %1 = args[1]
+        x(%0)2 = 00000000
+        ret 00000000, 00000000"#]]
+    .assert_eq(&block.display_instructions().to_string());
 }
