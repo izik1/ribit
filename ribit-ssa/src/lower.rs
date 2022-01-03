@@ -6,7 +6,7 @@ use ribit_core::{instruction, opcode, register, Width};
 use super::{AnySource, BinOp, CmpKind, Id, Instruction};
 use crate::instruction::{ExtInt, Select};
 use crate::reference::Reference;
-use crate::ty::{Bitness, BoolTy, ConstTy, Constant, Int};
+use crate::ty::{Bitness, BoolTy, ConstTy, Constant, I32Ty, Int};
 use crate::{
     eval, Arg, Block, CommutativeBinOp, IdAllocator, SourcePair, Terminator, TypedRef, TypedSource,
 };
@@ -15,8 +15,8 @@ pub struct Context {
     id_allocator: IdAllocator,
     pub pc: AnySource,
     registers: [Option<AnySource>; 32],
-    register_arg: Option<AnySource>,
-    memory_arg: Option<AnySource>,
+    register_arg: Option<TypedSource<I32Ty>>,
+    memory_arg: Option<TypedSource<I32Ty>>,
     registers_written: u32,
     instructions: Vec<Instruction>,
     memory_size: u32,
@@ -43,8 +43,8 @@ impl Context {
         self_
     }
 
-    fn arg(&mut self, arg: Arg) -> AnySource {
-        self.instruction(|id| Instruction::Arg { dest: id, src: arg })
+    fn arg(&mut self, arg: Arg) -> TypedSource<I32Ty> {
+        self.typed_instruction(|id| Instruction::Arg { dest: id, src: arg })
     }
 
     pub fn add_pc(&mut self, src: AnySource) -> AnySource {
@@ -159,6 +159,7 @@ impl Context {
     }
 
     pub fn read_memory(&mut self, src: AnySource, width: Width, sign_extend: bool) -> AnySource {
+        // todo: remove the upcast (inserted for minimal modifications)
         let base = self.memory_arg.expect("Memory arg wasn't initialized?");
         self.instruction(|dest| Instruction::ReadMem { dest, src, base, width, sign_extend })
     }
@@ -168,7 +169,7 @@ impl Context {
         self.registers_written |= 1 << reg.get();
     }
 
-    pub fn write_memory(&mut self, addr: AnySource, val: AnySource, width: Width) {
+    pub fn write_memory(&mut self, addr: TypedSource<I32Ty>, val: AnySource, width: Width) {
         self.instructions.push(Instruction::WriteMem {
             addr,
             base: self.memory_arg.expect("Memory arg wasn't initialized?"),
@@ -404,7 +405,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
             let addr = ctx.mem_mask(addr);
 
             let src2 = ctx.load_register(rs2);
-            ctx.write_memory(addr, src2, width);
+            ctx.write_memory(addr.downcast().unwrap(), src2, width);
         }
         instruction::Instruction::U(instruction::U { opcode, imm, rd }) => {
             // ensure that the immediate only uses the upper 20 bits.

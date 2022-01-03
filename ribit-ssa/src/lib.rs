@@ -194,7 +194,7 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
             }
 
             Instruction::ReadReg { dest: _, base, .. } => {
-                update_reference(base, old, new);
+                update_typed_reference(base, old, new);
             }
 
             Instruction::WriteStack { dest: _, src } => {
@@ -204,13 +204,14 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
             }
 
             Instruction::WriteReg { src, base, .. } | Instruction::ReadMem { src, base, .. } => {
-                update_reference(base, old, new);
+                update_typed_reference(base, old, new);
                 update_reference(src, old, new);
             }
 
             Instruction::WriteMem { addr, src, base, .. } => {
-                update_reference(base, old, new);
-                update_reference(addr, old, new);
+                update_typed_reference(base, old, new);
+
+                update_typed_reference(addr, old, new);
                 update_reference(src, old, new);
             }
 

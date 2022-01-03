@@ -15,6 +15,12 @@ pub enum TypedSource<T: ConstTy> {
     Ref(Id),
 }
 
+impl<T: ConstTy> From<TypedRef<T>> for TypedSource<T> {
+    fn from(r: TypedRef<T>) -> Self {
+        Self::Ref(r.id)
+    }
+}
+
 impl<T: ConstTy> Copy for TypedSource<T> where T::Const: Copy {}
 
 impl<T: ConstTy> Clone for TypedSource<T>
@@ -59,13 +65,10 @@ where
     }
 }
 
-impl<T: ConstTy> fmt::Display for TypedSource<T>
-where
-    T::Const: fmt::Display,
-{
+impl<T: ConstTy> fmt::Display for TypedSource<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Const(v) => v.fmt(f),
+            Self::Const(v) => T::fmt_const(v, f),
             Self::Ref(r) => r.fmt(f),
         }
     }

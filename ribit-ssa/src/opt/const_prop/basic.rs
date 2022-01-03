@@ -16,15 +16,21 @@ fn run_instruction(
         | Instruction::WriteStack { .. } => None,
 
         Instruction::ReadReg { base, .. } => {
-            *base = lookup(consts, *base);
+            *base = lookup(consts, base.upcast()).downcast().unwrap();
             None
         }
 
-        Instruction::WriteReg { src, base, .. }
-        | Instruction::ReadMem { src, base, .. }
-        | Instruction::WriteMem { src, base, .. } => {
+        Instruction::WriteReg { src, base, .. } | Instruction::ReadMem { src, base, .. } => {
             *src = lookup(consts, *src);
-            *base = lookup(consts, *base);
+            *base = lookup(consts, base.upcast()).downcast().unwrap();
+
+            None
+        }
+
+        Instruction::WriteMem { src, base, addr, .. } => {
+            *src = lookup(consts, *src);
+            *base = lookup(consts, base.upcast()).downcast().unwrap();
+            *addr = lookup(consts, addr.upcast()).downcast().unwrap();
 
             None
         }

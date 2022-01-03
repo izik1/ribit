@@ -1,5 +1,6 @@
-use crate::reference::Reference;
-use crate::{Arg, Id, IdAllocator, Instruction, Terminator, Type};
+use crate::reference::{Reference, TypedRef};
+use crate::ty::I32Ty;
+use crate::{Arg, Id, IdAllocator, Instruction, Terminator};
 
 pub struct BlockDisplay<'a>(&'a [Instruction], &'a Terminator);
 
@@ -28,11 +29,9 @@ pub struct Block {
 
 impl Block {
     #[must_use]
-    pub fn arg_ref(&self, arg: Arg) -> Option<Reference> {
+    pub fn arg_ref(&self, arg: Arg) -> Option<TypedRef<I32Ty>> {
         self.instructions.iter().find_map(|it| match it {
-            Instruction::Arg { dest, src } if *src == arg => {
-                Some(Reference { ty: Type::I32, id: *dest })
-            }
+            Instruction::Arg { dest, src } if *src == arg => Some(TypedRef::new(*dest)),
             _ => None,
         })
     }

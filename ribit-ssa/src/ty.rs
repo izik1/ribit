@@ -33,6 +33,8 @@ pub trait ConstTy {
     type Const;
     const TY: Type;
     fn downcast(constant: Constant) -> Option<Self::Const>;
+
+    fn fmt_const(constant: &Self::Const, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -48,18 +50,35 @@ impl ConstTy for BoolTy {
             _ => None,
         }
     }
+
+    fn fmt_const(constant: &Self::Const, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <bool as fmt::Display>::fmt(&constant, f)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct I32Ty;
+
+impl ConstTy for I32Ty {
+    type Const = u32;
+    const TY: Type = Type::I32;
+
+    fn downcast(constant: Constant) -> Option<Self::Const> {
+        match constant {
+            Constant::Int(Int(Bitness::B32, i)) => Some(i),
+            _ => None,
+        }
+    }
+
+    fn fmt_const(constant: &Self::Const, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <Constant as fmt::Display>::fmt(&Constant::i32(*constant), f)
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum Constant {
     Int(Int),
     Bool(bool),
-}
-
-impl From<bool> for Constant {
-    fn from(b: bool) -> Self {
-        Self::Bool(b)
-    }
 }
 
 impl Constant {
@@ -84,6 +103,18 @@ impl Constant {
             Constant::Int(it) => it.ty(),
             Constant::Bool(_) => Type::Boolean,
         }
+    }
+}
+
+impl From<bool> for Constant {
+    fn from(b: bool) -> Self {
+        Self::Bool(b)
+    }
+}
+
+impl From<u32> for Constant {
+    fn from(v: u32) -> Self {
+        Self::i32(v)
     }
 }
 
@@ -148,7 +179,11 @@ impl Int {
 
 impl fmt::Display for Int {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if f.sign_minus() { self.signed().fmt(f) } else { self.unsigned().fmt(f) }
+        if f.sign_minus() {
+            self.signed().fmt(f)
+        } else {
+            self.unsigned().fmt(f)
+        }
     }
 }
 

@@ -3,7 +3,10 @@ use std::fmt;
 use ribit_core::{register, Width};
 
 use crate::reference::Reference;
-use crate::{AnySource, Arg, BinOp, CmpKind, CommutativeBinOp, Id, SourcePair, StackIndex, Type};
+use crate::ty::I32Ty;
+use crate::{
+    AnySource, Arg, BinOp, CmpKind, CommutativeBinOp, Id, SourcePair, StackIndex, Type, TypedSource,
+};
 
 mod ext_int;
 mod select;
@@ -11,15 +14,18 @@ mod select;
 pub use ext_int::ExtInt;
 pub use select::Select;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Instruction {
     Arg { dest: Id, src: Arg },
     WriteStack { dest: StackIndex, src: Reference },
     ReadStack { dest: Id, src: StackIndex },
-    ReadReg { dest: Id, base: AnySource, src: register::RiscV },
-    WriteReg { dest: register::RiscV, base: AnySource, src: AnySource },
-    ReadMem { dest: Id, src: AnySource, base: AnySource, width: Width, sign_extend: bool },
-    WriteMem { addr: AnySource, src: AnySource, base: AnySource, width: Width },
+    ReadReg { dest: Id, base: TypedSource<I32Ty>, src: register::RiscV },
+    WriteReg { dest: register::RiscV, base: TypedSource<I32Ty>, src: AnySource },
+    ReadMem { dest: Id, src: AnySource, base: TypedSource<I32Ty>, width: Width, sign_extend: bool },
+    WriteMem { addr: TypedSource<I32Ty>, src: AnySource, base: TypedSource<I32Ty>, width: Width },
     BinOp { dest: Id, src: SourcePair, op: BinOp },
     Cmp { dest: Id, src: SourcePair, kind: CmpKind },
     CommutativeBinOp { dest: Id, src1: Reference, src2: AnySource, op: CommutativeBinOp },
@@ -34,13 +40,13 @@ impl Instruction {
         match self {
             Instruction::Arg { .. } | Instruction::ReadStack { .. } | Instruction::Fence => {}
             Instruction::ReadReg { base, .. } => {
-                if let AnySource::Ref(it) = base {
-                    visit(it.id)
+                if let TypedSource::Ref(it) = base {
+                    visit(*it)
                 }
             }
             Instruction::WriteReg { base, src, .. } | Instruction::ReadMem { base, src, .. } => {
-                if let AnySource::Ref(base) = base {
-                    visit(base.id)
+                if let TypedSource::Ref(it) = base {
+                    visit(*it)
                 }
 
                 if let AnySource::Ref(src) = src {
@@ -49,16 +55,16 @@ impl Instruction {
             }
 
             Instruction::WriteMem { addr, src, base, .. } => {
-                if let AnySource::Ref(it) = addr {
-                    visit(it.id)
+                if let TypedSource::Ref(it) = addr {
+                    visit(*it)
                 }
 
                 if let AnySource::Ref(it) = src {
                     visit(it.id)
                 }
 
-                if let AnySource::Ref(it) = base {
-                    visit(it.id)
+                if let TypedSource::Ref(it) = base {
+                    visit(*it)
                 }
             }
 

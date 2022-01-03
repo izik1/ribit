@@ -78,8 +78,8 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 }
 
                 &ssa::Instruction::ReadReg { dest, base, src } => {
-                    let base =
-                        crate::Source::from_ssa_src(base, allocs).expect("base not allocated!?");
+                    let base = crate::Source::from_ssa_src(base.upcast(), allocs)
+                        .expect("base not allocated!?");
 
                     let mem = Mem32(memory::src_rv_reg(base, src));
                     let dest = *allocs.get(&dest).expect("dest not allocated!?");
@@ -87,8 +87,8 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 }
 
                 &ssa::Instruction::ReadMem { dest, src, base, sign_extend, width } => {
-                    let base =
-                        crate::Source::from_ssa_src(base, allocs).expect("base not allocated!?");
+                    let base = crate::Source::from_ssa_src(base.upcast(), allocs)
+                        .expect("base not allocated!?");
 
                     let src =
                         crate::Source::from_ssa_src(src, allocs).expect("src not allocated!?");
@@ -107,8 +107,8 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 }
 
                 &ssa::Instruction::WriteReg { dest, base, src } => {
-                    let base =
-                        crate::Source::from_ssa_src(base, allocs).expect("base not allocated!?");
+                    let base = crate::Source::from_ssa_src(base.upcast(), allocs)
+                        .expect("base not allocated!?");
 
                     let mem = Mem32(memory::src_rv_reg(base, dest));
 
@@ -122,12 +122,12 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 }
 
                 &ssa::Instruction::WriteMem { src, base, addr, width } => {
-                    let base =
-                        crate::Source::from_ssa_src(base, allocs).expect("base not allocated!?");
+                    let base = crate::Source::from_ssa_src(base.upcast(), allocs)
+                        .expect("base not allocated!?");
                     let src =
                         crate::Source::from_ssa_src(src, allocs).expect("src not allocated!?");
-                    let addr =
-                        crate::Source::from_ssa_src(addr, allocs).expect("addr not allocated!?");
+                    let addr = crate::Source::from_ssa_src(addr.upcast(), allocs)
+                        .expect("addr not allocated!?");
 
                     let mem = memory::src_src(base, addr);
 

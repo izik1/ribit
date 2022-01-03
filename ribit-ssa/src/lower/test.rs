@@ -282,20 +282,12 @@ fn reads_register() {
 
     assert_eq!(
         block.instructions[2],
-        Instruction::ReadReg {
-            dest: Id(2),
-            src: register::RiscV::X1,
-            base: AnySource::Ref(reg_arg)
-        }
+        Instruction::ReadReg { dest: Id(2), src: register::RiscV::X1, base: reg_arg.into() }
     );
 
     assert_eq!(
         block.instructions[3],
-        Instruction::ReadReg {
-            dest: Id(3),
-            src: register::RiscV::X2,
-            base: AnySource::Ref(reg_arg)
-        }
+        Instruction::ReadReg { dest: Id(3), src: register::RiscV::X2, base: reg_arg.into() }
     );
 
     assert_eq!(
@@ -327,7 +319,7 @@ fn writes_register() {
         Instruction::WriteReg {
             dest: register::RiscV::X2,
             src: AnySource::Const(Constant::i32(0)),
-            base: AnySource::Ref(reg_arg),
+            base: reg_arg.into(),
         }
     );
 }
