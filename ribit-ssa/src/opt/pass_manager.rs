@@ -27,8 +27,13 @@ pub struct PassManager {
 
 impl PassManager {
     #[must_use]
-    pub fn new() -> Self {
+    pub fn unoptimized() -> Self {
         Self::default()
+    }
+
+    #[must_use]
+    pub fn with_passes(passes: Vec<Pass>) -> Self {
+        Self { passes }
     }
 
     // Theoretically the best for most situations where optimized output is desired.

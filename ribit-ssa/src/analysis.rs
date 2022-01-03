@@ -233,6 +233,7 @@ mod test {
 
     use super::ShowLifetimes;
     use crate::opt;
+    use crate::opt::pass_manager::InplacePass;
     use crate::tests::{max_fn, MEM_SIZE};
 
     #[test]
@@ -396,9 +397,7 @@ mod test {
             "#,
         );
 
-        opt::fold_and_prop_consts(&mut block);
-        opt::dead_instruction_elimination(&mut block);
-        opt::register_writeback_shrinking(&mut block);
+        opt::PassManager::optimized().run(&mut block);
 
         let lifetimes = super::lifetimes(&mut block);
 
@@ -475,9 +474,7 @@ mod test {
     fn max_lifetimes() {
         let mut block = max_fn();
 
-        opt::fold_and_prop_consts(&mut block);
-        opt::dead_instruction_elimination(&mut block);
-        opt::register_writeback_shrinking(&mut block);
+        opt::PassManager::optimized().run(&mut block);
 
         let lifetimes = super::lifetimes(&mut block);
 
