@@ -9,10 +9,10 @@
 
 use std::convert::TryInto;
 
-use goblin::elf::program_header::PT_LOAD;
-use goblin::elf32;
-use goblin::elf32::sym::{Symtab, STB_GLOBAL};
-use goblin::strtab::Strtab;
+use xmas_elf::header::Data;
+use xmas_elf::sections::SectionData;
+use xmas_elf::symbol_table::{Binding, Entry};
+use xmas_elf::ElfFile;
 
 struct TestAddrs {
     _from_host: u32,
@@ -21,44 +21,67 @@ struct TestAddrs {
     end_signature: u32,
 }
 
+#[derive(Default)]
+struct TestAddrBuilder {
+    to_host: Option<u32>,
+    begin_signature: Option<u32>,
+    end_signature: Option<u32>,
+}
+
+fn sym_iter<S: Entry>(
+    ctx: &mut TestAddrBuilder,
+    file: &ElfFile,
+    syms: &[S],
+) -> Result<(), &'static str> {
+    for sym in syms {
+        if !matches!(sym.get_binding()?, Binding::Global) {
+            continue;
+        }
+
+        let name = sym.get_name(file)?;
+
+        log::info!("sym: {}", name);
+
+        let value = sym.value();
+
+        if name == "tohost" {
+            log::info!("found tohost: {:08x}", value);
+            ctx.to_host = Some(value as u32);
+        }
+
+        if name == "begin_signature" {
+            log::info!("found begin_signature: {:08x}", value);
+
+            ctx.begin_signature = Some(value as u32);
+        }
+
+        if name == "end_signature" {
+            log::info!("found end_signature: {:08x}", value);
+
+            ctx.end_signature = Some(value as u32);
+        }
+    }
+
+    Ok(())
+}
+
 impl TestAddrs {
-    fn from_syms(syms: &Symtab, strs: &Strtab) -> Option<Self> {
-        let mut to_host_addr: Option<u32> = None;
-        let mut begin_signature_addr: Option<u32> = None;
-        let mut end_signature_addr: Option<u32> = None;
+    fn from_elf(file: &ElfFile) -> Option<Self> {
+        let mut ctx = TestAddrBuilder::default();
 
-        for sym in syms.iter() {
-            if sym.st_bind() != STB_GLOBAL {
-                continue;
-            }
-
-            if let Some(name) = strs.get_unsafe(sym.st_name) {
-                log::info!("sym: {}", name);
-
-                if name == "tohost" {
-                    log::info!("found tohost: {:08x}", sym.st_value);
-                    to_host_addr = Some(sym.st_value as u32);
-                }
-
-                if name == "begin_signature" {
-                    log::info!("found begin_signature: {:08x}", sym.st_value);
-
-                    begin_signature_addr = Some(sym.st_value as u32);
-                }
-
-                if name == "end_signature" {
-                    log::info!("found end_signature: {:08x}", sym.st_value);
-
-                    end_signature_addr = Some(sym.st_value as u32);
-                }
+        for section in file.section_iter() {
+            match section.get_data(file).ok()? {
+                SectionData::SymbolTable32(tabs) => sym_iter(&mut ctx, file, tabs).ok()?,
+                SectionData::SymbolTable64(tabs) => sym_iter(&mut ctx, file, tabs).ok()?,
+                _ => {}
             }
         }
 
         Some(Self {
             _from_host: 0,
-            to_host: to_host_addr?,
-            begin_signature: begin_signature_addr?,
-            end_signature: end_signature_addr?,
+            to_host: ctx.to_host?,
+            begin_signature: ctx.begin_signature?,
+            end_signature: ctx.end_signature?,
         })
     }
 }
@@ -93,29 +116,32 @@ impl ExecutionEngine {
 
     #[must_use]
     pub fn new_elf(program: &[u8]) -> Self {
-        let elf = goblin::elf::Elf::parse(program).unwrap();
-        assert!(!elf.is_64);
-        assert!(elf.little_endian);
-        assert!(elf.entry == 0x10000);
+        let elf = xmas_elf::ElfFile::new(program).unwrap();
+        assert!(matches!(elf.header.pt1.data(), Data::LittleEndian));
+        let entry = match elf.header.pt2 {
+            xmas_elf::header::HeaderPt2::Header32(it) => it.entry_point,
+            xmas_elf::header::HeaderPt2::Header64(_) => panic!(),
+        };
+
+        assert_eq!(entry, 0x10000);
 
         let mut memory = vec![0; ribit_jit::MEMORY_SIZE as usize].into_boxed_slice();
 
-        for header in &elf.program_headers {
-            if header.p_type == PT_LOAD {
-                let header = elf32::program_header::ProgramHeader::from(header.clone());
-                memory[(header.p_paddr as usize)..][..(header.p_memsz as usize)].copy_from_slice(
-                    &program[(header.p_offset as usize)..][..(header.p_memsz as usize)],
-                );
+        for header in elf.program_iter() {
+            if header.get_type().unwrap() == xmas_elf::program::Type::Load {
+                memory[(header.physical_addr() as usize)..][..(header.mem_size() as usize)]
+                    .copy_from_slice(
+                        &program[(header.physical_addr() as usize)..]
+                            [..(header.mem_size() as usize)],
+                    );
             }
         }
-
-        // elf.syms
 
         let xregs = [0; ribit_jit::XLEN];
         let pc = 0x10000;
         let jit = ribit_jit::AMD64Runtime::new();
 
-        Self { xregs, pc, memory, jit, test_ctx: TestAddrs::from_syms(&elf.syms, &elf.strtab) }
+        Self { xregs, pc, memory, jit, test_ctx: TestAddrs::from_elf(&elf) }
     }
 
     fn parse_compressed(

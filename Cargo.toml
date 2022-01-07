@@ -12,11 +12,7 @@ version = "0.1.0"
 
 [dependencies]
 log = "0.4.8"
-
-[dependencies.goblin]
-default-features = false
-features = ["alloc", "elf32", "elf64", "endian_fd"]
-version = "0.4.3"
+xmas-elf = "0.8.0"
 
 [dependencies.env_logger]
 default-features = false
