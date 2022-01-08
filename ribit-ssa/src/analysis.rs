@@ -185,8 +185,18 @@ impl<'a, 'b> ShowLifetimes<'a, 'b> {
     }
 }
 
+fn log10(mut v: usize) -> usize {
+    let mut result = 0;
+    while v >= 10 {
+        v /= 10;
+        result += 1;
+    }
+
+    result
+}
+
 fn show_lifetime(f: &mut fmt::Formatter, lifetime: &Lifetime, idx: usize) -> fmt::Result {
-    let width = (lifetime.end - lifetime.start) / 10 + 1;
+    let width = log10(lifetime.end - lifetime.start) + 1;
     if lifetime.is_alive_after(idx) {
         write!(f, "{:1$}", lifetime.end - idx, width)
     } else {

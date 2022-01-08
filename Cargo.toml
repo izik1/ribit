@@ -4,7 +4,7 @@ members = ["ribit-*"]
 [package]
 authors = ["Skyler Ross <orangesnowfox@gmail.com>"]
 description = "A Risc-V 32i-mc JIT"
-edition = "2018"
+edition = "2021"
 name = "ribit"
 version = "0.1.0"
 

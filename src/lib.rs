@@ -7,8 +7,6 @@
 )]
 #![warn(clippy::must_use_candidate)]
 
-use std::convert::TryInto;
-
 use xmas_elf::header::Data;
 use xmas_elf::sections::SectionData;
 use xmas_elf::symbol_table::{Binding, Entry};

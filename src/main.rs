@@ -8,8 +8,6 @@ use ribit_decode::{CompressedDecodeError, DecodeError};
 fn main() {
     env_logger::init();
 
-    // dbg!(ribit_core::register::RiscV::X1);
-
     let mut args = env::args().skip(1);
 
     let path = args.next().unwrap();
