@@ -11,7 +11,6 @@ extern crate static_assertions;
 
 mod rt;
 mod sbi;
-pub mod x86_64;
 
 use std::collections::HashMap;
 
@@ -20,8 +19,16 @@ use ribit_ssa as ssa;
 pub use rt::{Block, Runtime, Target};
 use ssa::Constant;
 
+
+#[cfg(any(target_arch = "x86_64"))]
+pub type DefaultRuntime = AMD64Runtime;
+
+#[cfg(not(any(target_arch = "x86_64")))]
+pub type DefaultRuntime = rt::Runtime<rt::Interpreter>;
+
 /// Runtime for X86-64 hosts.
-pub type AMD64Runtime = rt::Runtime<x86_64::rt::X86_64>;
+#[cfg(any(target_arch = "x86_64"))]
+pub type AMD64Runtime = Runtime<rt::x86_64::rt::X86_64>;
 
 pub const XLEN: usize = 32;
 

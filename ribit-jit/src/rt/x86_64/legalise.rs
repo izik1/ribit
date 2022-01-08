@@ -106,12 +106,12 @@ pub fn legalise(block: &mut Block, allocs: &HashMap<Id, Register>) {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_arch = "x86_64"))]
 mod test {
     use ribit_ssa::{analysis, opt};
 
+    use crate::rt::x86_64::register_alloc;
     use crate::test::max_fn;
-    use crate::x86_64::register_alloc;
 
     #[test]
     fn legalise_max() {

@@ -31,7 +31,7 @@ pub use block::{Block, BlockDisplay};
 pub use id::{Id, IdAllocator};
 pub use instruction::Instruction;
 pub use source::{AnySource, SourcePair, TypedSource};
-pub use ty::{Bitness, Constant, Type};
+pub use ty::{Bitness, Constant, Int, Type};
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, PartialOrd, Ord)]
 pub struct StackIndex(pub u8);
 

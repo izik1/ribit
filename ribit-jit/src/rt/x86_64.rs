@@ -30,7 +30,7 @@ impl BlockReturn {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_arch = "x86_64"))]
 mod test {
     use ribit_core::instruction::Instruction;
     use ribit_core::{instruction, opcode, register};

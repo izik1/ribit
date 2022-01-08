@@ -5,7 +5,7 @@ use ribit_ssa as ssa;
 use ribit_ssa::analysis::Lifetimes;
 use ribit_ssa::{analysis, Arg, Id, Instruction};
 
-use super::legalise;
+use crate::rt::x86_64::legalise;
 
 const fn system_v_abi_saved() -> u16 {
     (1 << Register::Zbx as u16)

@@ -6,8 +6,7 @@ use std::mem;
 use rasen::params::Register;
 
 use super::generator::BlockBuilder;
-use super::{legalise, register_alloc, ReturnCode};
-use crate::x86_64::BasicBlock;
+use crate::rt::x86_64::{legalise, register_alloc, BasicBlock, ReturnCode};
 
 pub struct X86_64;
 

@@ -10,7 +10,7 @@ use ribit_core::{ReturnCode, Width};
 use ribit_ssa as ssa;
 use ssa::{instruction, Bitness, StackIndex, Type};
 
-use crate::x86_64::Assembler;
+use crate::rt::x86_64::Assembler;
 use crate::Source;
 
 mod cmp;
@@ -97,6 +97,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
 
                     let dest = Reg32(*allocs.get(&dest).expect("dest not allocated!?"));
 
+                    // todo: handle address space wraps
                     match (width, sign_extend) {
                         (Width::Byte, true) => self.stream.movsx_reg_mem8(dest, mem),
                         (Width::Byte, false) => self.stream.movzx_reg_mem8(dest, mem),
@@ -131,6 +132,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
 
                     let mem = memory::src_src(base, addr);
 
+                    // todo: handle address space wraps
                     match (src, width) {
                         (crate::Source::Val(v), Width::Byte) => {
                             self.stream.mov_mem_imm(mem, Imm8(v as u8))

@@ -4,6 +4,14 @@ use ribit_core::{instruction, ReturnCode};
 use ribit_ssa::opt;
 use ribit_ssa::opt::pass_manager::InplacePass;
 
+
+mod interpreter;
+
+pub use interpreter::Interpreter;
+
+#[cfg(any(target_arch = "x86_64"))]
+pub mod x86_64;
+
 pub struct Runtime<Rt: Target> {
     buffer: Rt::Buffer,
     blocks: Vec<Rt::Block>,
