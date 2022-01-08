@@ -146,10 +146,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ribit-encode"
-version = "0.1.0"
-
-[[package]]
 name = "ribit-jit"
 version = "0.1.0"
 dependencies = [
