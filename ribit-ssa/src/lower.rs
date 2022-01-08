@@ -22,6 +22,46 @@ pub struct Context {
     memory_size: u32,
 }
 
+/// try to use associativity
+/// this optimizes things like the following:
+/// ```text
+/// %2 = %1 + 1
+/// %3 = %2 + 1
+/// %4 = %3 + 0xffff_fffd
+/// ```
+/// to
+/// ```text
+/// %4 = %1 + 0
+/// ```
+/// which we can then munch away via identity.
+fn try_associate(
+    instructions: &[Instruction],
+    op: CommutativeBinOp,
+    src1: Reference,
+    src2: Constant,
+) -> (Reference, Constant) {
+    if !op.is_associative() {
+        return (src1, src2);
+    }
+
+    let instr = instructions.iter().rfind(|it| it.id() == Some(src1.id)).unwrap();
+    let inner = match instr {
+        Instruction::CommutativeBinOp { dest: _, src1, src2, op: inner_op } if *inner_op == op => {
+            (src1, src2)
+        }
+        _ => return (src1, src2),
+    };
+
+    let src2 = match inner.1 {
+        AnySource::Const(inner_src2) => eval::commutative_binop_consts(*inner_src2, src2, op),
+        _ => return (src1, src2),
+    };
+
+    let src1 = inner.0;
+
+    (*src1, src2)
+}
+
 impl Context {
     #[must_use]
     pub fn new(start_pc: u32, memory_size: u32) -> Self {
@@ -88,17 +128,13 @@ impl Context {
         assert_eq!(src1.ty(), src2.ty());
 
         let (src1, src2) = match (src1, src2) {
-            (AnySource::Const(src1), AnySource::Const(src2)) => match (src1, src2) {
-                (Constant::Int(Int(Bitness::B32, lhs)), Constant::Int(Int(Bitness::B32, rhs))) => {
-                    return AnySource::Const(Constant::i32(eval::commutative_binop(lhs, rhs, op)));
-                }
-
-                (lhs, rhs) => {
-                    panic!("binop between unsupported types: ({},{})", lhs.ty(), rhs.ty())
-                }
-            },
-            (c @ AnySource::Const(_), AnySource::Ref(r))
-            | (AnySource::Ref(r), c @ AnySource::Const(_)) => (r, c),
+            (AnySource::Const(src1), AnySource::Const(src2)) => {
+                return AnySource::Const(eval::commutative_binop_consts(src1, src2, op));
+            }
+            (AnySource::Const(c), AnySource::Ref(r)) | (AnySource::Ref(r), AnySource::Const(c)) => {
+                let (r, c) = try_associate(&self.instructions, op, r, c);
+                (r, AnySource::Const(c))
+            }
             (AnySource::Ref(src1), src2 @ AnySource::Ref(_)) => (src1, src2),
         };
 

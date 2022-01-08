@@ -1,9 +1,8 @@
 use expect_test::expect;
 
-use crate::tests::{expect_block_with_opts, max_fn, min_fn};
-
 use super::pass_manager::{InplacePass, Pass};
 use super::PassManager;
+use crate::tests::{expect_block_with_opts, max_fn, min_fn};
 
 #[test]
 fn jal_basic_const_prop() {
@@ -115,6 +114,46 @@ fn max_opt_bf_bb_1() {
             x(%0)6 = 00000408
             ret 00000000, 000004be"#]],
     );
+}
+
+#[test]
+fn max_opt_ori_ori() {
+    expect_block_with_opts(
+        PassManager::optimized(),
+        r#"
+            ori x10, x10, 1
+            ori x10, x10, 8
+            ebreak
+        "#,
+        expect![[r#"
+            %0 = args[0]
+            %2 = x(%0)10
+            %4 = or %2, 00000009
+            x(%0)10 = %4
+            ret 00000001, 0000040c"#]],
+    )
+}
+
+#[test]
+fn max_opt_many_addis() {
+    expect_block_with_opts(
+        PassManager::optimized(),
+        r#"
+            addi x10, x10, 1
+            addi x10, x10, 2
+            addi x10, x10, 3
+            addi x10, x10, 4
+            addi x10, x10, -1
+            addi x10, x10, 5
+            ebreak
+        "#,
+        expect![[r#"
+            %0 = args[0]
+            %2 = x(%0)10
+            %8 = add %2, 0000000e
+            x(%0)10 = %8
+            ret 00000001, 0000041c"#]],
+    )
 }
 
 #[test]

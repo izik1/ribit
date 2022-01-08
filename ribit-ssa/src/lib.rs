@@ -92,6 +92,19 @@ pub enum CommutativeBinOp {
     Xor,
 }
 
+impl CommutativeBinOp {
+    // all current commutative binops *are* associative (iff we're talking about integers.)
+    // But theoretically we could implement some commutative binop that isn't associative.
+    pub const fn is_associative(self) -> bool {
+        match self {
+            CommutativeBinOp::And
+            | CommutativeBinOp::Add
+            | CommutativeBinOp::Or
+            | CommutativeBinOp::Xor => true,
+        }
+    }
+}
+
 impl fmt::Display for CommutativeBinOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

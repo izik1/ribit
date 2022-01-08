@@ -105,6 +105,19 @@ pub fn binop(src1: u32, src2: u32, op: BinOp) -> u32 {
 }
 
 #[must_use]
+pub fn commutative_binop_consts(src1: Constant, src2: Constant, op: CommutativeBinOp) -> Constant {
+    match (src1, src2) {
+        (Constant::Int(Int(Bitness::B32, lhs)), Constant::Int(Int(Bitness::B32, rhs))) => {
+            return Constant::i32(commutative_binop(lhs, rhs, op));
+        }
+
+        (lhs, rhs) => {
+            panic!("binop between unsupported types: ({},{})", lhs.ty(), rhs.ty())
+        }
+    }
+}
+
+#[must_use]
 pub fn commutative_binop(src1: u32, src2: u32, op: CommutativeBinOp) -> u32 {
     match op {
         CommutativeBinOp::And => src1 & src2,
