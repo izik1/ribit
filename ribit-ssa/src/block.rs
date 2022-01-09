@@ -1,20 +1,15 @@
-use crate::reference::{Ref, Reference};
-use crate::{ty, Arg, Id, IdAllocator, Instruction, Terminator};
+use crate::reference::Reference;
+use crate::{Id, IdAllocator, Instruction, Terminator};
 
 pub struct BlockDisplay<'a>(&'a [Instruction], &'a Terminator);
 
 impl<'a> std::fmt::Display for BlockDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if let Some((first, rest)) = self.0.split_first() {
-            write!(f, "{}", first)?;
-            for item in rest {
-                write!(f, "\n{}", item)?;
-            }
-
-            write!(f, "\n{}", self.1)?;
-        } else {
-            write!(f, "{}", self.1)?;
+        for item in self.0 {
+            writeln!(f, "{}", item)?;
         }
+
+        write!(f, "{}", self.1)?;
 
         Ok(())
     }
@@ -27,14 +22,6 @@ pub struct Block {
 }
 
 impl Block {
-    #[must_use]
-    pub fn arg_ref(&self, arg: Arg) -> Option<Ref<ty::I32>> {
-        self.instructions.iter().find_map(|it| match it {
-            Instruction::Arg { dest, src } if *src == arg => Some(Ref::new(*dest)),
-            _ => None,
-        })
-    }
-
     #[must_use]
     pub fn reference(&self, id: Id) -> Option<Reference> {
         self.instructions
