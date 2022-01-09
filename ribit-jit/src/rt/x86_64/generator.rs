@@ -33,15 +33,6 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
         Self { stream }
     }
 
-    fn mov_reg_src(&mut self, dest: Register, src: crate::Source) -> io::Result<()> {
-        match src {
-            // Don't need to move because src and dest are the same.
-            crate::Source::Register(src) if src == dest => Ok(()),
-            crate::Source::Register(src) => self.stream.mov_reg_reg(Reg32(dest), Reg32(src)),
-            crate::Source::Val(val) => self.mov_r32_imm32(dest, val),
-        }
-    }
-
     pub fn make_block(
         &mut self,
         instructions: &[ssa::Instruction],
@@ -59,13 +50,10 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 &ssa::Instruction::BinOp { dest, src, op } => {
                     let dest = *allocs.get(&dest).expect("dest not allocated!?");
 
-                    let src1 = crate::Source::from_ssa_src(src.lhs(), allocs)
-                        .expect("lhs not allocated!?");
+                    let src =
+                        crate::SourcePair::from_ssa(src, allocs).expect("sources not allocated");
 
-                    let src2 = crate::Source::from_ssa_src(src.rhs(), allocs)
-                        .expect("src2 not allocated!?");
-
-                    math::binop(self, dest, src1, src2, op)
+                    math::binop(self, dest, src, op)
                 }
 
                 &ssa::Instruction::CommutativeBinOp { dest, src1, src2, op } => {
@@ -158,13 +146,10 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 &ssa::Instruction::Cmp { dest, src, kind } => {
                     let dest = *allocs.get(&dest).expect("dest not allocated!?");
 
-                    let src1 = crate::Source::from_ssa_src(src.lhs(), allocs)
-                        .expect("lhs not allocated!?");
+                    let src =
+                        crate::SourcePair::from_ssa(src, allocs).expect("sources not allocated");
 
-                    let src2 = crate::Source::from_ssa_src(src.rhs(), allocs)
-                        .expect("src2 not allocated!?");
-
-                    cmp::set_bool_conditional(self, dest, src1, src2, kind)
+                    cmp::set_bool_conditional(self, dest, src, kind)
                 }
 
                 // todo(perf): split into `dest = if cond { if_true } else { <undefined> }; dest = if !cond { if_false } else { dest }

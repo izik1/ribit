@@ -3,10 +3,10 @@ use std::io;
 use rasen::params::imm::Imm32;
 use rasen::params::reg::Reg32;
 use rasen::params::Register;
-use ribit_ssa::{eval, CmpKind};
+use ribit_ssa::CmpKind;
 
 use super::BlockBuilder;
-use crate::Source;
+use crate::{Source, SourcePair};
 
 pub fn select(
     builder: &mut BlockBuilder<'_, '_>,
@@ -69,41 +69,30 @@ pub fn select(
     }
 }
 
-fn bool_cmp(
-    src1: Source,
-    src2: Source,
-    false_value: u32,
-    true_value: u32,
-    mode: CmpKind,
-) -> CmpValue {
-    match (src1, src2) {
-        (rs1, rs2) if rs1 == rs2 => CmpValue::Const(same_val(false_value, true_value, mode)),
+fn bool_cmp(src: SourcePair, false_value: u32, true_value: u32, mode: CmpKind) -> CmpValue {
+    match src {
+        SourcePair::RegVal(src, 0) => match zero(false_value, true_value, mode) {
+            Some(const_value) => CmpValue::Const(const_value),
+            None => CmpValue::Test(src, false),
+        },
 
-        (Source::Val(a), Source::Val(b)) => {
-            CmpValue::Const(if eval::cmp(a, b, mode) { true_value } else { false_value })
-        }
+        SourcePair::RegVal(src, val) => CmpValue::CmpImm(src, val, false),
 
-        (Source::Register(src), Source::Val(0)) | (Source::Val(0), Source::Register(src)) => {
-            // if `src` came from src2 we need to invert the values
-            let (true_value, false_value) = match src1.is_reg() {
-                true => (true_value, false_value),
-                false => (false_value, true_value),
-            };
-
-            let inversable = matches!(mode, CmpKind::Eq | CmpKind::Ne);
-
+        SourcePair::ValReg(0, src) => {
+            let (true_value, false_value) = (false_value, true_value);
             match zero(false_value, true_value, mode) {
                 Some(const_value) => CmpValue::Const(const_value),
-                None => CmpValue::Test(src, src2.is_reg() && !inversable),
+                None => CmpValue::Test(src, !matches!(mode, CmpKind::Eq | CmpKind::Ne)),
             }
         }
 
-        (Source::Register(src), Source::Val(val)) | (Source::Val(val), Source::Register(src)) => {
-            // if `src` came from src2 we need to invert the values
-            CmpValue::CmpImm(src, val, src2.is_reg())
+        SourcePair::ValReg(val, src) => CmpValue::CmpImm(src, val, true),
+
+        SourcePair::RegReg(rs1, rs2) if rs1 == rs2 => {
+            CmpValue::Const(same_val(false_value, true_value, mode))
         }
 
-        (Source::Register(src1), Source::Register(src2)) => CmpValue::CmpReg(src1, src2),
+        SourcePair::RegReg(src1, src2) => CmpValue::CmpReg(src1, src2),
     }
 }
 
@@ -163,11 +152,11 @@ fn cmp_bit(
 pub fn set_bool_conditional(
     builder: &mut BlockBuilder,
     dest: Register,
-    src1: Source,
-    src2: Source,
+    src: SourcePair,
     mode: CmpKind,
 ) -> io::Result<()> {
-    let cmp = bool_cmp(src1, src2, 0, 1, mode);
+    let cmp = bool_cmp(src, 0, 1, mode);
+
     let xor = match cmp {
         CmpValue::Const(_) => false,
         CmpValue::Test(r, _) | CmpValue::CmpImm(r, _, _) => r != dest,

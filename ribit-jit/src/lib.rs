@@ -36,6 +36,39 @@ pub const MEMORY_SIZE: u32 = 1024 * 1024 * 16;
 // ensure that memory size is a power of two.
 const_assert_eq!(MEMORY_SIZE.count_ones(), 1);
 
+pub enum SourcePair {
+    RegReg(Register, Register),
+    RegVal(Register, u32),
+    ValReg(u32, Register),
+}
+
+impl SourcePair {
+    fn from_ssa(pair: ssa::SourcePair, map: &HashMap<ssa::Id, Register>) -> Option<Self> {
+        match pair {
+            ssa::SourcePair::RefRef(lhs, rhs) => {
+                Some(Self::RegReg(*map.get(&lhs.id)?, *map.get(&rhs.id)?))
+            }
+            ssa::SourcePair::RefConst(lhs, rhs) => {
+                Some(Self::RegVal(*map.get(&lhs.id)?, get_val(rhs)))
+            }
+            ssa::SourcePair::ConstRef(lhs, rhs) => {
+                Some(Self::ValReg(get_val(lhs), *map.get(&rhs.id)?))
+            }
+        }
+    }
+}
+
+fn get_val(konst: Constant) -> u32 {
+    match konst {
+        Constant::Int(i) => {
+            assert_eq!(i.bits(), 32);
+            i.unsigned()
+        }
+        // fixme: should we panic here?
+        Constant::Bool(i) => i as u32,
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Source {
     Val(u32),
@@ -57,14 +90,7 @@ impl Source {
     #[must_use]
     pub fn from_ssa_src(src: ssa::AnySource, map: &HashMap<ssa::Id, Register>) -> Option<Self> {
         match src {
-            ssa::AnySource::Const(Constant::Int(i)) => {
-                assert_eq!(i.bits(), 32);
-                Some(Source::Val(i.unsigned()))
-            }
-            ssa::AnySource::Const(Constant::Bool(i)) => {
-                // fixme: should we panic here?
-                Some(Source::Val(i as u32))
-            }
+            ssa::AnySource::Const(konst) => Some(Source::Val(get_val(konst))),
             ssa::AnySource::Ref(r) => map.get(&r.id).copied().map(Self::Register),
         }
     }
