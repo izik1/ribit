@@ -144,7 +144,7 @@ pub enum Arg {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Terminator {
-    Ret { addr: AnySource, code: ReturnCode },
+    Ret { addr: TypedSource<ty::I32Ty>, code: ReturnCode },
 }
 
 impl fmt::Display for Terminator {
@@ -242,7 +242,7 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
 
         match &mut graph.terminator {
             Terminator::Ret { addr, .. } => {
-                update_reference(addr, old, new);
+                update_typed_reference(addr, old, new);
             }
         }
     }

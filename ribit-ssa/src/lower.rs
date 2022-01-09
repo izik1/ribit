@@ -6,14 +6,14 @@ use ribit_core::{instruction, opcode, register, ReturnCode, Width};
 use super::{AnySource, BinOp, CmpKind, Id, Instruction};
 use crate::instruction::{ExtInt, Select};
 use crate::reference::Reference;
-use crate::ty::{BoolTy, ConstTy, Constant, I32Ty};
+use crate::ty::{self, BoolTy, ConstTy, Constant, I32Ty};
 use crate::{
     eval, Arg, Block, CommutativeBinOp, IdAllocator, SourcePair, Terminator, TypedRef, TypedSource,
 };
 
 pub struct Context {
     id_allocator: IdAllocator,
-    pub pc: AnySource,
+    pub pc: TypedSource<ty::I32Ty>,
     registers: [Option<AnySource>; 32],
     register_arg: Option<TypedSource<I32Ty>>,
     memory_arg: Option<TypedSource<I32Ty>>,
@@ -70,7 +70,7 @@ impl Context {
 
         let mut self_ = Self {
             id_allocator: IdAllocator::new(),
-            pc: AnySource::Const(Constant::i32(start_pc)),
+            pc: TypedSource::Const(start_pc),
             registers: [None; 32],
             register_arg: None,
             memory_arg: None,
@@ -88,12 +88,12 @@ impl Context {
         self.typed_instruction(|id| Instruction::Arg { dest: id, src: arg })
     }
 
-    pub fn add_pc(&mut self, src: AnySource) -> AnySource {
-        self.pc = self.add(src, self.pc);
+    pub fn add_pc(&mut self, src: AnySource) -> TypedSource<ty::I32Ty> {
+        self.pc = self.add(src, self.pc.upcast()).downcast().unwrap();
         self.pc
     }
 
-    pub fn override_pc(&mut self, src: AnySource) {
+    pub fn override_pc(&mut self, src: TypedSource<ty::I32Ty>) {
         self.pc = src;
     }
 
@@ -293,7 +293,7 @@ impl Context {
     }
 
     #[must_use]
-    pub fn ret_with_code(mut self, addr: AnySource, code: ReturnCode) -> Block {
+    pub fn ret_with_code(mut self, addr: TypedSource<ty::I32Ty>, code: ReturnCode) -> Block {
         for (idx, src) in self.registers.iter().enumerate().skip(1) {
             let dest = register::RiscV::with_u8(idx as u8).unwrap();
 
@@ -316,7 +316,7 @@ impl Context {
     }
 
     #[must_use]
-    pub fn ret_with_addr(self, addr: AnySource) -> Block {
+    pub fn ret_with_addr(self, addr: TypedSource<ty::I32Ty>) -> Block {
         self.ret_with_code(addr, ReturnCode::Normal)
     }
 
@@ -441,7 +441,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
 
             let res = match opcode {
                 opcode::U::LUI => imm,
-                opcode::U::AUIPC => ctx.add(ctx.pc, imm),
+                opcode::U::AUIPC => ctx.add(ctx.pc.upcast(), imm),
             };
 
             if let Some(rd) = rd {
@@ -464,7 +464,7 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
                 // we specifically need to avoid modifying `pc`, since we need the
                 // old value for adding the immediate.
 
-                let next_pc = ctx.add(ctx.pc, len);
+                let next_pc = ctx.add(ctx.pc.upcast(), len);
 
                 ctx.write_register(rd, next_pc);
             }
@@ -491,7 +491,7 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
             if let Some(rd) = rd {
                 let next_pc = ctx.add_pc(len);
 
-                ctx.write_register(rd, next_pc);
+                ctx.write_register(rd, next_pc.upcast());
             }
 
             // adding 0 is the same as not adding, so don't bother with a match here.
@@ -502,11 +502,10 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
                 }
 
                 src = ctx.and(src, AnySource::Const(Constant::i32(!1)));
-                ctx.override_pc(src);
+                ctx.override_pc(src.downcast().unwrap());
             } else {
-                let imm = AnySource::Const(Constant::i32(imm));
-                let imm = ctx.and(imm, AnySource::Const(Constant::i32(!1)));
-                ctx.override_pc(imm);
+                let imm = imm & !1;
+                ctx.override_pc(TypedSource::Const(imm));
             }
 
             ctx.ret()
@@ -531,13 +530,13 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
 
             let cmp = ctx.cmp(src1, src2, cmp_mode.into());
 
-            let continue_pc = ctx.add(ctx.pc, len);
+            let continue_pc = ctx.add(ctx.pc.upcast(), len);
 
-            let jump_pc = ctx.add(ctx.pc, imm);
+            let jump_pc = ctx.add(ctx.pc.upcast(), imm);
 
             let addr = ctx.select(cmp, jump_pc, continue_pc);
 
-            ctx.ret_with_addr(addr)
+            ctx.ret_with_addr(addr.downcast().unwrap())
         }
 
         _ => panic!("Instruction wasn't a terminal"),

@@ -1,21 +1,13 @@
-use crate::{AnySource, Block, Id, Terminator};
-
-fn mark_live(live_instructions: &mut [bool; 0x1_0000], src: AnySource) {
-    if let AnySource::Ref(r) = src {
-        mark_id_live(live_instructions, r.id);
-    }
-}
-
-fn mark_id_live(live_instructions: &mut [bool; 0x1_0000], id: Id) {
-    live_instructions[id.0 as usize] = true;
-}
+use crate::{Block, Terminator, TypedSource};
 
 pub fn run(block: &mut Block) {
     let mut live_ids = [false; 0x1_0000];
 
     match &block.terminator {
         Terminator::Ret { addr, .. } => {
-            mark_live(&mut live_ids, *addr);
+            if let TypedSource::Ref(id) = *addr {
+                live_ids[id.0 as usize] = true;
+            }
         }
     }
 

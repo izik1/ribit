@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 
-use crate::{AnySource, Block, Id, Instruction, StackIndex, Terminator};
+use crate::{Block, Id, Instruction, StackIndex, Terminator, TypedSource};
 
 fn lifetime_instruction<F: FnMut(&mut Lifetimes, Id, usize)>(
     instr: &Instruction,
@@ -25,8 +25,8 @@ fn lifetime_terminator<F: FnMut(&mut Lifetimes, Id, usize)>(
 ) {
     match term {
         Terminator::Ret { addr, .. } => {
-            if let AnySource::Ref(r) = addr {
-                update(lifetimes, r.id, idx);
+            if let TypedSource::Ref(id) = addr {
+                update(lifetimes, *id, idx);
             }
         }
     }

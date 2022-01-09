@@ -248,7 +248,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
             ssa::Terminator::Ret { code, addr } => {
                 // note: addr is in the low dword, code is high dword
 
-                let addr = crate::Source::from_ssa_src(addr, allocs).expect("addr not allocated!?");
+                let addr = crate::Source::from_ssa_src(addr.upcast(), allocs).expect("addr not allocated!?");
 
                 match (code, addr) {
                     (code, Source::Val(addr)) => {

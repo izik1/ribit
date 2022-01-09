@@ -142,7 +142,7 @@ impl crate::rt::Block for Block {
 
         match &self.0.terminator {
             &ribit_ssa::Terminator::Ret { addr, code } => {
-                let addr = unwrap_u32(lookup_source(&evaluated, addr));
+                let addr = unwrap_u32(lookup_source(&evaluated, addr.upcast()));
 
                 (addr, code)
             }
