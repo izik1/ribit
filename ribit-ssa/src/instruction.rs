@@ -4,7 +4,8 @@ use ribit_core::{register, Width};
 
 use crate::reference::Reference;
 use crate::{
-    ty, AnySource, Arg, BinOp, CmpKind, CommutativeBinOp, Id, Source, SourcePair, StackIndex, Type,
+    ty, AnySource, Arg, CmpKind, CommutativeBinOp, Id, ShiftOp, Source, SourcePair, StackIndex,
+    Type,
 };
 
 mod ext_int;
@@ -18,16 +19,65 @@ mod tests;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Instruction {
-    Arg { dest: Id, src: Arg },
-    WriteStack { dest: StackIndex, src: Reference },
-    ReadStack { dest: Id, src: StackIndex },
-    ReadReg { dest: Id, base: Source<ty::I32>, src: register::RiscV },
-    WriteReg { dest: register::RiscV, base: Source<ty::I32>, src: AnySource },
-    ReadMem { dest: Id, src: AnySource, base: Source<ty::I32>, width: Width, sign_extend: bool },
-    WriteMem { addr: Source<ty::I32>, src: AnySource, base: Source<ty::I32>, width: Width },
-    BinOp { dest: Id, src: SourcePair, op: BinOp },
-    Cmp { dest: Id, src: SourcePair, kind: CmpKind },
-    CommutativeBinOp { dest: Id, src1: Reference, src2: AnySource, op: CommutativeBinOp },
+    Arg {
+        dest: Id,
+        src: Arg,
+    },
+    WriteStack {
+        dest: StackIndex,
+        src: Reference,
+    },
+    ReadStack {
+        dest: Id,
+        src: StackIndex,
+    },
+    ReadReg {
+        dest: Id,
+        base: Source<ty::I32>,
+        src: register::RiscV,
+    },
+    WriteReg {
+        dest: register::RiscV,
+        base: Source<ty::I32>,
+        src: AnySource,
+    },
+    ReadMem {
+        dest: Id,
+        src: AnySource,
+        base: Source<ty::I32>,
+        width: Width,
+        sign_extend: bool,
+    },
+    WriteMem {
+        addr: Source<ty::I32>,
+        src: AnySource,
+        base: Source<ty::I32>,
+        width: Width,
+    },
+    ShiftOp {
+        dest: Id,
+        src: SourcePair,
+        op: ShiftOp,
+    },
+
+    /// Subtraction is special, and not in a good way.
+    /// Specifically, `x - imm` is the same as `x + (-imm)`.
+    Sub {
+        dest: Id,
+        src1: AnySource,
+        src2: Reference,
+    },
+    Cmp {
+        dest: Id,
+        src: SourcePair,
+        kind: CmpKind,
+    },
+    CommutativeBinOp {
+        dest: Id,
+        src1: Reference,
+        src2: AnySource,
+        op: CommutativeBinOp,
+    },
     // todo: box this
     Select(Select),
     ExtInt(ExtInt),
@@ -37,13 +87,13 @@ pub enum Instruction {
 impl Instruction {
     pub fn visit_arg_ids<F: FnMut(Id)>(&self, mut visit: F) {
         match self {
-            Instruction::Arg { .. } | Instruction::ReadStack { .. } | Instruction::Fence => {}
-            Instruction::ReadReg { base, .. } => {
+            Self::Arg { .. } | Self::ReadStack { .. } | Self::Fence => {}
+            Self::ReadReg { base, .. } => {
                 if let Source::Ref(it) = base {
                     visit(*it)
                 }
             }
-            Instruction::WriteReg { base, src, .. } | Instruction::ReadMem { base, src, .. } => {
+            Self::WriteReg { base, src, .. } | Self::ReadMem { base, src, .. } => {
                 if let Source::Ref(it) = base {
                     visit(*it)
                 }
@@ -53,7 +103,7 @@ impl Instruction {
                 }
             }
 
-            Instruction::WriteMem { addr, src, base, .. } => {
+            Self::WriteMem { addr, src, base, .. } => {
                 if let Source::Ref(it) = addr {
                     visit(*it)
                 }
@@ -67,7 +117,7 @@ impl Instruction {
                 }
             }
 
-            Instruction::BinOp { src, .. } | Instruction::Cmp { src, .. } => match src {
+            Self::ShiftOp { src, .. } | Self::Cmp { src, .. } => match src {
                 SourcePair::RefRef(l, r) => {
                     visit(l.id);
                     visit(r.id);
@@ -75,15 +125,16 @@ impl Instruction {
                 SourcePair::RefConst(it, _) | SourcePair::ConstRef(_, it) => visit(it.id),
             },
 
-            Instruction::CommutativeBinOp { src1, src2, .. } => {
-                visit(src1.id);
+            Self::CommutativeBinOp { src1: reference, src2: source, .. }
+            | Self::Sub { src1: source, src2: reference, .. } => {
+                visit(reference.id);
 
-                if let AnySource::Ref(it) = src2 {
+                if let AnySource::Ref(it) = source {
                     visit(it.id)
                 }
             }
 
-            Instruction::Select(it) => {
+            Self::Select(it) => {
                 visit(it.cond.id);
                 if let AnySource::Ref(it) = it.if_true {
                     visit(it.id)
@@ -94,24 +145,22 @@ impl Instruction {
                 }
             }
 
-            Instruction::WriteStack { src, .. } => visit(src.id),
-            Instruction::ExtInt(it) => visit(it.src.id),
+            Self::WriteStack { src, .. } => visit(src.id),
+            Self::ExtInt(it) => visit(it.src.id),
         }
     }
 
     #[must_use]
     pub fn ty(&self) -> Type {
         match self {
-            Instruction::Arg { dest: _, src: _ } => Type::I32,
-            Instruction::WriteStack { dest: _, src: _ } => Type::Unit,
-            Instruction::ReadStack { dest: _, src: _ } => Type::I32,
-            Instruction::ReadReg { dest: _, base: _, src: _ } => Type::I32,
-            Instruction::WriteReg { dest: _, base: _, src: _ } => Type::Unit,
-            Instruction::ReadMem { dest: _, src: _, base: _, width: _, sign_extend: _ } => {
-                Type::I32
-            }
-            Instruction::WriteMem { addr: _, src: _, base: _, width: _ } => Type::Unit,
-            Instruction::BinOp { dest: _, src, op: _ } => {
+            Self::Arg { dest: _, src: _ } => Type::I32,
+            Self::WriteStack { dest: _, src: _ } => Type::Unit,
+            Self::ReadStack { dest: _, src: _ } => Type::I32,
+            Self::ReadReg { dest: _, base: _, src: _ } => Type::I32,
+            Self::WriteReg { dest: _, base: _, src: _ } => Type::Unit,
+            Self::ReadMem { dest: _, src: _, base: _, width: _, sign_extend: _ } => Type::I32,
+            Self::WriteMem { addr: _, src: _, base: _, width: _ } => Type::Unit,
+            Self::ShiftOp { dest: _, src, op: _ } => {
                 let ty = src.lhs().ty();
 
                 assert_eq!(ty, src.rhs().ty());
@@ -121,17 +170,18 @@ impl Instruction {
 
                 ty
             }
-            Instruction::CommutativeBinOp { dest: _, src1, src2, op: _ } => {
-                let ty = src1.ty;
+            Self::CommutativeBinOp { dest: _, src1: reference, src2: source, op: _ }
+            | Self::Sub { dest: _, src1: source, src2: reference } => {
+                let ty = reference.ty;
 
-                assert_eq!(ty, src2.ty());
+                assert_eq!(ty, source.ty());
 
                 // type technically depends on op, but... for now:
                 assert!(matches!(ty, Type::Int(_)));
 
                 ty
             }
-            Instruction::Cmp { dest: _, src, kind: _ } => {
+            Self::Cmp { dest: _, src, kind: _ } => {
                 let ty = src.lhs().ty();
 
                 assert_eq!(ty, src.rhs().ty());
@@ -139,10 +189,10 @@ impl Instruction {
                 Type::Boolean
             }
 
-            Instruction::Select(it) => it.ty(),
+            Self::Select(it) => it.ty(),
 
-            Instruction::Fence => Type::Unit,
-            Instruction::ExtInt(it) => it.ty(),
+            Self::Fence => Type::Unit,
+            Self::ExtInt(it) => it.ty(),
         }
     }
 
@@ -155,7 +205,8 @@ impl Instruction {
             | Self::Cmp { dest, .. }
             | Self::Arg { dest, .. }
             | Self::CommutativeBinOp { dest, .. }
-            | Self::BinOp { dest, .. } => Some(*dest),
+            | Self::Sub { dest, .. }
+            | Self::ShiftOp { dest, .. } => Some(*dest),
 
             Self::Select(it) => Some(it.id()),
             Self::ExtInt(it) => Some(it.id()),
@@ -199,7 +250,7 @@ impl fmt::Display for Instruction {
                 src2 = src2
             ),
 
-            Self::BinOp { dest, src, op } => write!(
+            Self::ShiftOp { dest, src, op } => write!(
                 f,
                 "{dest} = {op} {src1}, {src2}",
                 dest = dest,
@@ -207,6 +258,9 @@ impl fmt::Display for Instruction {
                 src1 = src.lhs(),
                 src2 = src.rhs()
             ),
+
+            Self::Sub { dest, src1, src2 } => write!(f, "{} = sub {}, {}", dest, src1, src2),
+
             Self::Cmp { dest, src, kind } => {
                 write!(f, "{} = cmp {} {}, {}", dest, kind, src.lhs(), src.rhs())
             }

@@ -3,7 +3,7 @@ use std::io;
 use rasen::params::imm::Imm32;
 use rasen::params::reg::Reg32;
 use rasen::params::Register;
-use ribit_ssa::{BinOp, CommutativeBinOp};
+use ribit_ssa::{CommutativeBinOp, ShiftOp};
 
 use super::BlockBuilder;
 use crate::{Source, SourcePair};
@@ -40,6 +40,7 @@ pub fn commutative_binop(
             (CommutativeBinOp::Or, false) => builder.stream.or_reg_imm(dest, Imm32(src2)),
             (CommutativeBinOp::Xor, false) => builder.stream.xor_reg_imm(dest, Imm32(src2)),
         },
+
         Source::Register(src2) => {
             let src2 = Reg32(src2);
 
@@ -53,52 +54,85 @@ pub fn commutative_binop(
     }
 }
 
-pub fn binop(
+pub fn sub(
+    builder: &mut BlockBuilder,
+    dest: Register,
+    lhs: Source,
+    rhs: Register,
+) -> io::Result<()> {
+    match lhs {
+        Source::Register(lhs) => {
+            match (lhs == dest, rhs == dest) {
+                (true, true) => {}
+                (true, false) => {}
+                // painful: need a 3rd register to swap lhs and rhs and then restore rhs.
+                (false, true) => unimplemented!(),
+                (false, false) => {
+                    builder.stream.mov_reg_reg(Reg32(dest), Reg32(lhs))?;
+                }
+            };
+
+            builder.stream.sub_reg_reg(Reg32(dest), Reg32(rhs))
+        }
+
+        Source::Val(0) => {
+            if rhs != dest {
+                builder.stream.mov_reg_reg(Reg32(dest), Reg32(rhs))?;
+            }
+
+            builder.stream.neg_reg(Reg32(dest))
+        }
+
+        Source::Val(lhs) if rhs != dest => {
+            builder.mov_r32_imm32(dest, lhs)?;
+            builder.stream.sub_reg_reg(Reg32(dest), Reg32(rhs))
+        }
+
+        // we can turn `a - b` into `a + (-b)` into `(-b) + a`
+        Source::Val(lhs) => {
+            builder.stream.neg_reg(Reg32(dest))?;
+            add_r32_imm(builder, Reg32(dest), lhs)
+        }
+    }
+}
+
+fn shift_3arg(
+    builder: &mut BlockBuilder,
+    dest: Register,
+    lhs: Register,
+    rhs: Register,
+    op: ShiftOp,
+) -> io::Result<()> {
+    let dest = Reg32(dest);
+    let lhs = Reg32(lhs);
+    let rhs = Reg32(rhs);
+    match op {
+        ShiftOp::Sll => builder.stream.shlx_reg_reg_reg(dest, lhs, rhs),
+        ShiftOp::Srl => builder.stream.shrx_reg_reg_reg(dest, lhs, rhs),
+        ShiftOp::Sra => builder.stream.sarx_reg_reg_reg(dest, lhs, rhs),
+    }
+}
+
+pub fn shift(
     builder: &mut BlockBuilder,
     dest: Register,
     src: SourcePair,
-    op: BinOp,
+    op: ShiftOp,
 ) -> io::Result<()> {
     // todo: if not 3-arg
 
     match src {
-        SourcePair::RegReg(lhs, rhs) => match op {
-            BinOp::Sll => builder.stream.shlx_reg_reg_reg(Reg32(dest), Reg32(lhs), Reg32(rhs)),
-            BinOp::Srl => builder.stream.shrx_reg_reg_reg(Reg32(dest), Reg32(lhs), Reg32(rhs)),
-            BinOp::Sra => builder.stream.sarx_reg_reg_reg(Reg32(dest), Reg32(lhs), Reg32(rhs)),
-            BinOp::Sub => {
-                match (lhs == dest, rhs == dest) {
-                    (true, true) => {}
-                    (true, false) => {}
-                    // painful: need a 3rd register to swap lhs and rhs and then restore rhs.
-                    (false, true) => unimplemented!(),
-                    (false, false) => {
-                        builder.stream.mov_reg_reg(Reg32(dest), Reg32(lhs))?;
-                    }
-                };
-
-                builder.stream.sub_reg_reg(Reg32(dest), Reg32(rhs))
-            }
-        },
+        SourcePair::RegReg(lhs, rhs) => shift_3arg(builder, dest, lhs, rhs, op),
         SourcePair::RegVal(lhs, rhs) => {
             if lhs != dest {
                 builder.stream.mov_reg_reg(Reg32(dest), Reg32(lhs))?;
             }
 
             match op {
-                BinOp::Sll => builder.stream.shl_reg_imm8(Reg32(dest), rhs as u8),
-                BinOp::Srl => builder.stream.shr_reg_imm8(Reg32(dest), rhs as u8),
-                BinOp::Sra => builder.stream.sar_reg_imm8(Reg32(dest), rhs as u8),
-                BinOp::Sub => sub(builder, Reg32(dest), rhs),
+                ShiftOp::Sll => builder.stream.shl_reg_imm8(Reg32(dest), rhs as u8),
+                ShiftOp::Srl => builder.stream.shr_reg_imm8(Reg32(dest), rhs as u8),
+                ShiftOp::Sra => builder.stream.sar_reg_imm8(Reg32(dest), rhs as u8),
             }
-        }
-
-        SourcePair::ValReg(0, rhs) if op == BinOp::Sub => {
-            if rhs != dest {
-                builder.stream.mov_reg_reg(Reg32(dest), Reg32(rhs))?;
-            }
-
-            builder.stream.neg_reg(Reg32(dest))
         }
 
         // shifts of 0 by n are trivially 0.
@@ -108,56 +142,12 @@ pub fn binop(
         // if `rhs` is there we need a scratch register.
         SourcePair::ValReg(lhs, rhs) if rhs != dest => {
             builder.mov_r32_imm32(dest, lhs)?;
-            match op {
-                BinOp::Sll => builder.stream.shlx_reg_reg_reg(Reg32(dest), Reg32(dest), Reg32(rhs)),
-                BinOp::Srl => builder.stream.shrx_reg_reg_reg(Reg32(dest), Reg32(dest), Reg32(rhs)),
-                BinOp::Sra => builder.stream.sarx_reg_reg_reg(Reg32(dest), Reg32(dest), Reg32(rhs)),
-                BinOp::Sub => builder.stream.sub_reg_reg(Reg32(dest), Reg32(rhs)),
-            }
+            shift_3arg(builder, dest, dest, rhs, op)
         }
 
-        // there's still hope!
-        // we can turn `a - b` into `a + (-b)` into `(-b) + a`
-        SourcePair::ValReg(lhs, _) if op == BinOp::Sub => {
-            builder.stream.neg_reg(Reg32(dest))?;
-            add_r32_imm(builder, Reg32(dest), lhs)
-        }
-
-        // we tried really hard. This *really* needs a clobber.
+        // Sadly, this needs a clobber.
         SourcePair::ValReg(_, _) => panic!(),
     }
-
-    // match (op, src) {
-    //     (BinOp::Sll, SourcePair::RegReg(_, _)) => todo!(),
-    //     (BinOp::Sll, SourcePair::RegVal(_, _)) => todo!(),
-    //     (BinOp::Sll, SourcePair::ValReg(_, _)) => todo!(),
-    //     (BinOp::Srl, SourcePair::RegReg(_, _)) => todo!(),
-    //     (BinOp::Srl, SourcePair::RegVal(_, _)) => todo!(),
-    //     (BinOp::Srl, SourcePair::ValReg(_, _)) => todo!(),
-    //     (BinOp::Sra, SourcePair::RegReg(_, _)) => todo!(),
-    //     (BinOp::Sra, SourcePair::RegVal(_, _)) => todo!(),
-    //     (BinOp::Sra, SourcePair::ValReg(_, _)) => todo!(),
-    //     (BinOp::Sub, SourcePair::RegReg(_, _)) => todo!(),
-    //     (BinOp::Sub, SourcePair::RegVal(_, _)) => todo!(),
-    //     (BinOp::Sub, SourcePair::ValReg(_, _)) => todo!(),
-    // }
-
-    // // fixme: MISCOMPILE: This doesn't function right if src2 != src1 and is already in dest.
-    // builder.mov_reg_src(dest, src1)?;
-
-    // let dest = Reg32(dest);
-
-    // match (op, src2) {
-    //     (BinOp::Sll, Source::Register(r)) => builder.stream.shlx_reg_reg_reg(dest, dest, Reg32(r)),
-    //     (BinOp::Srl, Source::Register(r)) => builder.stream.shrx_reg_reg_reg(dest, dest, Reg32(r)),
-    //     (BinOp::Sra, Source::Register(r)) => builder.stream.sarx_reg_reg_reg(dest, dest, Reg32(r)),
-
-    //     (BinOp::Sll, Source::Val(v)) => builder.stream.shl_reg_imm8(dest, v as u8),
-    //     (BinOp::Srl, Source::Val(v)) => builder.stream.shr_reg_imm8(dest, v as u8),
-    //     (BinOp::Sra, Source::Val(v)) => builder.stream.sar_reg_imm8(dest, v as u8),
-
-    //     (BinOp::Sub, src2) => sub(builder, dest, src2),
-    // }
 }
 
 fn add_r32_imm(builder: &mut BlockBuilder, dest: Reg32, v: u32) -> Result<(), io::Error> {
@@ -187,8 +177,4 @@ fn add_r32_imm(builder: &mut BlockBuilder, dest: Reg32, v: u32) -> Result<(), io
 
     // fallback.
     builder.stream.add_reg_imm(dest, Imm32(v))
-}
-
-fn sub(builder: &mut BlockBuilder, dest: Reg32, v: u32) -> Result<(), io::Error> {
-    add_r32_imm(builder, dest, -(v as i32) as u32)
 }

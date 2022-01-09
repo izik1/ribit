@@ -4,7 +4,6 @@ use ribit_core::{instruction, ReturnCode};
 use ribit_ssa::opt;
 use ribit_ssa::opt::pass_manager::InplacePass;
 
-
 mod interpreter;
 
 pub use interpreter::Interpreter;

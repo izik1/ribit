@@ -19,8 +19,10 @@ pub fn count_clobbers_for(instr: &Instruction, allocs: &HashMap<Id, Register>) -
         | Instruction::WriteMem { .. }
         | Instruction::Fence
         | Instruction::ExtInt { .. }
-        | Instruction::BinOp { .. }
         | Instruction::CommutativeBinOp {.. }
+        // todo: these *can* run into a clobber requirement.
+        | Instruction::ShiftOp { .. }
+        | Instruction::Sub { .. }
         // note: although slightly complicated, this can indeed be done without any branching
         // in even the worst cases, by doing the following:
         // <comparision>
@@ -93,7 +95,8 @@ pub fn legalise(block: &mut Block, allocs: &HashMap<Id, Register>) {
             Instruction::Select(_) => {}
             Instruction::Fence => {}
             Instruction::ExtInt(_) => {}
-            Instruction::BinOp { .. } => {}
+            Instruction::ShiftOp { .. } => {}
+            Instruction::Sub { .. } => {}
         }
     }
 

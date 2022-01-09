@@ -95,10 +95,10 @@ impl crate::rt::Block for Block {
                     memory[(addr as usize)..][..len].copy_from_slice(&src[..len]);
                 }
 
-                &ribit_ssa::Instruction::BinOp { dest, src, op } => {
+                &ribit_ssa::Instruction::ShiftOp { dest, src, op } => {
                     let src1 = lookup_source(&evaluated, src.lhs());
                     let src2 = lookup_source(&evaluated, src.rhs());
-                    evaluated.insert(dest, eval::binop(src1, src2, op));
+                    evaluated.insert(dest, eval::shift(src1, src2, op));
                 }
 
                 &ribit_ssa::Instruction::Cmp { dest, src, kind } => {
@@ -114,6 +114,13 @@ impl crate::rt::Block for Block {
                     let src1 = evaluated[&src1.id];
                     let src2 = lookup_source(&evaluated, src2);
                     let output = eval::commutative_binop(src1, src2, op);
+                    evaluated.insert(dest, output);
+                }
+
+                &ribit_ssa::Instruction::Sub { dest, src1, src2 } => {
+                    let src1 = lookup_source(&evaluated, src1);
+                    let src2 = evaluated[&src2.id];
+                    let output = eval::sub(src1, src2);
                     evaluated.insert(dest, output);
                 }
 

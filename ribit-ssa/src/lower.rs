@@ -3,7 +3,7 @@ mod test;
 
 use ribit_core::{instruction, opcode, register, ReturnCode, Width};
 
-use super::{AnySource, BinOp, CmpKind, Id, Instruction};
+use super::{AnySource, CmpKind, Id, Instruction, ShiftOp};
 use crate::instruction::{ExtInt, Select};
 use crate::reference::Reference;
 use crate::ty::{self, ConstTy, Constant};
@@ -145,15 +145,15 @@ impl Context {
         self.instruction(|dest| Instruction::CommutativeBinOp { dest, src1, src2, op })
     }
 
-    pub fn binop(&mut self, op: BinOp, src1: AnySource, src2: AnySource) -> AnySource {
+    pub fn shift(&mut self, op: ShiftOp, src1: AnySource, src2: AnySource) -> AnySource {
         assert_eq!(src1.ty(), src2.ty());
 
         let consts = match SourcePair::try_from((src1, src2)) {
-            Ok(src) => return self.instruction(|dest| Instruction::BinOp { dest, src, op }),
+            Ok(src) => return self.instruction(|dest| Instruction::ShiftOp { dest, src, op }),
             Err(consts) => consts,
         };
 
-        AnySource::Const(eval::binop(consts.0, consts.1, op))
+        AnySource::Const(eval::shift(consts.0, consts.1, op))
     }
 
     pub fn read_register(&mut self, reg: register::RiscV) -> AnySource {
@@ -205,15 +205,15 @@ impl Context {
     }
 
     pub fn sll(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
-        self.binop(BinOp::Sll, src1, src2)
+        self.shift(ShiftOp::Sll, src1, src2)
     }
 
     pub fn srl(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
-        self.binop(BinOp::Srl, src1, src2)
+        self.shift(ShiftOp::Srl, src1, src2)
     }
 
     pub fn sra(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
-        self.binop(BinOp::Sra, src1, src2)
+        self.shift(ShiftOp::Sra, src1, src2)
     }
 
     pub fn xor(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
@@ -229,7 +229,12 @@ impl Context {
     }
 
     pub fn sub(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
-        self.binop(BinOp::Sub, src1, src2)
+        let src2 = match src2 {
+            AnySource::Const(c) => return self.add(src1, AnySource::Const(eval::neg(c))),
+            AnySource::Ref(src2) => src2,
+        };
+
+        self.instruction(|dest| Instruction::Sub { dest, src1, src2 })
     }
 
     pub fn cmp(&mut self, src1: AnySource, src2: AnySource, mode: CmpKind) -> Source<ty::Bool> {

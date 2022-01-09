@@ -2,7 +2,7 @@ use core::fmt;
 
 use crate::reference::Reference;
 use crate::ty::{Constant, Int};
-use crate::{AnySource, BinOp, Bitness, CmpKind, CommutativeBinOp};
+use crate::{AnySource, Bitness, CmpKind, CommutativeBinOp, ShiftOp};
 
 #[must_use]
 pub fn commutative_identity(
@@ -69,6 +69,32 @@ pub fn commutative_absorb(
 }
 
 #[must_use]
+pub(crate) fn neg(v: Constant) -> Constant {
+    match v {
+        Constant::Int(it) => {
+            let val = (-it.signed()) as u32;
+
+            // can't do `(1 << bits) - 1` because of underflows.
+            let mask = if it.bits() >= 32 { u32::MAX } else { (1 << (it.bits() as u32)) - 1 };
+
+            Constant::Int(Int(it.0, val & mask))
+        }
+        Constant::Bool(_) => panic!("attempted to negate boolean"),
+    }
+}
+
+pub fn sub(lhs: Constant, rhs: Constant) -> Constant {
+    struct Op;
+    impl fmt::Display for Op {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("sub")
+        }
+    }
+
+    u32_op_consts(|lhs, rhs, Op| lhs.wrapping_sub(rhs), lhs, rhs, Op)
+}
+
+#[must_use]
 pub fn cmp(src1: u32, src2: u32, mode: CmpKind) -> bool {
     cmp_int(Int::i32(src1), Int::i32(src2), mode)
 }
@@ -89,17 +115,16 @@ pub fn cmp_int(lhs: Int, rhs: Int, op: CmpKind) -> bool {
 
 // todo: "just work with arbitrary constants of compatable types"
 #[must_use]
-pub fn binop(src1: Constant, src2: Constant, op: BinOp) -> Constant {
-    u32_op_consts(binop_u32, src1, src2, op)
+pub fn shift(src1: Constant, src2: Constant, op: ShiftOp) -> Constant {
+    u32_op_consts(shift_u32, src1, src2, op)
 }
 
 #[must_use]
-fn binop_u32(src1: u32, src2: u32, op: BinOp) -> u32 {
+fn shift_u32(src1: u32, src2: u32, op: ShiftOp) -> u32 {
     match op {
-        BinOp::Sll => src1 << (src2 & 0x1f),
-        BinOp::Srl => src1 >> (src2 & 0x1f),
-        BinOp::Sra => ((src1 as i32) >> (src2 & 0x1f)) as u32,
-        BinOp::Sub => src1.wrapping_sub(src2),
+        ShiftOp::Sll => src1 << (src2 & 0x1f),
+        ShiftOp::Srl => src1 >> (src2 & 0x1f),
+        ShiftOp::Sra => ((src1 as i32) >> (src2 & 0x1f)) as u32,
     }
 }
 
@@ -161,11 +186,11 @@ pub fn extend_int(width: ribit_core::Width, src: Constant, signed: bool) -> Int 
 
 #[cfg(test)]
 mod test {
-    use crate::BinOp;
+    use crate::ShiftOp;
 
     #[test]
     fn sra_1() {
-        let res = super::binop_u32(0x80000 << 12, 0x8, BinOp::Sra);
+        let res = super::shift_u32(0x80000 << 12, 0x8, ShiftOp::Sra);
         assert_eq!(0xff800000, res);
     }
 }

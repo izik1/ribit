@@ -1,6 +1,5 @@
-use crate::reference::{Reference, Ref};
-use crate::ty;
-use crate::{Arg, Id, IdAllocator, Instruction, Terminator};
+use crate::reference::{Ref, Reference};
+use crate::{ty, Arg, Id, IdAllocator, Instruction, Terminator};
 
 pub struct BlockDisplay<'a>(&'a [Instruction], &'a Terminator);
 

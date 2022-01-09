@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 
-use crate::{Block, Id, Instruction, StackIndex, Terminator, Source};
+use crate::{Block, Id, Instruction, Source, StackIndex, Terminator};
 
 fn lifetime_instruction<F: FnMut(&mut Lifetimes, Id, usize)>(
     instr: &Instruction,

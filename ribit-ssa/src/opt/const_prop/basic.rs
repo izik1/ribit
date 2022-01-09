@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use super::{lookup, typed_lookup};
 use crate::{
-    eval, instruction, AnySource, Block, Constant, Id, Instruction, SourcePair, Terminator,
+    eval, instruction, AnySource, Block, CommutativeBinOp, Constant, Id, Instruction, SourcePair,
+    Terminator,
 };
 
 fn run_instruction(
@@ -59,7 +60,36 @@ fn run_instruction(
             Some((*dest, res))
         }
 
-        Instruction::BinOp { dest, src, op } => {
+        Instruction::Sub { dest, src1, src2 } => {
+            let lhs = lookup(consts, *src1);
+            let rhs = lookup(consts, AnySource::Ref(*src2));
+
+            match (lhs, rhs) {
+                (AnySource::Const(lhs), AnySource::Const(rhs)) => {
+                    Some((*dest, eval::sub(lhs, rhs)))
+                }
+
+                (lhs @ AnySource::Const(_), AnySource::Ref(_)) => {
+                    *src1 = lhs;
+                    None
+                }
+
+                (AnySource::Ref(src1), AnySource::Const(src2)) => {
+                    let src2 = eval::neg(src2);
+                    *instruction = Instruction::CommutativeBinOp {
+                        dest: *dest,
+                        src1,
+                        src2: AnySource::Const(src2),
+                        op: CommutativeBinOp::Add,
+                    };
+
+                    None
+                }
+                (AnySource::Ref(_), AnySource::Ref(_)) => None,
+            }
+        }
+
+        Instruction::ShiftOp { dest, src, op } => {
             let lhs = lookup(consts, src.lhs());
             let rhs = lookup(consts, src.rhs());
 
@@ -72,7 +102,7 @@ fn run_instruction(
                 Err(it) => it,
             };
 
-            let res = eval::binop(lhs, rhs, *op);
+            let res = eval::shift(lhs, rhs, *op);
 
             Some((*dest, res))
         }

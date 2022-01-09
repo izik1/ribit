@@ -68,6 +68,25 @@ fn jalr_pc() {
 }
 
 #[test]
+fn sub_imm_into_add() {
+    expect_block(
+        r#"
+            addi x10, x0, 10
+            sub x11, x11, x10
+            ebreak
+        "#,
+        expect![[r#"
+            %0 = args[0]
+            %1 = args[1]
+            %2 = x(%0)11
+            %3 = add %2, fffffff6
+            x(%0)10 = 0000000a
+            x(%0)11 = %3
+            ret 1, 0000040c"#]],
+    )
+}
+
+#[test]
 fn jal_basic() {
     expect_block(
         "jal x4, 2048",

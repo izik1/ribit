@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::reference::{Reference, Ref};
+use crate::reference::{Ref, Reference};
 use crate::ty::ConstTy;
 use crate::{Constant, Id, Type};
 

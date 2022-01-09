@@ -118,20 +118,18 @@ impl fmt::Display for CommutativeBinOp {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum BinOp {
+pub enum ShiftOp {
     Sll,
     Srl,
     Sra,
-    Sub,
 }
 
-impl fmt::Display for BinOp {
+impl fmt::Display for ShiftOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Sll => f.write_str("sll"),
             Self::Srl => f.write_str("srl"),
             Self::Sra => f.write_str("sra"),
-            Self::Sub => f.write_str("sub"),
         }
     }
 }
@@ -176,7 +174,7 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
         match instr {
             Instruction::Fence | Instruction::Arg { .. } | Instruction::ReadStack { .. } => {}
 
-            Instruction::BinOp { dest: _, src, .. } | Instruction::Cmp { dest: _, src, .. } => {
+            Instruction::ShiftOp { dest: _, src, .. } | Instruction::Cmp { dest: _, src, .. } => {
                 match src {
                     SourcePair::RefRef(lhs, rhs) => {
                         if lhs.id == old {
@@ -195,12 +193,13 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
                 }
             }
 
-            Instruction::CommutativeBinOp { dest: _, src1, src2, .. } => {
-                if src1.id == old {
-                    src1.id = new;
+            Instruction::CommutativeBinOp { dest: _, src1: reference, src2: source, .. }
+            | Instruction::Sub { dest: _, src1: source, src2: reference } => {
+                if reference.id == old {
+                    reference.id = new;
                 }
 
-                update_reference(src2, old, new);
+                update_reference(source, old, new);
             }
 
             Instruction::ReadReg { dest: _, base, .. } => {

@@ -47,13 +47,13 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
 
         for (idx, instruction) in instructions.iter().enumerate() {
             match instruction {
-                &ssa::Instruction::BinOp { dest, src, op } => {
+                &ssa::Instruction::ShiftOp { dest, src, op } => {
                     let dest = *allocs.get(&dest).expect("dest not allocated!?");
 
                     let src =
                         crate::SourcePair::from_ssa(src, allocs).expect("sources not allocated");
 
-                    math::binop(self, dest, src, op)
+                    math::shift(self, dest, src, op)
                 }
 
                 &ssa::Instruction::CommutativeBinOp { dest, src1, src2, op } => {
@@ -63,6 +63,17 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                         crate::Source::from_ssa_src(src2, allocs).expect("src2 not allocated!?");
 
                     math::commutative_binop(self, dest, src1, src2, op)
+                }
+
+                &ssa::Instruction::Sub { dest, src1, src2 } => {
+                    let dest = *allocs.get(&dest).expect("dest not allocated!?");
+
+                    let src1 =
+                        crate::Source::from_ssa_src(src1, allocs).expect("src1 not allocated!?");
+
+                    let src2 = *allocs.get(&src2.id).expect("src2 not allocated!?");
+
+                    math::sub(self, dest, src1, src2)
                 }
 
                 &ssa::Instruction::ReadReg { dest, base, src } => {

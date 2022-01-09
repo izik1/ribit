@@ -1,4 +1,4 @@
-use crate::{Block, Terminator, Source};
+use crate::{Block, Source, Terminator};
 
 pub fn run(block: &mut Block) {
     let mut live_ids = [false; 0x1_0000];
