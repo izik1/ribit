@@ -38,9 +38,9 @@ pub trait ConstTy {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub struct BoolTy;
+pub struct Bool;
 
-impl ConstTy for BoolTy {
+impl ConstTy for Bool {
     type Const = bool;
     const TY: Type = Type::Boolean;
 
@@ -57,9 +57,9 @@ impl ConstTy for BoolTy {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct I32Ty;
+pub struct I32;
 
-impl ConstTy for I32Ty {
+impl ConstTy for I32 {
     type Const = u32;
     const TY: Type = Type::I32;
 

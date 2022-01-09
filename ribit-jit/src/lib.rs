@@ -19,7 +19,6 @@ use ribit_ssa as ssa;
 pub use rt::{Block, Runtime, Target};
 use ssa::Constant;
 
-
 #[cfg(any(target_arch = "x86_64"))]
 pub type DefaultRuntime = AMD64Runtime;
 
@@ -44,6 +43,17 @@ pub enum Source {
 }
 
 impl Source {
+    #[must_use]
+    pub fn from_typed_source(
+        src: ssa::Source<ssa::ty::I32>,
+        map: &HashMap<ssa::Id, Register>,
+    ) -> Option<Self> {
+        match src {
+            ssa::Source::Const(c) => Some(Self::Val(c)),
+            ssa::Source::Ref(id) => map.get(&id).copied().map(Self::Register),
+        }
+    }
+
     #[must_use]
     pub fn from_ssa_src(src: ssa::AnySource, map: &HashMap<ssa::Id, Register>) -> Option<Self> {
         match src {

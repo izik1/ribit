@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ribit_ssa::{eval, AnySource, Bitness, Constant, Id, Int};
+use ribit_ssa::{eval, ty, AnySource, Bitness, Constant, Id};
 
 pub struct Interpreter;
 
@@ -15,7 +15,7 @@ fn lookup_source(ctx: &HashMap<Id, Constant>, src: AnySource) -> Constant {
 
 fn unwrap_u32(c: Constant) -> u32 {
     match c {
-        Constant::Int(Int(Bitness::B32, v)) => v,
+        Constant::Int(ty::Int(Bitness::B32, v)) => v,
         _ => panic!("value was not a 32-bit integer"),
     }
 }
@@ -73,7 +73,7 @@ impl crate::rt::Block for Block {
                     val[..len].copy_from_slice(&memory[(src as usize)..][..len]);
 
                     let val = u32::from_le_bytes(val);
-                    let val = Constant::Int(Int(width.into(), val));
+                    let val = Constant::Int(ty::Int(width.into(), val));
                     let res = Constant::Int(eval::extend_int(width, val, sign_extend));
 
                     evaluated.insert(dest, res);

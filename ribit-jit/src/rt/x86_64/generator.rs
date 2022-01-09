@@ -78,7 +78,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 }
 
                 &ssa::Instruction::ReadReg { dest, base, src } => {
-                    let base = crate::Source::from_ssa_src(base.upcast(), allocs)
+                    let base = crate::Source::from_typed_source(base, allocs)
                         .expect("base not allocated!?");
 
                     let mem = Mem32(memory::src_rv_reg(base, src));
@@ -87,7 +87,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 }
 
                 &ssa::Instruction::ReadMem { dest, src, base, sign_extend, width } => {
-                    let base = crate::Source::from_ssa_src(base.upcast(), allocs)
+                    let base = crate::Source::from_typed_source(base, allocs)
                         .expect("base not allocated!?");
 
                     let src =
@@ -108,7 +108,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 }
 
                 &ssa::Instruction::WriteReg { dest, base, src } => {
-                    let base = crate::Source::from_ssa_src(base.upcast(), allocs)
+                    let base = crate::Source::from_typed_source(base, allocs)
                         .expect("base not allocated!?");
 
                     let mem = Mem32(memory::src_rv_reg(base, dest));
@@ -123,11 +123,11 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 }
 
                 &ssa::Instruction::WriteMem { src, base, addr, width } => {
-                    let base = crate::Source::from_ssa_src(base.upcast(), allocs)
+                    let base = crate::Source::from_typed_source(base, allocs)
                         .expect("base not allocated!?");
                     let src =
                         crate::Source::from_ssa_src(src, allocs).expect("src not allocated!?");
-                    let addr = crate::Source::from_ssa_src(addr.upcast(), allocs)
+                    let addr = crate::Source::from_typed_source(addr, allocs)
                         .expect("addr not allocated!?");
 
                     let mem = memory::src_src(base, addr);
@@ -248,7 +248,8 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
             ssa::Terminator::Ret { code, addr } => {
                 // note: addr is in the low dword, code is high dword
 
-                let addr = crate::Source::from_ssa_src(addr.upcast(), allocs).expect("addr not allocated!?");
+                let addr = crate::Source::from_ssa_src(addr.upcast(), allocs)
+                    .expect("addr not allocated!?");
 
                 match (code, addr) {
                     (code, Source::Val(addr)) => {

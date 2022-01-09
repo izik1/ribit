@@ -9,7 +9,7 @@
 
 use std::fmt;
 
-use reference::TypedRef;
+use reference::Ref;
 use ribit_core::{opcode, ReturnCode};
 use ty::ConstTy;
 
@@ -22,7 +22,7 @@ pub mod lower;
 pub mod opt;
 pub mod reference;
 mod source;
-mod ty;
+pub mod ty;
 
 #[cfg(test)]
 mod tests;
@@ -30,8 +30,9 @@ mod tests;
 pub use block::{Block, BlockDisplay};
 pub use id::{Id, IdAllocator};
 pub use instruction::Instruction;
-pub use source::{AnySource, SourcePair, TypedSource};
-pub use ty::{Bitness, Constant, Int, Type};
+pub use source::{AnySource, Source, SourcePair};
+pub use ty::{Bitness, Constant, Type};
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, PartialOrd, Ord)]
 pub struct StackIndex(pub u8);
 
@@ -144,7 +145,7 @@ pub enum Arg {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Terminator {
-    Ret { addr: TypedSource<ty::I32Ty>, code: ReturnCode },
+    Ret { addr: Source<ty::I32>, code: ReturnCode },
 }
 
 impl fmt::Display for Terminator {
@@ -162,9 +163,9 @@ pub fn update_reference(src: &mut AnySource, old: Id, new: Id) {
     }
 }
 
-pub fn update_typed_reference<T: ConstTy>(src: &mut TypedSource<T>, old: Id, new: Id) {
+pub fn update_typed_reference<T: ConstTy>(src: &mut Source<T>, old: Id, new: Id) {
     match src {
-        TypedSource::Ref(r) if *r == old => *r = new,
+        Source::Ref(r) if *r == old => *r = new,
         _ => {}
     }
 }

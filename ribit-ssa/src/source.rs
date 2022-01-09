@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::reference::{Reference, TypedRef};
+use crate::reference::{Reference, Ref};
 use crate::ty::ConstTy;
 use crate::{Constant, Id, Type};
 
@@ -8,22 +8,22 @@ use crate::{Constant, Id, Type};
 ///
 /// Such as `Int` or `bool`.
 #[derive(PartialEq, Eq)]
-pub enum TypedSource<T: ConstTy> {
+pub enum Source<T: ConstTy> {
     /// A constant of type `T`
     Const(T::Const),
     /// A reference to a value of type `T`
     Ref(Id),
 }
 
-impl<T: ConstTy> From<TypedRef<T>> for TypedSource<T> {
-    fn from(r: TypedRef<T>) -> Self {
+impl<T: ConstTy> From<Ref<T>> for Source<T> {
+    fn from(r: Ref<T>) -> Self {
         Self::Ref(r.id)
     }
 }
 
-impl<T: ConstTy> Copy for TypedSource<T> where T::Const: Copy {}
+impl<T: ConstTy> Copy for Source<T> where T::Const: Copy {}
 
-impl<T: ConstTy> Clone for TypedSource<T>
+impl<T: ConstTy> Clone for Source<T>
 where
     T::Const: Clone,
 {
@@ -35,7 +35,7 @@ where
     }
 }
 
-impl<T: ConstTy> TypedSource<T> {
+impl<T: ConstTy> Source<T> {
     #[must_use]
     pub fn constant(self) -> Option<T::Const> {
         match self {
@@ -45,15 +45,15 @@ impl<T: ConstTy> TypedSource<T> {
     }
 
     #[must_use]
-    pub fn reference(self) -> Option<TypedRef<T>> {
+    pub fn reference(self) -> Option<Ref<T>> {
         match self {
-            Self::Ref(it) => Some(TypedRef::new(it)),
+            Self::Ref(it) => Some(Ref::new(it)),
             Self::Const(_) => None,
         }
     }
 }
 
-impl<T: ConstTy> TypedSource<T>
+impl<T: ConstTy> Source<T>
 where
     T::Const: Into<Constant>,
 {
@@ -65,7 +65,7 @@ where
     }
 }
 
-impl<T: ConstTy> fmt::Display for TypedSource<T> {
+impl<T: ConstTy> fmt::Display for Source<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Const(v) => T::fmt_const(v, f),
@@ -74,7 +74,7 @@ impl<T: ConstTy> fmt::Display for TypedSource<T> {
     }
 }
 
-impl<T: ConstTy> fmt::Debug for TypedSource<T>
+impl<T: ConstTy> fmt::Debug for Source<T>
 where
     T::Const: fmt::Debug,
 {
@@ -118,10 +118,10 @@ impl AnySource {
     }
 
     #[must_use]
-    pub fn downcast<T: ConstTy>(self) -> Option<TypedSource<T>> {
+    pub fn downcast<T: ConstTy>(self) -> Option<Source<T>> {
         match self {
-            AnySource::Const(c) => T::downcast(c).map(TypedSource::Const),
-            AnySource::Ref(r) => (r.ty == T::TY).then(|| TypedSource::Ref(r.id)),
+            AnySource::Const(c) => T::downcast(c).map(Source::Const),
+            AnySource::Ref(r) => (r.ty == T::TY).then(|| Source::Ref(r.id)),
         }
     }
 }

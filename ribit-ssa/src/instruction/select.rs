@@ -1,12 +1,11 @@
 use std::fmt;
 
-use crate::ty::BoolTy;
-use crate::{AnySource, Id, Type, TypedRef};
+use crate::{ty, AnySource, Id, Ref, Type};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Select {
     pub dest: Id,
-    pub cond: TypedRef<BoolTy>,
+    pub cond: Ref<ty::Bool>,
     pub if_true: AnySource,
     pub if_false: AnySource,
 }

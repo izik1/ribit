@@ -1,11 +1,11 @@
-use crate::{Block, Terminator, TypedSource};
+use crate::{Block, Terminator, Source};
 
 pub fn run(block: &mut Block) {
     let mut live_ids = [false; 0x1_0000];
 
     match &block.terminator {
         Terminator::Ret { addr, .. } => {
-            if let TypedSource::Ref(id) = *addr {
+            if let Source::Ref(id) = *addr {
                 live_ids[id.0 as usize] = true;
             }
         }

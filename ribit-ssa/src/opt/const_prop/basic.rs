@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{lookup, typed_const_ref_lookup};
+use super::{lookup, typed_lookup};
 use crate::{
     eval, instruction, AnySource, Block, Constant, Id, Instruction, SourcePair, Terminator,
 };
@@ -16,21 +16,21 @@ fn run_instruction(
         | Instruction::WriteStack { .. } => None,
 
         Instruction::ReadReg { base, .. } => {
-            *base = lookup(consts, base.upcast()).downcast().unwrap();
+            *base = typed_lookup(consts, *base);
             None
         }
 
         Instruction::WriteReg { src, base, .. } | Instruction::ReadMem { src, base, .. } => {
             *src = lookup(consts, *src);
-            *base = lookup(consts, base.upcast()).downcast().unwrap();
+            *base = typed_lookup(consts, *base);
 
             None
         }
 
         Instruction::WriteMem { src, base, addr, .. } => {
             *src = lookup(consts, *src);
-            *base = lookup(consts, base.upcast()).downcast().unwrap();
-            *addr = lookup(consts, addr.upcast()).downcast().unwrap();
+            *base = typed_lookup(consts, *base);
+            *addr = typed_lookup(consts, *addr);
 
             None
         }
@@ -125,7 +125,7 @@ fn select(consts: &HashMap<Id, Constant>, it: &mut instruction::Select) -> Optio
     it.if_true = lookup(consts, it.if_true);
     it.if_false = lookup(consts, it.if_false);
 
-    let konst = typed_const_ref_lookup(consts, it.cond)?;
+    let konst = typed_lookup(consts, it.cond.into()).constant()?;
 
     let taken = match konst {
         true => it.if_true,
@@ -145,7 +145,7 @@ pub fn run(block: &mut Block) {
 
     match &mut block.terminator {
         Terminator::Ret { addr, .. } => {
-            *addr = lookup(&consts, addr.upcast()).downcast().unwrap();
+            *addr = typed_lookup(&consts, *addr);
         }
     }
 }

@@ -6,17 +6,15 @@ use ribit_core::{instruction, opcode, register, ReturnCode, Width};
 use super::{AnySource, BinOp, CmpKind, Id, Instruction};
 use crate::instruction::{ExtInt, Select};
 use crate::reference::Reference;
-use crate::ty::{self, BoolTy, ConstTy, Constant, I32Ty};
-use crate::{
-    eval, Arg, Block, CommutativeBinOp, IdAllocator, SourcePair, Terminator, TypedRef, TypedSource,
-};
+use crate::ty::{self, ConstTy, Constant};
+use crate::{eval, Arg, Block, CommutativeBinOp, IdAllocator, Ref, Source, SourcePair, Terminator};
 
 pub struct Context {
     id_allocator: IdAllocator,
-    pub pc: TypedSource<ty::I32Ty>,
+    pub pc: Source<ty::I32>,
     registers: [Option<AnySource>; 32],
-    register_arg: Option<TypedSource<I32Ty>>,
-    memory_arg: Option<TypedSource<I32Ty>>,
+    register_arg: Option<Source<ty::I32>>,
+    memory_arg: Option<Source<ty::I32>>,
     registers_written: u32,
     instructions: Vec<Instruction>,
     memory_size: u32,
@@ -70,7 +68,7 @@ impl Context {
 
         let mut self_ = Self {
             id_allocator: IdAllocator::new(),
-            pc: TypedSource::Const(start_pc),
+            pc: Source::Const(start_pc),
             registers: [None; 32],
             register_arg: None,
             memory_arg: None,
@@ -84,16 +82,16 @@ impl Context {
         self_
     }
 
-    fn arg(&mut self, arg: Arg) -> TypedSource<I32Ty> {
+    fn arg(&mut self, arg: Arg) -> Source<ty::I32> {
         self.typed_instruction(|id| Instruction::Arg { dest: id, src: arg })
     }
 
-    pub fn add_pc(&mut self, src: AnySource) -> TypedSource<ty::I32Ty> {
+    pub fn add_pc(&mut self, src: AnySource) -> Source<ty::I32> {
         self.pc = self.add(src, self.pc.upcast()).downcast().unwrap();
         self.pc
     }
 
-    pub fn override_pc(&mut self, src: TypedSource<ty::I32Ty>) {
+    pub fn override_pc(&mut self, src: Source<ty::I32>) {
         self.pc = src;
     }
 
@@ -107,17 +105,14 @@ impl Context {
         AnySource::Ref(Reference { ty, id })
     }
 
-    fn typed_instruction<T: ConstTy, F: FnOnce(Id) -> Instruction>(
-        &mut self,
-        f: F,
-    ) -> TypedSource<T> {
+    fn typed_instruction<T: ConstTy, F: FnOnce(Id) -> Instruction>(&mut self, f: F) -> Source<T> {
         let id = self.id_allocator.allocate();
 
         let instr = f(id);
         assert_eq!(instr.ty(), T::TY);
 
         self.instructions.push(instr);
-        TypedSource::Ref(id)
+        Source::Ref(id)
     }
 
     pub fn commutative_binop(
@@ -196,7 +191,7 @@ impl Context {
         self.registers_written |= 1 << reg.get();
     }
 
-    pub fn write_memory(&mut self, addr: TypedSource<I32Ty>, val: AnySource, width: Width) {
+    pub fn write_memory(&mut self, addr: Source<ty::I32>, val: AnySource, width: Width) {
         self.instructions.push(Instruction::WriteMem {
             addr,
             base: self.memory_arg.expect("Memory arg wasn't initialized?"),
@@ -237,7 +232,7 @@ impl Context {
         self.binop(BinOp::Sub, src1, src2)
     }
 
-    pub fn cmp(&mut self, src1: AnySource, src2: AnySource, mode: CmpKind) -> TypedSource<BoolTy> {
+    pub fn cmp(&mut self, src1: AnySource, src2: AnySource, mode: CmpKind) -> Source<ty::Bool> {
         let consts = match SourcePair::try_from((src1, src2)) {
             Ok(src) => {
                 return self.typed_instruction(|dest| Instruction::Cmp { dest, src, kind: mode });
@@ -247,7 +242,7 @@ impl Context {
 
         match consts {
             (Constant::Int(lhs), Constant::Int(rhs)) => {
-                TypedSource::Const(eval::cmp_int(lhs, rhs, mode))
+                Source::Const(eval::cmp_int(lhs, rhs, mode))
             }
 
             (src1, src2) => {
@@ -269,15 +264,15 @@ impl Context {
 
     pub fn select(
         &mut self,
-        cond: TypedSource<BoolTy>,
+        cond: Source<ty::Bool>,
         if_true: AnySource,
         if_false: AnySource,
     ) -> AnySource {
         match cond {
-            TypedSource::Const(false) => if_false,
-            TypedSource::Const(true) => if_true,
-            TypedSource::Ref(id) => self.instruction(|dest| {
-                Instruction::Select(Select { dest, if_true, if_false, cond: TypedRef::new(id) })
+            Source::Const(false) => if_false,
+            Source::Const(true) => if_true,
+            Source::Ref(id) => self.instruction(|dest| {
+                Instruction::Select(Select { dest, if_true, if_false, cond: Ref::new(id) })
             }),
         }
     }
@@ -293,7 +288,7 @@ impl Context {
     }
 
     #[must_use]
-    pub fn ret_with_code(mut self, addr: TypedSource<ty::I32Ty>, code: ReturnCode) -> Block {
+    pub fn ret_with_code(mut self, addr: Source<ty::I32>, code: ReturnCode) -> Block {
         for (idx, src) in self.registers.iter().enumerate().skip(1) {
             let dest = register::RiscV::with_u8(idx as u8).unwrap();
 
@@ -316,7 +311,7 @@ impl Context {
     }
 
     #[must_use]
-    pub fn ret_with_addr(self, addr: TypedSource<ty::I32Ty>) -> Block {
+    pub fn ret_with_addr(self, addr: Source<ty::I32>) -> Block {
         self.ret_with_code(addr, ReturnCode::Normal)
     }
 
@@ -383,7 +378,10 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
                 opcode::I::SRLI => ctx.srl(src, imm),
                 opcode::I::SRAI => ctx.sra(src, imm),
                 opcode::I::ORI => ctx.or(src, imm),
-                opcode::I::SICond(cmp_mode) => ctx.cmp(src, imm, cmp_mode.into()).upcast(),
+                opcode::I::SICond(cmp) => {
+                    let tmp = ctx.cmp(src, imm, cmp.into()).upcast();
+                    ctx.int_extend(tmp, Width::DWord, false)
+                }
             };
 
             if let Some(rd) = rd {
@@ -505,7 +503,7 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
                 ctx.override_pc(src.downcast().unwrap());
             } else {
                 let imm = imm & !1;
-                ctx.override_pc(TypedSource::Const(imm));
+                ctx.override_pc(Source::Const(imm));
             }
 
             ctx.ret()
