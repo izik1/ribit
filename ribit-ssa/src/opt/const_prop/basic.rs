@@ -54,17 +54,7 @@ fn run_instruction(
                 }
             };
 
-            let res = match (lhs, rhs) {
-                (Constant::Int(lhs), Constant::Int(rhs))
-                    if lhs.bits() == rhs.bits() && lhs.bits() == 32 =>
-                {
-                    Constant::i32(eval::commutative_binop(lhs.1, rhs.1, *op))
-                }
-
-                (lhs, rhs) => {
-                    panic!("can't compare types of `{}` and `{}`", lhs.ty(), rhs.ty())
-                }
-            };
+            let res = eval::commutative_binop(lhs, rhs, *op);
 
             Some((*dest, res))
         }
@@ -82,20 +72,7 @@ fn run_instruction(
                 Err(it) => it,
             };
 
-            let res = match (lhs, rhs) {
-                (Constant::Int(lhs), Constant::Int(rhs))
-                    if lhs.bits() == rhs.bits() && lhs.bits() == 32 =>
-                {
-                    Constant::i32(eval::binop(lhs.1, rhs.1, *op))
-                }
-
-                (Constant::Int(lhs), Constant::Int(rhs)) => {
-                    panic!("mismatched integral bitness: ({} != {})", lhs.bits(), rhs.bits())
-                }
-                (lhs, rhs) => {
-                    panic!("can't compare types of `{}` and `{}`", lhs.ty(), rhs.ty())
-                }
-            };
+            let res = eval::binop(lhs, rhs, *op);
 
             Some((*dest, res))
         }

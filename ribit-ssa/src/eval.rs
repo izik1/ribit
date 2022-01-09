@@ -1,3 +1,5 @@
+use core::fmt;
+
 use crate::reference::Reference;
 use crate::ty::{Constant, Int};
 use crate::{AnySource, BinOp, Bitness, CmpKind, CommutativeBinOp};
@@ -67,17 +69,8 @@ pub fn commutative_absorb(
 }
 
 #[must_use]
-pub fn cmp(src1: u32, src2: u32, mode: CmpKind) -> u32 {
-    let res = match mode {
-        CmpKind::Eq => src1 == src2,
-        CmpKind::Ne => src1 != src2,
-        CmpKind::Sge => (src1 as i32) >= (src2 as i32),
-        CmpKind::Sl => (src1 as i32) < (src2 as i32),
-        CmpKind::Uge => src1 >= src2,
-        CmpKind::Ul => src1 < src2,
-    };
-
-    res as u32
+pub fn cmp(src1: u32, src2: u32, mode: CmpKind) -> bool {
+    cmp_int(Int::i32(src1), Int::i32(src2), mode)
 }
 
 #[must_use]
@@ -94,8 +87,14 @@ pub fn cmp_int(lhs: Int, rhs: Int, op: CmpKind) -> bool {
     }
 }
 
+// todo: "just work with arbitrary constants of compatable types"
 #[must_use]
-pub fn binop(src1: u32, src2: u32, op: BinOp) -> u32 {
+pub fn binop(src1: Constant, src2: Constant, op: BinOp) -> Constant {
+    u32_op_consts(binop_u32, src1, src2, op)
+}
+
+#[must_use]
+fn binop_u32(src1: u32, src2: u32, op: BinOp) -> u32 {
     match op {
         BinOp::Sll => src1 << (src2 & 0x1f),
         BinOp::Srl => src1 >> (src2 & 0x1f),
@@ -105,40 +104,36 @@ pub fn binop(src1: u32, src2: u32, op: BinOp) -> u32 {
 }
 
 #[must_use]
-pub fn commutative_binop_consts(src1: Constant, src2: Constant, op: CommutativeBinOp) -> Constant {
+fn u32_op_consts<O, F>(f: F, src1: Constant, src2: Constant, op: O) -> Constant
+where
+    F: FnOnce(u32, u32, O) -> u32,
+    O: fmt::Display,
+{
     match (src1, src2) {
         (Constant::Int(Int(Bitness::B32, lhs)), Constant::Int(Int(Bitness::B32, rhs))) => {
-            return Constant::i32(commutative_binop(lhs, rhs, op));
+            return Constant::i32(f(lhs, rhs, op));
         }
 
         (lhs, rhs) => {
-            panic!("binop between unsupported types: ({},{})", lhs.ty(), rhs.ty())
+            panic!("unsupported operation `{}` between types: ({},{})", op, lhs.ty(), rhs.ty())
         }
     }
 }
 
+// todo: "just work with arbitrary constants of compatable types"
 #[must_use]
-pub fn commutative_binop(src1: u32, src2: u32, op: CommutativeBinOp) -> u32 {
+pub fn commutative_binop(src1: Constant, src2: Constant, op: CommutativeBinOp) -> Constant {
+    u32_op_consts(commutative_binop_u32, src1, src2, op)
+}
+
+#[must_use]
+fn commutative_binop_u32(src1: u32, src2: u32, op: CommutativeBinOp) -> u32 {
     match op {
         CommutativeBinOp::And => src1 & src2,
         CommutativeBinOp::Add => src1.wrapping_add(src2),
         CommutativeBinOp::Or => src1 | src2,
         CommutativeBinOp::Xor => src1 ^ src2,
     }
-}
-
-#[must_use]
-pub fn select(cond: u32, if_true: u32, if_false: u32) -> u32 {
-    if cond >= 1 { if_true } else { if_false }
-}
-
-#[must_use]
-pub fn partial_select_int(
-    cond: bool,
-    if_true: Option<Constant>,
-    if_false: Option<Constant>,
-) -> Option<Constant> {
-    if cond { if_true } else { if_false }
 }
 
 #[must_use]
@@ -155,7 +150,7 @@ pub fn extend_int(width: ribit_core::Width, src: Constant, signed: bool) -> Int 
         Constant::Bool(b) => {
             assert!(target_bitness.to_bits() >= 1);
             match signed {
-                true => (0_i32 - b as u32 as i32) as u32,
+                true => -(b as u32 as i32) as u32,
                 false => b as u32,
             }
         }
@@ -170,7 +165,7 @@ mod test {
 
     #[test]
     fn sra_1() {
-        let res = super::binop(0x80000 << 12, 0x8, BinOp::Sra);
+        let res = super::binop_u32(0x80000 << 12, 0x8, BinOp::Sra);
         assert_eq!(0xff800000, res);
     }
 }

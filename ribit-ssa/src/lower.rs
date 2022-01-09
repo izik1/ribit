@@ -6,7 +6,7 @@ use ribit_core::{instruction, opcode, register, Width};
 use super::{AnySource, BinOp, CmpKind, Id, Instruction};
 use crate::instruction::{ExtInt, Select};
 use crate::reference::Reference;
-use crate::ty::{Bitness, BoolTy, ConstTy, Constant, I32Ty, Int};
+use crate::ty::{BoolTy, ConstTy, Constant, I32Ty};
 use crate::{
     eval, Arg, Block, CommutativeBinOp, IdAllocator, SourcePair, Terminator, TypedRef, TypedSource,
 };
@@ -22,7 +22,8 @@ pub struct Context {
     memory_size: u32,
 }
 
-/// try to use associativity
+/// try to use associativity.
+/// 
 /// this optimizes things like the following:
 /// ```text
 /// %2 = %1 + 1
@@ -53,7 +54,7 @@ fn try_associate(
     };
 
     let src2 = match inner.1 {
-        AnySource::Const(inner_src2) => eval::commutative_binop_consts(*inner_src2, src2, op),
+        AnySource::Const(inner_src2) => eval::commutative_binop(*inner_src2, src2, op),
         _ => return (src1, src2),
     };
 
@@ -129,7 +130,7 @@ impl Context {
 
         let (src1, src2) = match (src1, src2) {
             (AnySource::Const(src1), AnySource::Const(src2)) => {
-                return AnySource::Const(eval::commutative_binop_consts(src1, src2, op));
+                return AnySource::Const(eval::commutative_binop(src1, src2, op));
             }
             (AnySource::Const(c), AnySource::Ref(r)) | (AnySource::Ref(r), AnySource::Const(c)) => {
                 let (r, c) = try_associate(&self.instructions, op, r, c);
@@ -157,16 +158,7 @@ impl Context {
             Err(consts) => consts,
         };
 
-        // "just work with arbitrary constants of compatable types"
-        match consts {
-            (Constant::Int(Int(Bitness::B32, lhs)), Constant::Int(Int(Bitness::B32, rhs))) => {
-                AnySource::Const(Constant::i32(eval::binop(lhs, rhs, op)))
-            }
-
-            (lhs, rhs) => {
-                panic!("binop between unsupported types: ({},{})", lhs.ty(), rhs.ty())
-            }
-        }
+        AnySource::Const(eval::binop(consts.0, consts.1, op))
     }
 
     pub fn read_register(&mut self, reg: register::RiscV) -> AnySource {
@@ -195,7 +187,6 @@ impl Context {
     }
 
     pub fn read_memory(&mut self, src: AnySource, width: Width, sign_extend: bool) -> AnySource {
-        // todo: remove the upcast (inserted for minimal modifications)
         let base = self.memory_arg.expect("Memory arg wasn't initialized?");
         self.instruction(|dest| Instruction::ReadMem { dest, src, base, width, sign_extend })
     }

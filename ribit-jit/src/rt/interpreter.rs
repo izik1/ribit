@@ -96,16 +96,16 @@ impl crate::rt::Block for Block {
                 }
 
                 &ribit_ssa::Instruction::BinOp { dest, src, op } => {
-                    let src1 = unwrap_u32(lookup_source(&evaluated, src.lhs()));
-                    let src2 = unwrap_u32(lookup_source(&evaluated, src.rhs()));
-                    evaluated.insert(dest, Constant::i32(eval::binop(src1, src2, op)));
+                    let src1 = lookup_source(&evaluated, src.lhs());
+                    let src2 = lookup_source(&evaluated, src.rhs());
+                    evaluated.insert(dest, eval::binop(src1, src2, op));
                 }
 
                 &ribit_ssa::Instruction::Cmp { dest, src, kind } => {
                     let src1 = unwrap_u32(lookup_source(&evaluated, src.lhs()));
                     let src2 = unwrap_u32(lookup_source(&evaluated, src.rhs()));
 
-                    let res = eval::cmp(src1, src2, kind) > 0;
+                    let res = eval::cmp(src1, src2, kind);
 
                     evaluated.insert(dest, Constant::Bool(res));
                 }
@@ -113,7 +113,7 @@ impl crate::rt::Block for Block {
                 &ribit_ssa::Instruction::CommutativeBinOp { dest, src1, src2, op } => {
                     let src1 = evaluated[&src1.id];
                     let src2 = lookup_source(&evaluated, src2);
-                    let output = eval::commutative_binop_consts(src1, src2, op);
+                    let output = eval::commutative_binop(src1, src2, op);
                     evaluated.insert(dest, output);
                 }
 

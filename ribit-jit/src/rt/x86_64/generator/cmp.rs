@@ -80,7 +80,7 @@ fn bool_cmp(
         (rs1, rs2) if rs1 == rs2 => CmpValue::Const(same_val(false_value, true_value, mode)),
 
         (Source::Val(a), Source::Val(b)) => {
-            CmpValue::Const(eval::select(eval::cmp(a, b, mode), true_value, false_value))
+            CmpValue::Const(if eval::cmp(a, b, mode) { true_value } else { false_value })
         }
 
         (Source::Register(src), Source::Val(0)) | (Source::Val(0), Source::Register(src)) => {
