@@ -10,7 +10,7 @@
 use std::fmt;
 
 use reference::TypedRef;
-use ribit_core::opcode;
+use ribit_core::{opcode, ReturnCode};
 use ty::ConstTy;
 
 pub mod analysis;
@@ -144,13 +144,13 @@ pub enum Arg {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Terminator {
-    Ret { addr: AnySource, code: AnySource },
+    Ret { addr: AnySource, code: ReturnCode },
 }
 
 impl fmt::Display for Terminator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Ret { addr, code } => write!(f, "ret {}, {}", code, addr),
+            Self::Ret { addr, code } => write!(f, "ret {}, {}", *code as u32, addr),
         }
     }
 }
@@ -241,9 +241,8 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
         }
 
         match &mut graph.terminator {
-            Terminator::Ret { addr, code } => {
+            Terminator::Ret { addr, .. } => {
                 update_reference(addr, old, new);
-                update_reference(code, old, new);
             }
         }
     }

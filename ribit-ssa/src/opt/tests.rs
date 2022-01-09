@@ -13,7 +13,7 @@ fn jal_basic_const_prop() {
             %0 = args[0]
             %1 = args[1]
             x(%0)4 = 00000404
-            ret 00000000, 00001400"#]],
+            ret 0, 00001400"#]],
     );
 }
 
@@ -38,7 +38,7 @@ fn mem_read_write_all_opts() {
             %6 = add %2, 00000032
             %7 = and %6, 00ffffff
             m(%1)%7 = dword %5
-            ret 00000001, 00000410"#]],
+            ret 1, 00000410"#]],
     );
 }
 
@@ -49,19 +49,19 @@ fn max() {
     PassManager::optimized().run(&mut block);
 
     expect![[r#"
-            %0 = args[0]
-            %2 = x(%0)10
-            %3 = x(%0)11
-            %4 = add %2, %3
-            %5 = srl %4, 0000001f
-            x(%0)12 = %5
-            %6 = and %4, %5
-            x(%0)11 = %6
-            %7 = add %2, %6
-            x(%0)10 = %7
-            %8 = x(%0)1
-            %9 = and %8, fffffffe
-            ret 00000000, %9"#]]
+        %0 = args[0]
+        %2 = x(%0)10
+        %3 = x(%0)11
+        %4 = add %2, %3
+        %5 = srl %4, 0000001f
+        x(%0)12 = %5
+        %6 = and %4, %5
+        x(%0)11 = %6
+        %7 = add %2, %6
+        x(%0)10 = %7
+        %8 = x(%0)1
+        %9 = and %8, fffffffe
+        ret 0, %9"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
@@ -72,20 +72,20 @@ fn min() {
     PassManager::optimized().run(&mut block);
 
     expect![[r#"
-            %0 = args[0]
-            %2 = x(%0)10
-            %3 = x(%0)11
-            %4 = cmp UL %2, %3
-            %5 = zext dword %4
-            %6 = sub 00000000, %5
-            x(%0)12 = %6
-            %7 = xor %2, %3
-            %8 = and %7, %6
-            %9 = xor %8, %3
-            x(%0)10 = %9
-            %10 = x(%0)1
-            %11 = and %10, fffffffe
-            ret 00000000, %11"#]]
+        %0 = args[0]
+        %2 = x(%0)10
+        %3 = x(%0)11
+        %4 = cmp UL %2, %3
+        %5 = zext dword %4
+        %6 = sub 00000000, %5
+        x(%0)12 = %6
+        %7 = xor %2, %3
+        %8 = and %7, %6
+        %9 = xor %8, %3
+        x(%0)10 = %9
+        %10 = x(%0)1
+        %11 = and %10, fffffffe
+        ret 0, %11"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
@@ -112,7 +112,7 @@ fn max_opt_bf_bb_1() {
             x(%0)2 = %5
             x(%0)1 = 00000410
             x(%0)6 = 00000408
-            ret 00000000, 000004be"#]],
+            ret 0, 000004be"#]],
     );
 }
 
@@ -130,7 +130,7 @@ fn max_opt_ori_ori() {
             %2 = x(%0)10
             %4 = or %2, 00000009
             x(%0)10 = %4
-            ret 00000001, 0000040c"#]],
+            ret 1, 0000040c"#]],
     )
 }
 
@@ -152,7 +152,7 @@ fn max_opt_many_addis() {
             %2 = x(%0)10
             %8 = add %2, 0000000e
             x(%0)10 = %8
-            ret 00000001, 0000041c"#]],
+            ret 1, 0000041c"#]],
     )
 }
 
@@ -164,6 +164,6 @@ fn jal_basic_die() {
         expect![[r#"
             %0 = args[0]
             x(%0)4 = 00000404
-            ret 00000000, 00001400"#]],
+            ret 0, 00001400"#]],
     );
 }

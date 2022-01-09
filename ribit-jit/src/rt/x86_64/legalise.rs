@@ -50,17 +50,13 @@ pub fn count_clobbers_for_terminal(
     allocs: &HashMap<Id, Register>,
 ) -> usize {
     match terminator {
-        Terminator::Ret { addr, code } => {
+        Terminator::Ret { addr, .. } => {
             // this terminator "needs" at least two registers- unless addr and cond are both `val`,
             // in which case, just one- one of which must be Zax.
 
-            let register_count =
-                (addr.reference().is_some() as usize) + (code.reference().is_some() as usize);
+            let register_count = addr.reference().is_some() as usize;
 
-            let zax_used = addr
-                .reference()
-                .or_else(|| code.reference())
-                .map_or(false, |r| allocs[&r.id] == Register::Zax);
+            let zax_used = addr.reference().map_or(false, |r| allocs[&r.id] == Register::Zax);
 
             if register_count == 1 && zax_used { 2 } else { 0 }
         }
@@ -156,7 +152,7 @@ mod test {
             [ 1, -, -, -, -, -, 0, -, -] x(zdi)10 = zax
             [ 0, -, -, -, -, -, -, 1, -] zax = x(zdi)1
             [--, -, -, -, -, -, -, 0, 1] zax = and zax, fffffffe
-            [--, -, -, -, -, -, -, -, 0] ret 00000000, zax
+            [--, -, -, -, -, -, -, -, 0] ret 0, zax
         "#]]
         .assert_eq(&lifetimes);
     }

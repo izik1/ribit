@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use ribit_core::{instruction, opcode, register, Width};
+use ribit_core::{instruction, opcode, register, ReturnCode, Width};
 
 use super::{AnySource, BinOp, CmpKind, Id, Instruction};
 use crate::instruction::{ExtInt, Select};
@@ -23,7 +23,7 @@ pub struct Context {
 }
 
 /// try to use associativity.
-/// 
+///
 /// this optimizes things like the following:
 /// ```text
 /// %2 = %1 + 1
@@ -293,7 +293,7 @@ impl Context {
     }
 
     #[must_use]
-    pub fn ret_with_code(mut self, addr: AnySource, code: AnySource) -> Block {
+    pub fn ret_with_code(mut self, addr: AnySource, code: ReturnCode) -> Block {
         for (idx, src) in self.registers.iter().enumerate().skip(1) {
             let dest = register::RiscV::with_u8(idx as u8).unwrap();
 
@@ -317,7 +317,7 @@ impl Context {
 
     #[must_use]
     pub fn ret_with_addr(self, addr: AnySource) -> Block {
-        self.ret_with_code(addr, AnySource::Const(Constant::i32(0)))
+        self.ret_with_code(addr, ReturnCode::Normal)
     }
 
     #[must_use]
@@ -513,13 +513,10 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
         }
 
         instruction::Instruction::Sys(instruction::Sys { opcode }) => {
-            use ribit_core::ReturnCode;
             let return_code = match opcode {
                 opcode::RSys::EBREAK => ReturnCode::EBreak,
                 opcode::RSys::ECALL => ReturnCode::ECall,
-            } as u32;
-
-            let return_code = AnySource::Const(Constant::i32(return_code));
+            };
 
             let pc = ctx.add_pc(len);
 

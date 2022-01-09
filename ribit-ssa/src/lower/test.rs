@@ -21,7 +21,7 @@ fn jalr_link_eq_src() {
         %0 = args[0]
         %1 = args[1]
         x(%0)17 = 00010138
-        ret 00000000, 00010148"#]]
+        ret 0, 00010148"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
@@ -48,7 +48,7 @@ fn jalr_bit() {
         %3 = add %2, 000007ff
         %4 = and %3, fffffffe
         x(%0)4 = 00000034
-        ret 00000000, %4"#]]
+        ret 0, %4"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
@@ -57,13 +57,13 @@ fn jalr_pc() {
     expect_block(
         "jalr x4, 1023(x1)",
         expect![[r#"
-        %0 = args[0]
-        %1 = args[1]
-        %2 = x(%0)1
-        %3 = add %2, 000003ff
-        %4 = and %3, fffffffe
-        x(%0)4 = 00000404
-        ret 00000000, %4"#]],
+            %0 = args[0]
+            %1 = args[1]
+            %2 = x(%0)1
+            %3 = add %2, 000003ff
+            %4 = and %3, fffffffe
+            x(%0)4 = 00000404
+            ret 0, %4"#]],
     );
 }
 
@@ -72,10 +72,10 @@ fn jal_basic() {
     expect_block(
         "jal x4, 2048",
         expect![[r#"
-        %0 = args[0]
-        %1 = args[1]
-        x(%0)4 = 00000404
-        ret 00000000, 00001400"#]],
+            %0 = args[0]
+            %1 = args[1]
+            x(%0)4 = 00000404
+            ret 0, 00001400"#]],
     );
 }
 
@@ -84,9 +84,9 @@ fn sys_break() {
     expect_block(
         "ebreak",
         expect![[r#"
-        %0 = args[0]
-        %1 = args[1]
-        ret 00000001, 00000404"#]],
+            %0 = args[0]
+            %1 = args[1]
+            ret 1, 00000404"#]],
     );
 }
 
@@ -100,7 +100,7 @@ fn addi_nop() {
         expect![[r#"
             %0 = args[0]
             %1 = args[1]
-            ret 00000001, 00000406"#]],
+            ret 1, 00000406"#]],
     );
 }
 
@@ -109,9 +109,9 @@ fn branch_0_0_eq() {
     expect_block(
         "beq x0, 512(x0)",
         expect![[r#"
-        %0 = args[0]
-        %1 = args[1]
-        ret 00000000, 00000800"#]],
+            %0 = args[0]
+            %1 = args[1]
+            ret 0, 00000800"#]],
     );
 }
 
@@ -120,12 +120,12 @@ fn branch_0_x1_eq() {
     expect_block(
         "beq x0, 512(x1)",
         expect![[r#"
-        %0 = args[0]
-        %1 = args[1]
-        %2 = x(%0)1
-        %3 = cmp EQ 00000000, %2
-        %4 = select %3, 00000800, 00000404
-        ret 00000000, %4"#]],
+            %0 = args[0]
+            %1 = args[1]
+            %2 = x(%0)1
+            %3 = cmp EQ 00000000, %2
+            %4 = select %3, 00000800, 00000404
+            ret 0, %4"#]],
     );
 }
 
@@ -141,7 +141,7 @@ fn addi_no_dest() {
             %1 = args[1]
             %2 = x(%0)1
             %3 = add %2, 00000032
-            ret 00000001, 00000408"#]],
+            ret 1, 00000408"#]],
     );
 }
 
@@ -165,7 +165,7 @@ fn mem_read_write() {
             %7 = and %6, 00ffffff
             m(%1)%7 = dword %5
             x(%0)2 = %5
-            ret 00000001, 00000410"#]],
+            ret 1, 00000410"#]],
     );
 }
 
@@ -180,7 +180,7 @@ fn addi_no_src() {
             %0 = args[0]
             %1 = args[1]
             x(%0)2 = 00000032
-            ret 00000001, 00000408"#]],
+            ret 1, 00000408"#]],
     );
 }
 
@@ -203,7 +203,7 @@ fn cmp_add() {
             %6 = x(%0)4
             %7 = add %5, %6
             x(%0)2 = %7
-            ret 00000001, 0000040c"#]],
+            ret 1, 0000040c"#]],
     );
 }
 
@@ -216,7 +216,7 @@ fn empty() {
     expect![[r#"
         %0 = args[0]
         %1 = args[1]
-        ret 00000000, fefefefe"#]]
+        ret 0, fefefefe"#]]
     .assert_eq(&block.display_instructions().to_string());
 }
 
@@ -234,7 +234,7 @@ fn reads_register() {
         %1 = args[1]
         %2 = x(%0)1
         %3 = x(%0)2
-        ret 00000000, 00000000"#]]
+        ret 0, 00000000"#]]
     .assert_eq(&block.display_instructions().to_string());
 }
 
@@ -249,6 +249,6 @@ fn writes_register() {
         %0 = args[0]
         %1 = args[1]
         x(%0)2 = 00000000
-        ret 00000000, 00000000"#]]
+        ret 0, 00000000"#]]
     .assert_eq(&block.display_instructions().to_string());
 }

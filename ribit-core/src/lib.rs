@@ -57,6 +57,7 @@ impl<I: IntoIterator<Item = T> + Copy, T: std::fmt::Display> std::fmt::Display
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u32)]
 pub enum ReturnCode {
     #[allow(dead_code)]

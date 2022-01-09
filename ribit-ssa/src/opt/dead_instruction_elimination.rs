@@ -14,9 +14,8 @@ pub fn run(block: &mut Block) {
     let mut live_ids = [false; 0x1_0000];
 
     match &block.terminator {
-        Terminator::Ret { addr, code } => {
+        Terminator::Ret { addr, .. } => {
             mark_live(&mut live_ids, *addr);
-            mark_live(&mut live_ids, *code);
         }
     }
 

@@ -6,7 +6,7 @@ use rasen::params::imm::{Imm16, Imm32, Imm8};
 use rasen::params::mem::Mem32;
 use rasen::params::reg::{Reg16, Reg32, Reg64, Reg8};
 use rasen::params::Register;
-use ribit_core::{ReturnCode, Width};
+use ribit_core::Width;
 use ribit_ssa as ssa;
 use ssa::{instruction, Bitness, StackIndex, Type};
 
@@ -249,37 +249,19 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                 // note: addr is in the low dword, code is high dword
 
                 let addr = crate::Source::from_ssa_src(addr, allocs).expect("addr not allocated!?");
-                let code = crate::Source::from_ssa_src(code, allocs).expect("code not allocated!?");
 
                 match (code, addr) {
-                    (Source::Val(code), Source::Val(addr)) => {
-                        let code = ReturnCode::new(code).expect("code must be a valid ReturnCode");
+                    (code, Source::Val(addr)) => {
                         self.mov_zax_imm64(super::BlockReturn::from_parts(addr, code).as_u64())?;
                     }
 
-                    (Source::Register(code @ Register::Zax), Source::Val(0)) => {
-                        // this automatically leaves the lower 32 bits empty
-                        self.stream.shl_reg_imm8(Reg64(code), 32)?;
-                    }
-
-                    (Source::Register(code @ Register::Zax), Source::Val(addr)) => {
-                        debug_assert_eq!(clobbers.get(0), Some(&Register::Zax));
-                        let clobber_reg =
-                            *clobbers.get(1).expect("Expected 2 clobbers (first being Zax)");
-
-                        // this complex string of instructions is needed becaause x86 can't do imm64s
-                        self.stream.shl_reg_imm8(Reg64(code), 32)?;
-                        self.mov_r32_imm32(clobber_reg, addr)?;
-                        self.stream.or_reg_reg(Reg64::ZAX, Reg64(clobber_reg))?;
-                    }
-
-                    (Source::Val(0), Source::Register(Register::Zax)) => {
+                    (code, Source::Register(Register::Zax)) if code as u32 == 0 => {
                         // clear the upper 32 bits of Rax
                         // todo: use `mov <clobber>, eax` to do this instead
                         self.stream.or_reg_reg(Reg32(Register::Zax), Reg32(Register::Zax))?;
                     }
 
-                    (Source::Val(code), Source::Register(Register::Zax)) => {
+                    (code, Source::Register(Register::Zax)) => {
                         debug_assert_eq!(clobbers.get(0), Some(&Register::Zax));
                         let clobber_reg =
                             *clobbers.get(1).expect("Expected 2 clobbers (first being Zax)");
@@ -288,20 +270,14 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                         // todo: use `mov <clobber>, eax` to do this instead
                         self.stream.or_reg_reg(Reg32::ZAX, Reg32::ZAX)?;
 
-                        self.mov_r32_imm32(clobber_reg, code)?;
+                        self.mov_r32_imm32(clobber_reg, code as u32)?;
                         self.stream.shl_reg_imm8(Reg64(clobber_reg), 32)?;
 
                         self.stream.or_reg_reg(Reg64::ZAX, Reg64(clobber_reg))?;
                     }
 
-                    (Source::Register(code), Source::Val(addr)) => {
-                        self.stream.shl_reg_imm8(Reg64(code), 32)?;
-                        self.mov_r32_imm32(Register::Zax, addr)?;
-                        self.stream.or_reg_reg(Reg64::ZAX, Reg64(code))?;
-                    }
-
-                    (Source::Val(code), Source::Register(addr)) => {
-                        self.mov_r32_imm32(Register::Zax, code)?;
+                    (code, Source::Register(addr)) => {
+                        self.mov_r32_imm32(Register::Zax, code as u32)?;
                         self.stream.shl_reg_imm8(Reg64::ZAX, 32)?;
 
                         // clear the upper 32 bits of addr
@@ -309,26 +285,6 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                         self.stream.or_reg_reg(Reg32(addr), Reg32(addr))?;
 
                         self.stream.or_reg_reg(Reg64::ZAX, Reg64(addr))?;
-                    }
-
-                    (Source::Register(code), Source::Register(addr)) => {
-                        self.stream.shl_reg_imm8(Reg64(code), 32)?;
-                        if code == Register::Zax {
-                            self.stream.or_reg_reg(Reg64::ZAX, Reg64(addr))?;
-                        } else if addr == Register::Zax {
-                            // clear the upper 32 bits of Rax
-                            // todo: use `mov <clobber>, eax` to do this instead
-                            self.stream.or_reg_reg(Reg32::ZAX, Reg32::ZAX)?;
-
-                            self.stream.or_reg_reg(Reg64::ZAX, Reg64(code))?;
-                        } else {
-                            // clear the upper 32 bits of addr
-                            // todo: use `mov <clobber>, addr` to do this instead
-                            self.stream.or_reg_reg(Reg32(addr), Reg32(addr))?;
-
-                            self.stream.or_reg_reg(Reg64(code), Reg64(addr))?;
-                            self.stream.mov_reg_reg(Reg64::ZAX, Reg64(code))?;
-                        }
                     }
                 }
 

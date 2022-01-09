@@ -283,7 +283,7 @@ mod test {
             [ 1, -, -, -, -, -, 0, -, -] x(zdi)10 = zax
             [ 0, -, -, -, -, -, -, 1, -] zax = x(zdi)1
             [--, -, -, -, -, -, -, 0, 1] zax = and zax, fffffffe
-            [--, -, -, -, -, -, -, -, 0] ret 00000000, zax
+            [--, -, -, -, -, -, -, -, 0] ret 0, zax
         "#]]
         .assert_eq(&lifetimes);
 

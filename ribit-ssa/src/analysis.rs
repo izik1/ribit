@@ -24,12 +24,8 @@ fn lifetime_terminator<F: FnMut(&mut Lifetimes, Id, usize)>(
     mut update: F,
 ) {
     match term {
-        Terminator::Ret { addr, code } => {
+        Terminator::Ret { addr, .. } => {
             if let AnySource::Ref(r) = addr {
-                update(lifetimes, r.id, idx);
-            }
-
-            if let AnySource::Ref(r) = code {
                 update(lifetimes, r.id, idx);
             }
         }
@@ -474,8 +470,9 @@ mod test {
             [ 2, --, -, -, -, -, -, -, -, -, -, -, -, -, -, -] x(%0)29 = eedbeadf
             [ 1, --, -, -, -, -, -, -, -, -, -, -, -, -, -, -] x(%0)30 = 00011202
             [ 0, --, -, -, -, -, -, -, -, -, -, -, -, -, -, -] x(%0)31 = fbb6fab7
-            [--, --, -, -, -, -, -, -, -, -, -, -, -, -, -, -] ret 00000000, 00010202
-        "#]].assert_eq(
+            [--, --, -, -, -, -, -, -, -, -, -, -, -, -, -, -] ret 0, 00010202
+        "#]]
+        .assert_eq(
             &ShowLifetimes::new(&lifetimes, &block.instructions, &block.terminator).to_string(),
         );
     }
@@ -501,7 +498,7 @@ mod test {
             [ 1, -, -, -, -, -, 0, -, -] x(%0)10 = %7
             [ 0, -, -, -, -, -, -, 1, -] %8 = x(%0)1
             [--, -, -, -, -, -, -, 0, 1] %9 = and %8, fffffffe
-            [--, -, -, -, -, -, -, -, 0] ret 00000000, %9
+            [--, -, -, -, -, -, -, -, 0] ret 0, %9
         "#]]
         .assert_eq(
             &ShowLifetimes::new(&lifetimes, &block.instructions, &block.terminator).to_string(),

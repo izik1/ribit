@@ -144,9 +144,8 @@ pub fn run(block: &mut Block) {
     }
 
     match &mut block.terminator {
-        Terminator::Ret { addr, code } => {
+        Terminator::Ret { addr, .. } => {
             *addr = lookup(&consts, *addr);
-            *code = lookup(&consts, *code);
         }
     }
 }
