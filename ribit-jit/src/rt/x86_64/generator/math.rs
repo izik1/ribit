@@ -60,11 +60,10 @@ pub fn sub(
     lhs: Source,
     rhs: Register,
 ) -> io::Result<()> {
-    match lhs {
+    let lhs = match lhs {
         Source::Register(lhs) => {
             match (lhs == dest, rhs == dest) {
-                (true, true) => {}
-                (true, false) => {}
+                (true, _) => {}
                 // painful: need a 3rd register to swap lhs and rhs and then restore rhs.
                 (false, true) => unimplemented!(),
                 (false, false) => {
@@ -72,28 +71,28 @@ pub fn sub(
                 }
             };
 
-            builder.stream.sub_reg_reg(Reg32(dest), Reg32(rhs))
+            return builder.stream.sub_reg_reg(Reg32(dest), Reg32(rhs));
         }
 
-        Source::Val(0) => {
-            if rhs != dest {
-                builder.stream.mov_reg_reg(Reg32(dest), Reg32(rhs))?;
-            }
+        Source::Val(v) => v,
+    };
 
-            builder.stream.neg_reg(Reg32(dest))
+    if lhs == 0 {
+        if rhs != dest {
+            builder.stream.mov_reg_reg(Reg32(dest), Reg32(rhs))?;
         }
 
-        Source::Val(lhs) if rhs != dest => {
-            builder.mov_r32_imm32(dest, lhs)?;
-            builder.stream.sub_reg_reg(Reg32(dest), Reg32(rhs))
-        }
-
-        // we can turn `a - b` into `a + (-b)` into `(-b) + a`
-        Source::Val(lhs) => {
-            builder.stream.neg_reg(Reg32(dest))?;
-            add_r32_imm(builder, Reg32(dest), lhs)
-        }
+        return builder.stream.neg_reg(Reg32(dest));
     }
+
+    if rhs != dest {
+        builder.mov_r32_imm32(dest, lhs)?;
+        return builder.stream.sub_reg_reg(Reg32(dest), Reg32(rhs));
+    }
+
+    // we can turn `a - b` into `a + (-b)` into `(-b) + a`
+    builder.stream.neg_reg(Reg32(dest))?;
+    add_r32_imm(builder, Reg32(dest), lhs)
 }
 
 fn shift_3arg(
