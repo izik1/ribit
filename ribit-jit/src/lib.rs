@@ -163,24 +163,26 @@ mod test {
 
     impl fmt::Display for FmtRegister {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            match self.0 {
-                Register::Zax => write!(f, "zax"),
-                Register::Zcx => write!(f, "zcx"),
-                Register::Zdx => write!(f, "zdx"),
-                Register::Zbx => write!(f, "zbx"),
-                Register::Zsp => write!(f, "zsp"),
-                Register::Zbp => write!(f, "zbp"),
-                Register::Zsi => write!(f, "zsi"),
-                Register::Zdi => write!(f, "zdi"),
-                Register::R8 => write!(f, "r8"),
-                Register::R9 => write!(f, "r9"),
-                Register::R10 => write!(f, "r10"),
-                Register::R11 => write!(f, "r11"),
-                Register::R12 => write!(f, "r12"),
-                Register::R13 => write!(f, "r13"),
-                Register::R14 => write!(f, "r14"),
-                Register::R15 => write!(f, "r15"),
-            }
+            let s = match self.0 {
+                Register::Zax => "zax",
+                Register::Zcx => "zcx",
+                Register::Zdx => "zdx",
+                Register::Zbx => "zbx",
+                Register::Zsp => "zsp",
+                Register::Zbp => "zbp",
+                Register::Zsi => "zsi",
+                Register::Zdi => "zdi",
+                Register::R8 => "r8",
+                Register::R9 => "r9",
+                Register::R10 => "r10",
+                Register::R11 => "r11",
+                Register::R12 => "r12",
+                Register::R13 => "r13",
+                Register::R14 => "r14",
+                Register::R15 => "r15",
+            };
+
+            f.write_str(s)
         }
     }
 

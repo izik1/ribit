@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::fmt;
+use std::fmt::{self, Write};
 
 use crate::{Block, Id, Instruction, Source, StackIndex, Terminator};
 
@@ -17,11 +17,11 @@ fn lifetime_instruction<F: FnMut(&mut Lifetimes, Id, usize)>(
     instr.visit_arg_ids(|id| update(lifetimes, id, idx));
 }
 
-fn lifetime_terminator<F: FnMut(&mut Lifetimes, Id, usize)>(
+fn lifetime_terminator<F: FnOnce(&mut Lifetimes, Id, usize)>(
     term: &Terminator,
     idx: usize,
     lifetimes: &mut Lifetimes,
-    mut update: F,
+    update: F,
 ) {
     match term {
         Terminator::Ret { addr, .. } => {
@@ -213,7 +213,7 @@ impl fmt::Display for ShowLifetimes<'_, '_> {
         {
             let mut lifetimes = lifetimes.iter();
 
-            write!(f, "[")?;
+            f.write_char('[')?;
 
             if let Some(lifetime) = lifetimes.next() {
                 show_lifetime(f, lifetime, idx)?;

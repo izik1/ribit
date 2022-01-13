@@ -28,8 +28,8 @@ pub enum Extension {
 impl std::fmt::Display for Extension {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::D => write!(f, "RV32-D"),
-            Self::F => write!(f, "RV32-F"),
+            Self::D => f.write_str("RV32-D"),
+            Self::F => f.write_str("RV32-F"),
         }
     }
 }

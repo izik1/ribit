@@ -16,7 +16,7 @@ impl fmt::Display for Reference {
             write!(f, "{} ", self.ty)?;
         }
 
-        write!(f, "{}", self.id)
+        self.id.fmt(f)
     }
 }
 
@@ -53,6 +53,6 @@ impl<T: ConstTy> fmt::Display for Ref<T> {
             write!(f, "{} ", T::TY)?;
         }
 
-        write!(f, "{}", self.id)
+        self.id.fmt(f)
     }
 }

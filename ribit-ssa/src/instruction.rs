@@ -266,7 +266,7 @@ impl fmt::Display for Instruction {
             }
 
             Self::Select(it) => it.fmt(f),
-            Self::Fence => write!(f, "fence"),
+            Self::Fence => f.write_str("fence"),
             Self::ExtInt(it) => it.fmt(f),
         }
     }

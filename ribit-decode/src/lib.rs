@@ -44,7 +44,6 @@ const fn sign_extend_32(value: u32, data_bits: u8) -> u32 {
 
 #[allow(clippy::too_many_lines)]
 pub fn instruction(instruction: u32) -> Result<Instruction, DecodeError> {
-    log::debug!("instruction: {:032b}", instruction);
     let funct3 = ((instruction >> 12) & 0b0000_0111) as u8;
     let funct7 = ((instruction >> 25) & 0b0111_1111) as u8;
     let opcode = (instruction & 0b0111_1111) as u8;

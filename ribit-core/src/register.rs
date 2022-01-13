@@ -50,13 +50,6 @@ impl RiscV {
         self.0.get()
     }
 
-    /// Returns the offset into a register array you'd have to find [`&self`]
-    #[inline(always)]
-    #[must_use]
-    pub const fn as_offset(self) -> u32 {
-        (self.0.get() * 4) as u32
-    }
-
     pub const X1: Self = Self::with_u8_panicking(1);
     pub const X2: Self = Self::with_u8_panicking(2);
     pub const X3: Self = Self::with_u8_panicking(3);

@@ -9,9 +9,7 @@ impl<'a> std::fmt::Display for BlockDisplay<'a> {
             writeln!(f, "{}", item)?;
         }
 
-        write!(f, "{}", self.1)?;
-
-        Ok(())
+        self.1.fmt(f)
     }
 }
 

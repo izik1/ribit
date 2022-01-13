@@ -155,6 +155,8 @@ impl ExecutionEngine {
                 .expect("bad slice size expected 2???"),
         );
 
+        log::debug!("instruction: {:016b}", instr);
+
         let instr = ribit_decode::compressed::decode_instruction(instr)?;
         let info = ribit_core::instruction::Info::new(instr, 2);
         self.pc += 2;
@@ -177,6 +179,7 @@ impl ExecutionEngine {
         // log::debug!("instruction bytes: {:08x}", instr.to_le());
 
         if instr & 0b11 == 0b11 {
+            log::debug!("instruction: {:032b}", instr);
             let instr = ribit_decode::instruction(instr)?;
             let info = ribit_core::instruction::Info::new(instr, 4);
             self.pc += 4;

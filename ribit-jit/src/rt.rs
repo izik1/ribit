@@ -41,20 +41,21 @@ impl<Rt: Target> Runtime<Rt> {
         // assert memory size for now
         assert_eq!(memory.len(), crate::MEMORY_SIZE as usize);
 
-        if let Some(block_num) = self.ranges.iter().position(|range| range.start == *pc) {
-            let block = &self.blocks[block_num];
+        let block_num = match self.ranges.iter().position(|range| range.start == *pc) {
+            Some(block_num) => block_num,
+            None => todo!("failed to find block -- put an error here"),
+        };
 
-            let (address, return_code) = block.execute(regs, memory);
+        let block = &self.blocks[block_num];
 
-            *pc = address;
+        let (address, return_code) = block.execute(regs, memory);
 
-            match return_code {
-                ReturnCode::Normal => {}
-                ReturnCode::EBreak => todo!("EBREAK"),
-                ReturnCode::ECall => crate::sbi::call(regs),
-            }
-        } else {
-            todo!("failed to find block -- put an error here")
+        *pc = address;
+
+        match return_code {
+            ReturnCode::Normal => {}
+            ReturnCode::EBreak => todo!("EBREAK"),
+            ReturnCode::ECall => crate::sbi::call(regs),
         }
     }
 

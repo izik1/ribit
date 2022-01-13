@@ -3,11 +3,13 @@
 // When unsafe code is used, it *must* be documented with a `safety`
 //   comment explaining how it follows the safety contract
 #![deny(unsafe_code)]
+#![deny(unsafe_block_in_unsafe_fn)]
 #![allow(clippy::match_bool)]
 #![warn(clippy::must_use_candidate, clippy::clone_on_copy)]
 
 use std::fmt;
 
+#[cfg(feature = "disassemble")]
 pub mod disassemble;
 pub mod instruction;
 pub mod opcode;
@@ -47,7 +49,7 @@ impl<I: IntoIterator<Item = T> + Copy, T: std::fmt::Display> std::fmt::Display
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut iter = self.0.into_iter();
         if let Some(first) = iter.next() {
-            write!(f, "{}", first)?;
+            first.fmt(f)?;
             for item in iter {
                 write!(f, "\n{}", item)?;
             }

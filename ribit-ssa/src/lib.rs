@@ -75,12 +75,12 @@ impl From<opcode::Cmp> for CmpKind {
 impl fmt::Display for CmpKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Eq => write!(f, "EQ"),
-            Self::Ne => write!(f, "NE"),
-            Self::Sge => write!(f, "SGE"),
-            Self::Sl => write!(f, "SL"),
-            Self::Uge => write!(f, "UGE"),
-            Self::Ul => write!(f, "UL"),
+            Self::Eq => f.write_str("EQ"),
+            Self::Ne => f.write_str("NE"),
+            Self::Sge => f.write_str("SGE"),
+            Self::Sl => f.write_str("SL"),
+            Self::Uge => f.write_str("UGE"),
+            Self::Ul => f.write_str("UL"),
         }
     }
 }

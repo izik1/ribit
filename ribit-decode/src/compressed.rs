@@ -19,8 +19,6 @@ fn decode_full_register(instruction: u16) -> Option<RiscVRegister> {
 
 #[allow(clippy::too_many_lines)]
 pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDecodeError> {
-    log::debug!("instruction: {:016b}", instruction);
-
     let opcode = (instruction & 0b11) as u8;
     let funct3 = ((instruction >> 13) & 0b111) as u8;
 
