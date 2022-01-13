@@ -5,6 +5,7 @@
     clippy::match_bool
 )]
 #![warn(clippy::must_use_candidate, clippy::clone_on_copy)]
+#![deny(unsafe_op_in_unsafe_fn)]
 
 #[macro_use]
 extern crate static_assertions;

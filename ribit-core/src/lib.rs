@@ -3,7 +3,7 @@
 // When unsafe code is used, it *must* be documented with a `safety`
 //   comment explaining how it follows the safety contract
 #![deny(unsafe_code)]
-#![deny(unsafe_block_in_unsafe_fn)]
+#![deny(unsafe_op_in_unsafe_fn)]
 #![allow(clippy::match_bool)]
 #![warn(clippy::must_use_candidate, clippy::clone_on_copy)]
 

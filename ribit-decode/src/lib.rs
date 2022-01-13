@@ -4,6 +4,7 @@
     clippy::cast_sign_loss,
     clippy::match_bool
 )]
+#![deny(unsafe_op_in_unsafe_fn)]
 
 use ribit_core::instruction::{self, Instruction};
 use ribit_core::{opcode, register, Width};

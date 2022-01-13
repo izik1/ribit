@@ -40,8 +40,9 @@ impl RiscV {
     #[must_use]
     #[allow(unsafe_code)]
     pub const unsafe fn new_unchecked(inner: u8) -> Self {
-        // SAFETY: caller *must* provide a non-zero value for the `NonZeroU8`.
-        Self(NonZeroU8::new_unchecked(inner))
+        // Safety: caller *must* provide a non-zero value for the `NonZeroU8`.
+        // Safety: caller *must* provide a value < 32 to avoid library UB.
+        unsafe { Self(NonZeroU8::new_unchecked(inner)) }
     }
 
     #[inline(always)]
