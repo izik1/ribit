@@ -22,18 +22,15 @@ fn main() {
             match e {
                 DecodeError::Other => panic!("Non specfic decode error"),
                 DecodeError::InvalidInstruction(instruction) => panic!(
-                    "Tried to parse invalid instruction: `{:08x}` @ pc {:08x}",
-                    instruction,
+                    "Tried to parse invalid instruction: `{instruction:08x}` @ pc {:08x}",
                     ee.pc()
                 ),
                 DecodeError::UnimplementedExtension(ext, instruction) => panic!(
-                    "Tried to parse instruction with unimplemented extension `{}`: `{:84x}`",
-                    ext, instruction
+                    "Tried to parse instruction with unimplemented extension `{ext}`: `{instruction:08x}`",
                 ),
                 DecodeError::Compressed(CompressedDecodeError::InvalidInstruction(instruction)) => {
                     panic!(
-                        "Tried to parse invalid instruction: `{:04x}`.C @ pc {:08x}",
-                        instruction,
+                        "Tried to parse invalid instruction: `{instruction:04x}`.C @ pc {:08x}",
                         ee.pc()
                     );
                 }
@@ -41,8 +38,7 @@ fn main() {
                     ext,
                     instruction,
                 )) => panic!(
-                    "Tried to parse instruction with unimplemented extension `{}`: `{:04x}`.C",
-                    ext, instruction
+                    "Tried to parse instruction with unimplemented extension `{ext}`: `{instruction:04x}`.C",
                 ),
             }
         }

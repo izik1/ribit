@@ -91,7 +91,7 @@ fn console_getchar() -> (StatusCode, u32) {
     };
 
     log::debug!("{}", u32::from(buf[0]));
-    log::debug!("{:?}", code);
+    log::debug!("{code:?}");
 
     (code, u32::from(buf[0]))
 }

@@ -38,23 +38,23 @@ fn sym_iter<S: Entry>(
 
         let name = sym.get_name(file)?;
 
-        log::info!("sym: {}", name);
+        log::info!("sym: {name}");
 
         let value = sym.value();
 
         if name == "tohost" {
-            log::info!("found tohost: {:08x}", value);
+            log::info!("found tohost: {value:08x}");
             ctx.to_host = Some(value as u32);
         }
 
         if name == "begin_signature" {
-            log::info!("found begin_signature: {:08x}", value);
+            log::info!("found begin_signature: {value:08x}");
 
             ctx.begin_signature = Some(value as u32);
         }
 
         if name == "end_signature" {
-            log::info!("found end_signature: {:08x}", value);
+            log::info!("found end_signature: {value:08x}");
 
             ctx.end_signature = Some(value as u32);
         }
@@ -155,7 +155,7 @@ impl ExecutionEngine {
                 .expect("bad slice size expected 2???"),
         );
 
-        log::debug!("instruction: {:016b}", instr);
+        log::debug!("instruction: {instr:016b}");
 
         let instr = ribit_decode::compressed::decode_instruction(instr)?;
         let info = ribit_core::instruction::Info::new(instr, 2);
@@ -179,7 +179,7 @@ impl ExecutionEngine {
         // log::debug!("instruction bytes: {:08x}", instr.to_le());
 
         if instr & 0b11 == 0b11 {
-            log::debug!("instruction: {:032b}", instr);
+            log::debug!("instruction: {instr:032b}");
             let instr = ribit_decode::instruction(instr)?;
             let info = ribit_core::instruction::Info::new(instr, 4);
             self.pc += 4;

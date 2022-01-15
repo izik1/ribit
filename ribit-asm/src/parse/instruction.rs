@@ -296,7 +296,7 @@ fn rir_args(
                     has_error = true;
                     context
                         .errors
-                        .push(format!("expected an arg in the format 0(x2), found `{}`", it));
+                        .push(format!("expected an arg in the format 0(x2), found `{it}`"));
 
                     (0, None)
                 }
@@ -358,7 +358,7 @@ pub(super) fn rir_args_16(
                     has_error = true;
                     context
                         .errors
-                        .push(format!("expected an arg in the format 0(x16), found `{}`", it));
+                        .push(format!("expected an arg in the format 0(x16), found `{it}`"));
 
                     (0, None)
                 }
@@ -485,8 +485,7 @@ pub(super) fn compressed(
 ) -> bool {
     if !context.supports_compressed {
         context.errors.push(format!(
-            "`{}` is not a valid opcode (hint: compressed instructions aren't enabled)",
-            full_op
+            "`{full_op}` is not a valid opcode (hint: compressed instructions aren't enabled)",
         ));
         return true;
     }
@@ -544,7 +543,7 @@ pub(super) fn compressed(
         "li" | "LI" => {
             if let Some((rd, imm)) = ri_args(context, full_op, &args, 6) {
                 if rd.is_none() {
-                    context.errors.push(format!("`x0` is not a valid register for `{}`", op));
+                    context.errors.push(format!("`x0` is not a valid register for `{op}`"));
                     return true;
                 }
 

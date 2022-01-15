@@ -51,7 +51,7 @@ impl<I: IntoIterator<Item = T> + Copy, T: std::fmt::Display> std::fmt::Display
         if let Some(first) = iter.next() {
             first.fmt(f)?;
             for item in iter {
-                write!(f, "\n{}", item)?;
+                write!(f, "\n{item}")?;
             }
         }
 

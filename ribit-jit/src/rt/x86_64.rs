@@ -72,9 +72,9 @@ mod test {
 
         for idx in 1..regs.len() {
             match idx {
-                0 => assert_eq!(regs[idx], 0, "reg-num: {}", idx),
-                4 => assert_eq!(regs[idx], 4, "reg-num: {}", idx),
-                _ => assert_eq!(regs[idx], 0xaaaaaaaa, "reg-num: {}", idx),
+                0 => assert_eq!(regs[idx], 0, "reg-num: {idx}"),
+                4 => assert_eq!(regs[idx], 4, "reg-num: {idx}"),
+                _ => assert_eq!(regs[idx], 0xaaaaaaaa, "reg-num: {idx}"),
             }
         }
     }
@@ -109,10 +109,10 @@ mod test {
 
         for idx in 0..regs.len() {
             match idx {
-                0 => assert_eq!(regs[idx], 0, "regnum={}", idx),
-                1 => assert_eq!(regs[idx], 1024, "regnum={}", idx),
-                4 => assert_eq!(regs[idx], 52, "regnum={}", idx),
-                _ => assert_eq!(regs[idx], 0xaaaaaaaa, "regnum={}", idx),
+                0 => assert_eq!(regs[idx], 0, "reg-num={idx}"),
+                1 => assert_eq!(regs[idx], 1024, "reg-num={idx}"),
+                4 => assert_eq!(regs[idx], 52, "reg-num={idx}"),
+                _ => assert_eq!(regs[idx], 0xaaaaaaaa, "reg-num={idx}"),
             }
         }
     }

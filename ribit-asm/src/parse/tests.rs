@@ -7,7 +7,7 @@ fn print_instructions(instructions: &[instruction::Info]) -> String {
     let mut output = String::new();
     for instruction in instructions {
         let fmt = ribit_core::disassemble::FmtInstruction::from_info(instruction);
-        writeln!(&mut output, "{}", fmt).unwrap();
+        writeln!(&mut output, "{fmt}").unwrap();
     }
 
     output
@@ -17,7 +17,7 @@ fn assert_instructions(input: &str, expected: expect_test::Expect) {
     let result = super::tokenize(input, true);
 
     for error in &result.errors {
-        eprintln!("error: {}", error);
+        eprintln!("error: {error}");
     }
 
     if !result.errors.is_empty() {

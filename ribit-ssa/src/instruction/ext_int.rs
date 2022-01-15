@@ -29,10 +29,12 @@ impl ExtInt {
 
 impl fmt::Display for ExtInt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let instr = match self.signed {
+        let Self { dest, width, src, signed } = self;
+        let instr = match signed {
             true => "sext",
             false => "zext",
         };
-        write!(f, "{} = {} {} {}", self.dest, instr, self.width, self.src)
+
+        write!(f, "{dest} = {instr} {width} {src}")
     }
 }

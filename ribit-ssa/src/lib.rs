@@ -149,7 +149,7 @@ pub enum Terminator {
 impl fmt::Display for Terminator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Ret { addr, code } => write!(f, "ret {}, {}", *code as u32, addr),
+            Self::Ret { addr, code } => write!(f, "ret {}, {addr}", *code as u32),
         }
     }
 }

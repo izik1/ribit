@@ -12,7 +12,8 @@ pub struct Select {
 
 impl fmt::Display for Select {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} = select {}, {}, {}", self.dest, self.cond, self.if_true, self.if_false)
+        let Self { dest, cond, if_true, if_false } = self;
+        write!(f, "{dest} = select {cond}, {if_true}, {if_false}")
     }
 }
 

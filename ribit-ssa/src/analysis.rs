@@ -224,9 +224,7 @@ impl fmt::Display for ShowLifetimes<'_, '_> {
                 show_lifetime(f, lifetime, idx)?;
             }
 
-            f.write_str("] ")?;
-
-            writeln!(f, "{}", instr)?;
+            writeln!(f, "] {instr}")?;
         }
 
         Ok(())

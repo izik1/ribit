@@ -143,7 +143,7 @@ mod test {
             }
 
             for (idx, regs) in clobbers {
-                write!(f, "{} => [", idx)?;
+                write!(f, "{idx} => [")?;
 
                 let reg_count = regs.len();
                 for (offset, reg) in regs.iter().enumerate() {
@@ -151,7 +151,7 @@ mod test {
                     if offset < reg_count - 1 {
                         f.write_str(", ")?;
                     } else {
-                        writeln!(f, "]")?;
+                        f.write_str("]\n")?;
                     }
                 }
             }

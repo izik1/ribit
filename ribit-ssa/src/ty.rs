@@ -22,7 +22,7 @@ impl Type {
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Int(b) => write!(f, "i{}", b),
+            Self::Int(b) => write!(f, "i{b}"),
             Type::Unit => f.write_str("()"),
             Type::Boolean => f.write_str("bool"),
         }

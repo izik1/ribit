@@ -140,7 +140,7 @@ where
         }
 
         (lhs, rhs) => {
-            panic!("unsupported operation `{}` between types: ({},{})", op, lhs.ty(), rhs.ty())
+            panic!("unsupported operation `{op}` between types: ({},{})", lhs.ty(), rhs.ty())
         }
     }
 }

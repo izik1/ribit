@@ -84,7 +84,7 @@ fn tokenize_instruction(context: &mut ParseContext, line: &str) {
     };
 
     if !instruction_matched {
-        context.errors.push(format!("Unknown instruction `{}`", full_op));
+        context.errors.push(format!("Unknown instruction `{full_op}`"));
     }
 }
 
@@ -132,7 +132,7 @@ fn test_len(context: &mut ParseContext, op: &str, expected: usize, actual: usize
     if actual != expected {
         context
             .errors
-            .push(format!("Expected {} argument(s) for `{}`, found `{}`", expected, op, actual));
+            .push(format!("Expected {expected} argument(s) for `{op}`, found `{actual}`"));
         return true;
     }
 
@@ -141,9 +141,9 @@ fn test_len(context: &mut ParseContext, op: &str, expected: usize, actual: usize
 
 fn parse_general_purpose_register(register: &str) -> Result<Option<register::RiscV>, String> {
     if let Some(num) = register.strip_prefix('x') {
-        let num = num.parse::<u8>().map_err(|_| format!("Invalid register number: `{}`", num))?;
+        let num = num.parse::<u8>().map_err(|_| format!("Invalid register number: `{num}`"))?;
         if num >= 32 {
-            return Err(format!("register out of range: `{}`", num));
+            return Err(format!("register out of range: `{num}`"));
         }
 
         return Ok(register::RiscV::with_u8(num));
@@ -151,14 +151,14 @@ fn parse_general_purpose_register(register: &str) -> Result<Option<register::Ris
 
     // todo: abi names.
 
-    Err(format!("Unexpected register name `{}`", register))
+    Err(format!("Unexpected register name `{register}`"))
 }
 fn parse_compressed_register(register: &str) -> Result<Option<register::RiscV>, String> {
     let res = parse_general_purpose_register(register)?;
 
     let register = res.map_or(0, |it| it.get());
     if register < 8 || register >= 16 {
-        return Err(format!("register out of range: `{}` (x8..x16)", register));
+        return Err(format!("register out of range: `{register}` (x8..x16)"));
     }
 
     Ok(res)
@@ -180,7 +180,7 @@ fn parse_immediate(src: &str, bits: u8) -> Result<u32, String> {
             (src, 10, "decimal")
         };
 
-        u32::from_str_radix(src, base).map_err(|_| format!("invalid {} number: {}", base_name, src))
+        u32::from_str_radix(src, base).map_err(|_| format!("invalid {base_name} number: {src}"))
     }
 
     let (src, negative) = match src.strip_prefix('-') {
@@ -195,8 +195,8 @@ fn parse_immediate(src: &str, bits: u8) -> Result<u32, String> {
 
     match negative {
         true if unsigned <= signed_min => Ok((-(unsigned as i32) as u32) & unsigned_max),
-        true => Err(format!("invalid {}bit literal (-{} < -{})", bits, unsigned, signed_min)),
+        true => Err(format!("invalid {bits}bit literal (-{unsigned} < -{signed_min})")),
         false if unsigned <= unsigned_max => Ok(unsigned),
-        false => Err(format!("invalid {}bit literal ({} > {})", bits, unsigned, unsigned_max)),
+        false => Err(format!("invalid {bits}bit literal ({unsigned} > {unsigned_max})")),
     }
 }

@@ -222,47 +222,37 @@ impl Instruction {
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::ReadReg { dest, base, src } => write!(f, "{} = x({}){}", dest, base, src.get()),
+            Self::ReadReg { dest, base, src } => write!(f, "{dest} = x({base}){}", src.get()),
 
             Self::ReadMem { dest, src, base, width, sign_extend } => match sign_extend {
-                true => write!(f, "{} = signed {} m({}){}", dest, width, base, src),
-                false => write!(f, "{} = {} m({}){}", dest, width, base, src),
+                true => write!(f, "{dest} = signed {width} m({base}){src}"),
+                false => write!(f, "{dest} = {width} m({base}){src}"),
             },
 
-            Self::ReadStack { dest, src } => write!(f, "{} = {}", dest, src),
+            Self::ReadStack { dest, src } => write!(f, "{dest} = {src}"),
 
-            Self::WriteReg { base, dest, src } => write!(f, "x({}){} = {}", base, dest.get(), src),
+            Self::WriteReg { base, dest, src } => write!(f, "x({base}){} = {src}", dest.get()),
 
             Self::WriteMem { base, addr, src, width } => {
-                write!(f, "m({}){} = {} {}", base, addr, width, src)
+                write!(f, "m({base}){addr} = {width} {src}")
             }
 
-            Self::WriteStack { dest, src } => write!(f, "{} = {}", dest, src),
+            Self::WriteStack { dest, src } => write!(f, "{dest} = {src}"),
 
-            Self::Arg { dest, src } => write!(f, "{} = args[{}]", dest, *src as u8),
+            Self::Arg { dest, src } => write!(f, "{dest} = args[{}]", *src as u8),
 
-            Self::CommutativeBinOp { dest, src1, src2, op } => write!(
-                f,
-                "{dest} = {op} {src1}, {src2}",
-                dest = dest,
-                op = op,
-                src1 = src1,
-                src2 = src2
-            ),
+            Self::CommutativeBinOp { dest, src1, src2, op } => {
+                write!(f, "{dest} = {op} {src1}, {src2}")
+            }
 
-            Self::ShiftOp { dest, src, op } => write!(
-                f,
-                "{dest} = {op} {src1}, {src2}",
-                dest = dest,
-                op = op,
-                src1 = src.lhs(),
-                src2 = src.rhs()
-            ),
+            Self::ShiftOp { dest, src, op } => {
+                write!(f, "{dest} = {op} {src1}, {src2}", src1 = src.lhs(), src2 = src.rhs())
+            }
 
-            Self::Sub { dest, src1, src2 } => write!(f, "{} = sub {}, {}", dest, src1, src2),
+            Self::Sub { dest, src1, src2 } => write!(f, "{dest} = sub {src1}, {src2}"),
 
             Self::Cmp { dest, src, kind } => {
-                write!(f, "{} = cmp {} {}, {}", dest, kind, src.lhs(), src.rhs())
+                write!(f, "{dest} = cmp {kind} {}, {}", src.lhs(), src.rhs())
             }
 
             Self::Select(it) => it.fmt(f),

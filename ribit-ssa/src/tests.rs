@@ -9,7 +9,7 @@ pub const MEM_SIZE: u32 = 0x1000000;
 pub(crate) fn assemble_block_with_context(mut context: lower::Context, block: &str) -> Block {
     let output = ribit_asm::tokenize(block, true);
     for error in &output.errors {
-        eprintln!("error: {}", error);
+        eprintln!("error: {error}");
     }
 
     if !output.errors.is_empty() {
@@ -67,12 +67,12 @@ pub fn min_fn() -> Block {
     // todo: psudeos: `neg`
     assemble_block(
         r#"
-                sltu x12, x10, x11
-                sub x12, x0, x12
-                xor x10, x10, x11
-                and x10, x10, x12
-                xor x10, x10, x11
-                c.ret
-            "#,
+            sltu x12, x10, x11
+            sub x12, x0, x12
+            xor x10, x10, x11
+            and x10, x10, x12
+            xor x10, x10, x11
+            c.ret
+        "#,
     )
 }

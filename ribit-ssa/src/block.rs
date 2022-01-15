@@ -6,7 +6,7 @@ pub struct BlockDisplay<'a>(&'a [Instruction], &'a Terminator);
 impl<'a> std::fmt::Display for BlockDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for item in self.0 {
-            writeln!(f, "{}", item)?;
+            writeln!(f, "{item}")?;
         }
 
         self.1.fmt(f)

@@ -48,21 +48,32 @@ impl X86_64 {
 
         let native_buffer = &raw_buffer[(start as usize)..(buffer.write_offset as usize)];
 
-        let mut byte_str = String::new();
-        {
+        let byte_str = {
+            const SEPARATOR: &str = ", ";
+            let len = native_buffer.len();
+
+            // len = 2 bytes per char, eg, `a9`, and an additional SEPARATOR bytes per separator
+            // there's 1 separator between every two chars, hence, so, `(len - 1) * SEPARATOR.len()`
+            // When there are no characters, there are *still* no separators, so, `len.saturating_sub(1)`
+            // ie, `0 - 1` should still give zero.
+            let mut byte_str =
+                String::with_capacity(len * 2 + len.saturating_sub(1) * SEPARATOR.len());
             let mut bytes = native_buffer.iter();
 
             if let Some(byte) = bytes.next() {
-                byte_str.push_str(&format!("{:02x}", byte));
+                byte_str.push_str(&format!("{byte:02x}"));
             }
 
             for byte in bytes {
-                byte_str.push_str(", ");
-                byte_str.push_str(&format!("{:02x}", byte));
-            }
-        }
+                byte_str.push_str(SEPARATOR);
 
-        log::debug!("Native block: [{}]", byte_str);
+                byte_str.push_str(&format!("{byte:02x}"));
+            }
+
+            byte_str
+        };
+
+        log::debug!("Native block: [{byte_str}]");
 
         buffer.raw = Some(raw_buffer.make_exec().unwrap());
 
