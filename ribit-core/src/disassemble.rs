@@ -55,7 +55,7 @@ impl<'a> fmt::Display for FmtInstruction<'a> {
                 let rs2 = WrapRegister(*rs2);
                 let rd = WrapRegister(*rd);
 
-                write!(f, "{opcode}, {rd}, {rs1}, {rs2}")
+                write!(f, "{opcode} {rd}, {rs1}, {rs2}")
             }
 
             Instruction::I(instruction::I { rd, rs1, imm, opcode }) => {
