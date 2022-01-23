@@ -11,29 +11,24 @@ pub fn run(block: &mut Block) {
         }
     }
 
-    let mut live_instruction_count = 0;
+    let mut all_live = true;
 
     for instruction in block.instructions.iter().rev() {
-        if instruction.id().map_or(false, |it| !live_ids[it.0 as usize]) {
+        let live = instruction.id().map_or(true, |id| live_ids[id.0 as usize]);
+        if !live {
+            all_live = false;
             continue;
         }
 
-        live_instruction_count += 1;
-
         // todo: note wrt dead reads: currently they can be removed, but, later maybe not.
-
         instruction.visit_arg_ids(|it| {
             live_ids[it.0 as usize] = true;
         });
     }
 
-    let mut instructions = Vec::with_capacity(live_instruction_count);
-
-    for instr in
-        block.instructions.iter().filter(|it| it.id().map_or(true, |id| live_ids[id.0 as usize]))
-    {
-        instructions.push(instr.clone());
+    if all_live {
+        return;
     }
 
-    block.instructions = instructions;
+    block.instructions.retain(|it| it.id().map_or(true, |id| live_ids[id.0 as usize]));
 }
