@@ -18,9 +18,9 @@ fn jalr_link_eq_src() {
     );
 
     expect![[r#"
-        %0 = args[0]
-        %1 = args[1]
-        x(%0)17 = 00010138
+        %2 = args[0]
+        %3 = args[1]
+        x(%2)17 = 00010138
         ret 0, 00010148"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
@@ -42,13 +42,13 @@ fn jalr_bit() {
     );
 
     expect![[r#"
-        %0 = args[0]
-        %1 = args[1]
-        %2 = x(%0)1
-        %3 = add %2, 000007ff
-        %4 = and %3, fffffffe
-        x(%0)4 = 00000034
-        ret 0, %4"#]]
+        %2 = args[0]
+        %3 = args[1]
+        %4 = x(%2)1
+        %5 = add %4, 000007ff
+        %6 = and %5, fffffffe
+        x(%2)4 = 00000034
+        ret 0, %6"#]]
     .assert_eq(&block.display_instructions().to_string())
 }
 
@@ -57,13 +57,13 @@ fn jalr_pc() {
     expect_block(
         "jalr x4, 1023(x1)",
         expect![[r#"
-            %0 = args[0]
-            %1 = args[1]
-            %2 = x(%0)1
-            %3 = add %2, 000003ff
-            %4 = and %3, fffffffe
-            x(%0)4 = 00000404
-            ret 0, %4"#]],
+            %2 = args[0]
+            %3 = args[1]
+            %4 = x(%2)1
+            %5 = add %4, 000003ff
+            %6 = and %5, fffffffe
+            x(%2)4 = 00000404
+            ret 0, %6"#]],
     );
 }
 
@@ -76,12 +76,12 @@ fn sub_imm_into_add() {
             ebreak
         "#,
         expect![[r#"
-            %0 = args[0]
-            %1 = args[1]
-            %2 = x(%0)11
-            %3 = add %2, fffffff6
-            x(%0)10 = 0000000a
-            x(%0)11 = %3
+            %2 = args[0]
+            %3 = args[1]
+            %4 = x(%2)11
+            %5 = add %4, fffffff6
+            x(%2)10 = 0000000a
+            x(%2)11 = %5
             ret 1, 0000040c"#]],
     )
 }
@@ -91,9 +91,9 @@ fn jal_basic() {
     expect_block(
         "jal x4, 2048",
         expect![[r#"
-            %0 = args[0]
-            %1 = args[1]
-            x(%0)4 = 00000404
+            %2 = args[0]
+            %3 = args[1]
+            x(%2)4 = 00000404
             ret 0, 00001400"#]],
     );
 }
@@ -103,8 +103,8 @@ fn sys_break() {
     expect_block(
         "ebreak",
         expect![[r#"
-            %0 = args[0]
-            %1 = args[1]
+            %2 = args[0]
+            %3 = args[1]
             ret 1, 00000404"#]],
     );
 }
@@ -117,8 +117,8 @@ fn addi_nop() {
             ebreak
         "#,
         expect![[r#"
-            %0 = args[0]
-            %1 = args[1]
+            %2 = args[0]
+            %3 = args[1]
             ret 1, 00000406"#]],
     );
 }
@@ -128,8 +128,8 @@ fn branch_0_0_eq() {
     expect_block(
         "beq x0, 512(x0)",
         expect![[r#"
-            %0 = args[0]
-            %1 = args[1]
+            %2 = args[0]
+            %3 = args[1]
             ret 0, 00000800"#]],
     );
 }
@@ -139,12 +139,12 @@ fn branch_0_x1_eq() {
     expect_block(
         "beq x0, 512(x1)",
         expect![[r#"
-            %0 = args[0]
-            %1 = args[1]
-            %2 = x(%0)1
-            %3 = cmp EQ 00000000, %2
-            %4 = select %3, 00000800, 00000404
-            ret 0, %4"#]],
+            %2 = args[0]
+            %3 = args[1]
+            %4 = x(%2)1
+            %5 = cmp EQ 00000000, %4
+            %6 = select %5, 00000800, 00000404
+            ret 0, %6"#]],
     );
 }
 
@@ -156,10 +156,10 @@ fn addi_no_dest() {
             ebreak
         "#,
         expect![[r#"
-            %0 = args[0]
-            %1 = args[1]
-            %2 = x(%0)1
-            %3 = add %2, 00000032
+            %2 = args[0]
+            %3 = args[1]
+            %4 = x(%2)1
+            %5 = add %4, 00000032
             ret 1, 00000408"#]],
     );
 }
@@ -174,16 +174,16 @@ fn mem_read_write() {
             ebreak
         "#,
         expect![[r#"
-            %0 = args[0]
-            %1 = args[1]
-            %2 = x(%0)1
-            %3 = and %2, 00ffffff
-            %4 = signed dword m(%1)%3
-            %5 = add %4, 00000064
-            %6 = add %2, 00000032
-            %7 = and %6, 00ffffff
-            m(%1)%7 = dword %5
-            x(%0)2 = %5
+            %2 = args[0]
+            %3 = args[1]
+            %4 = x(%2)1
+            %5 = and %4, 00ffffff
+            %6 = signed dword m(%3)%5
+            %7 = add %6, 00000064
+            %8 = add %4, 00000032
+            %9 = and %8, 00ffffff
+            m(%3)%9 = dword %7
+            x(%2)2 = %7
             ret 1, 00000410"#]],
     );
 }
@@ -196,9 +196,9 @@ fn addi_no_src() {
             ebreak
         "#,
         expect![[r#"
-            %0 = args[0]
-            %1 = args[1]
-            x(%0)2 = 00000032
+            %2 = args[0]
+            %3 = args[1]
+            x(%2)2 = 00000032
             ret 1, 00000408"#]],
     );
 }
@@ -213,15 +213,15 @@ fn cmp_add() {
             ebreak
         "#,
         expect![[r#"
-            %0 = args[0]
-            %1 = args[1]
-            %2 = x(%0)2
-            %3 = x(%0)3
-            %4 = cmp SL %2, %3
-            %5 = zext dword %4
-            %6 = x(%0)4
-            %7 = add %5, %6
-            x(%0)2 = %7
+            %2 = args[0]
+            %3 = args[1]
+            %4 = x(%2)2
+            %5 = x(%2)3
+            %6 = cmp SL %4, %5
+            %7 = zext dword %6
+            %8 = x(%2)4
+            %9 = add %7, %8
+            x(%2)2 = %9
             ret 1, 0000040c"#]],
     );
 }
@@ -233,8 +233,8 @@ fn empty() {
     let block = ctx.ret();
 
     expect![[r#"
-        %0 = args[0]
-        %1 = args[1]
+        %2 = args[0]
+        %3 = args[1]
         ret 0, fefefefe"#]]
     .assert_eq(&block.display_instructions().to_string());
 }
@@ -249,10 +249,10 @@ fn reads_register() {
     let block = ctx.ret();
 
     expect![[r#"
-        %0 = args[0]
-        %1 = args[1]
-        %2 = x(%0)1
-        %3 = x(%0)2
+        %2 = args[0]
+        %3 = args[1]
+        %4 = x(%2)1
+        %5 = x(%2)2
         ret 0, 00000000"#]]
     .assert_eq(&block.display_instructions().to_string());
 }
@@ -265,9 +265,9 @@ fn writes_register() {
     let block = ctx.ret();
 
     expect![[r#"
-        %0 = args[0]
-        %1 = args[1]
-        x(%0)2 = 00000000
+        %2 = args[0]
+        %3 = args[1]
+        x(%2)2 = 00000000
         ret 0, 00000000"#]]
     .assert_eq(&block.display_instructions().to_string());
 }

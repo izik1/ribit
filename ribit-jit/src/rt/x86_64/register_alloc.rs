@@ -288,15 +288,15 @@ mod test {
         .assert_eq(&lifetimes);
 
         expect![[r#"
-            %0 => zdi
-            %2 => zax
-            %3 => zcx
-            %4 => zcx
-            %5 => zdx
+            %2 => zdi
+            %4 => zax
+            %5 => zcx
             %6 => zcx
-            %7 => zax
-            %8 => zax
+            %7 => zdx
+            %8 => zcx
             %9 => zax
+            %10 => zax
+            %11 => zax
             ---------
             12 => [zax, zcx]
         "#]]
