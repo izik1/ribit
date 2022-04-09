@@ -84,6 +84,81 @@ impl TestAddrs {
     }
 }
 
+fn parse_compressed(
+    pc: &mut u32,
+    memory: &[u8],
+) -> Result<ribit_core::instruction::Info, ribit_decode::DecodeError> {
+    if *pc as usize + 1 >= memory.len() {
+        return Err(ribit_decode::DecodeError::Other);
+    }
+
+    let instr = u16::from_le_bytes(
+        memory[(*pc as usize)..][..2].try_into().expect("bad slice size expected 2???"),
+    );
+
+    log::debug!("instruction: {instr:016b}");
+
+    let instr = ribit_decode::compressed::decode_instruction(instr)?;
+    let info = ribit_core::instruction::Info::new(instr, 2);
+    *pc += 2;
+    Ok(info)
+}
+
+fn parse_instruction(
+    pc: &mut u32,
+    memory: &[u8],
+) -> Result<ribit_core::instruction::Info, ribit_decode::DecodeError> {
+    if *pc as usize + 3 >= memory.len() {
+        return Err(ribit_decode::DecodeError::Other);
+    }
+
+    let instr = u32::from_le_bytes(
+        memory[(*pc as usize)..][..4].try_into().expect("bad slice size expected 4???"),
+    );
+
+    // log::debug!("instruction bytes: {:08x}", instr.to_le());
+
+    if instr & 0b11 == 0b11 {
+        log::debug!("instruction: {instr:032b}");
+        let instr = ribit_decode::instruction(instr)?;
+        let info = ribit_core::instruction::Info::new(instr, 4);
+        *pc += 4;
+        Ok(info)
+    } else {
+        parse_compressed(pc, memory)
+    }
+}
+
+fn decode_block(
+    start_pc: u32,
+    memory: &[u8],
+) -> Result<
+    (Vec<ribit_core::instruction::Info>, ribit_core::instruction::Info, u32),
+    ribit_decode::DecodeError,
+> {
+    let mut current_pc = start_pc;
+
+    let mut block_instrs = Vec::new();
+    let terminator;
+    loop {
+        log::debug!("PC: ${:04x}", current_pc);
+        let inst_info = parse_instruction(&mut current_pc, memory)?;
+
+        log::debug!("instr: {}", ribit_core::disassemble::FmtInstruction::from_info(&inst_info));
+
+        if inst_info.instruction.is_terminator() {
+            terminator = inst_info;
+            break;
+        }
+
+        block_instrs.push(inst_info);
+    }
+
+    let end_pc = current_pc;
+
+    Ok((block_instrs, terminator, end_pc))
+}
+
 pub struct ExecutionEngine {
     // xregs[0] is fixed to 0
     xregs: [u32; ribit_jit::XLEN],
@@ -142,77 +217,10 @@ impl ExecutionEngine {
         Self { xregs, pc, memory, jit, test_ctx: TestAddrs::from_elf(&elf) }
     }
 
-    fn parse_compressed(
-        &mut self,
-    ) -> Result<ribit_core::instruction::Info, ribit_decode::DecodeError> {
-        if self.pc as usize + 1 >= self.memory.len() {
-            return Err(ribit_decode::DecodeError::Other);
-        }
-
-        let instr = u16::from_le_bytes(
-            self.memory[(self.pc as usize)..][..2]
-                .try_into()
-                .expect("bad slice size expected 2???"),
-        );
-
-        log::debug!("instruction: {instr:016b}");
-
-        let instr = ribit_decode::compressed::decode_instruction(instr)?;
-        let info = ribit_core::instruction::Info::new(instr, 2);
-        self.pc += 2;
-        Ok(info)
-    }
-
-    fn parse_instruction(
-        &mut self,
-    ) -> Result<ribit_core::instruction::Info, ribit_decode::DecodeError> {
-        if self.pc as usize + 3 >= self.memory.len() {
-            return Err(ribit_decode::DecodeError::Other);
-        }
-
-        let instr = u32::from_le_bytes(
-            self.memory[(self.pc as usize)..][..4]
-                .try_into()
-                .expect("bad slice size expected 4???"),
-        );
-
-        // log::debug!("instruction bytes: {:08x}", instr.to_le());
-
-        if instr & 0b11 == 0b11 {
-            log::debug!("instruction: {instr:032b}");
-            let instr = ribit_decode::instruction(instr)?;
-            let info = ribit_core::instruction::Info::new(instr, 4);
-            self.pc += 4;
-            Ok(info)
-        } else {
-            self.parse_compressed()
-        }
-    }
-
     fn create_block(&mut self) -> Result<(), ribit_decode::DecodeError> {
-        let pc = self.pc;
-        let mut block_instrs = Vec::new();
+        let (block_instrs, terminator, end_pc) = decode_block(self.pc, &self.memory)?;
 
-        let terminator;
-        loop {
-            log::debug!("PC: ${:04x}", self.pc);
-            let inst_info = self.parse_instruction()?;
-
-            log::debug!(
-                "instr: {}",
-                ribit_core::disassemble::FmtInstruction::from_info(&inst_info)
-            );
-
-            if inst_info.instruction.is_terminator() {
-                terminator = inst_info;
-                break;
-            }
-
-            block_instrs.push(inst_info);
-        }
-
-        self.pc = pc;
-        self.jit.generate_basic_block(block_instrs, terminator, pc, self.pc);
+        self.jit.generate_basic_block(block_instrs, terminator, self.pc, end_pc);
 
         Ok(())
     }
