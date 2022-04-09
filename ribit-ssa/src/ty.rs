@@ -52,7 +52,7 @@ impl ConstTy for Bool {
     }
 
     fn fmt_const(constant: &Self::Const, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        <bool as fmt::Display>::fmt(&constant, f)
+        <bool as fmt::Display>::fmt(constant, f)
     }
 }
 

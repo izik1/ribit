@@ -67,7 +67,7 @@ impl Context {
         assert!(memory_size.is_power_of_two());
 
         let mut self_ = Self {
-            id_allocator: IdAllocator::new(),
+            id_allocator: IdAllocator::with_start(Id(2)),
             pc: Source::Const(start_pc),
             registers: [None; 32],
             register_arg: None,

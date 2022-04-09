@@ -83,6 +83,7 @@ pub(crate) fn neg(v: Constant) -> Constant {
     }
 }
 
+#[must_use]
 pub fn sub(lhs: Constant, rhs: Constant) -> Constant {
     struct Op;
     impl fmt::Display for Op {
@@ -136,7 +137,7 @@ where
 {
     match (src1, src2) {
         (Constant::Int(Int(Bitness::B32, lhs)), Constant::Int(Int(Bitness::B32, rhs))) => {
-            return Constant::i32(f(lhs, rhs, op));
+             Constant::i32(f(lhs, rhs, op))
         }
 
         (lhs, rhs) => {

@@ -7,7 +7,12 @@ pub struct IdAllocator {
 impl IdAllocator {
     #[must_use]
     pub fn new() -> Self {
-        Self { next_id: Id(0) }
+        Self::with_start(Id(0))
+    }
+
+    #[must_use]
+    pub fn with_start(start: Id) -> Self {
+        Self { next_id: start }
     }
 
     #[must_use = "ignoring the return of this function will leak an ID slot and is almost never what you want"]

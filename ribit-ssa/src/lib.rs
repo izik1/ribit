@@ -96,6 +96,7 @@ pub enum CommutativeBinOp {
 impl CommutativeBinOp {
     // all current commutative binops *are* associative (iff we're talking about integers.)
     // But theoretically we could implement some commutative binop that isn't associative.
+    #[must_use]
     pub const fn is_associative(self) -> bool {
         match self {
             CommutativeBinOp::And
