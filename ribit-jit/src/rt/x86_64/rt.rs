@@ -8,7 +8,7 @@ use rasen::params::Register;
 
 use super::generator::BlockBuilder;
 use crate::rt::common;
-use crate::rt::x86_64::{legalise, register_alloc, BasicBlock, ReturnCode};
+use crate::rt::x86_64::{legalise, register_alloc, BasicBlockFunc, Block, ReturnCode};
 
 #[derive(Default)]
 pub struct X86_64 {
@@ -18,18 +18,46 @@ pub struct X86_64 {
     ranges: Vec<Range<u32>>,
 }
 
+fn print_block(buffer: &[u8], block: &Block) {
+    let buffer = &buffer[block.offset..][..block.length];
+    let byte_str = {
+        const SEPARATOR: &str = ", ";
+        let len = buffer.len();
+
+        // len = 2 bytes per char, eg, `a9`, and an additional SEPARATOR bytes per separator
+        // there's 1 separator between every two chars, hence, so, `(len - 1) * SEPARATOR.len()`
+        // When there are no characters, there are *still* no separators, so, `len.saturating_sub(1)`
+        // ie, `0 - 1` should still give zero.
+        let mut byte_str = String::with_capacity(len * 2 + len.saturating_sub(1) * SEPARATOR.len());
+        let mut bytes = buffer.iter();
+
+        if let Some(byte) = bytes.next() {
+            byte_str.push_str(&format!("{byte:02x}"));
+        }
+
+        for byte in bytes {
+            byte_str.push_str(SEPARATOR);
+
+            byte_str.push_str(&format!("{byte:02x}"));
+        }
+
+        byte_str
+    };
+
+    log::debug!("Native block: [{byte_str}]");
+}
+
 impl X86_64 {
     fn make_fn(
         buffer: &mut Buffer,
         block: &ribit_ssa::Block,
         allocs: &HashMap<ribit_ssa::Id, Register>,
         clobbers: &HashMap<usize, Vec<Register>>,
-    ) -> BasicBlock {
+    ) -> Block {
         log::debug!("{}", block.display_instructions());
 
         let raw_buffer = buffer.raw.take().expect("Failed to take buffer");
         let mut raw_buffer = raw_buffer.make_mut().expect("Failed to make buffer mutable");
-        let funct_ptr = unsafe { raw_buffer.as_mut_ptr().add(buffer.write_offset as usize) };
 
         let mut writer = Cursor::new(raw_buffer.as_mut());
         writer.set_position(buffer.write_offset);
@@ -52,40 +80,17 @@ impl X86_64 {
             .complete(&block.terminator, allocs, &*final_clobbers)
             .expect("todo: handle block creation error");
 
-        let start = mem::replace(&mut buffer.write_offset, writer.position());
+        let start = mem::replace(&mut buffer.write_offset, writer.position()) as usize;
 
-        let native_buffer = &raw_buffer[(start as usize)..(buffer.write_offset as usize)];
+        let len = (buffer.write_offset as usize) - (start as usize);
 
-        let byte_str = {
-            const SEPARATOR: &str = ", ";
-            let len = native_buffer.len();
+        let block = Block { offset: start, length: len };
 
-            // len = 2 bytes per char, eg, `a9`, and an additional SEPARATOR bytes per separator
-            // there's 1 separator between every two chars, hence, so, `(len - 1) * SEPARATOR.len()`
-            // When there are no characters, there are *still* no separators, so, `len.saturating_sub(1)`
-            // ie, `0 - 1` should still give zero.
-            let mut byte_str =
-                String::with_capacity(len * 2 + len.saturating_sub(1) * SEPARATOR.len());
-            let mut bytes = native_buffer.iter();
-
-            if let Some(byte) = bytes.next() {
-                byte_str.push_str(&format!("{byte:02x}"));
-            }
-
-            for byte in bytes {
-                byte_str.push_str(SEPARATOR);
-
-                byte_str.push_str(&format!("{byte:02x}"));
-            }
-
-            byte_str
-        };
-
-        log::debug!("Native block: [{byte_str}]");
+        print_block(&raw_buffer, &block);
 
         buffer.raw = Some(raw_buffer.make_exec().unwrap());
 
-        unsafe { std::mem::transmute(funct_ptr) }
+        block
     }
 }
 
@@ -102,12 +107,12 @@ impl crate::rt::Target for X86_64 {
 
         legalise::legalise(&mut block, &allocs);
 
-        let funct = Self::make_fn(&mut self.buffer, &block, &allocs, &clobbers);
+        let block = Self::make_fn(&mut self.buffer, &block, &allocs, &clobbers);
 
         let insert_idx =
             self.ranges.binary_search_by_key(&start_pc, |range| range.start).unwrap_or_else(|e| e);
 
-        self.blocks.insert(insert_idx, Block(funct));
+        self.blocks.insert(insert_idx, block);
         self.ranges.insert(insert_idx, start_pc..end_pc);
     }
 
@@ -121,16 +126,17 @@ impl crate::rt::Target for X86_64 {
         regs: &mut [u32; crate::XLEN],
         memory: &mut [u8],
     ) -> (u32, ReturnCode) {
-        self.lookup_block(pc).unwrap().execute(regs, memory)
-    }
-}
+        let block = self.lookup_block(pc).unwrap();
+        // safety: blocks *must* point to a valid offset into the buffer.
+        let ptr = unsafe { self.buffer.raw.as_ref().unwrap().as_ptr().add(block.offset) };
 
-pub struct Block(super::BasicBlock);
+        // safety: blocks in `self.blocks` must be valid BasicBlockFuncs.
+        let func: BasicBlockFunc = unsafe { std::mem::transmute(ptr) };
 
-impl Block {
-    fn execute(&self, registers: &mut [u32; crate::XLEN], memory: &mut [u8]) -> (u32, ReturnCode) {
-        // safety: contract of Runtime is that blocks *must* stay valid for as long as they exist.
-        unsafe { self.0(registers.as_mut_ptr(), memory.as_mut_ptr()) }.into_parts()
+        // safety: the code we generated promises to not invoke UB, which is the best you can do with dynamic code.
+        let ret = unsafe { func(regs.as_mut_ptr(), memory.as_mut_ptr()) };
+
+        ret.into_parts()
     }
 }
 

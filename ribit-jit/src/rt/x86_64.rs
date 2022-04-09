@@ -8,7 +8,13 @@ use ribit_core::ReturnCode;
 
 type Assembler<'a, 'b> = rasen::Assembler<'a, std::io::Cursor<&'b mut [u8]>>;
 
-type BasicBlock = unsafe extern "sysv64" fn(regs: *mut u32, memory: *mut u8) -> BlockReturn;
+type BasicBlockFunc = unsafe extern "sysv64" fn(regs: *mut u32, memory: *mut u8) -> BlockReturn;
+
+// this is an offset + length pair into the `Buffer` for `BasicBlockFunc`s.
+pub struct Block {
+    offset: usize,
+    length: usize,
+}
 
 #[repr(transparent)]
 #[derive(Copy, Clone)]
