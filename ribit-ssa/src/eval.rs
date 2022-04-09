@@ -137,7 +137,7 @@ where
 {
     match (src1, src2) {
         (Constant::Int(Int(Bitness::B32, lhs)), Constant::Int(Int(Bitness::B32, rhs))) => {
-             Constant::i32(f(lhs, rhs, op))
+            Constant::i32(f(lhs, rhs, op))
         }
 
         (lhs, rhs) => {

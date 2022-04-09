@@ -31,15 +31,23 @@ pub trait Target {
     ) -> (u32, ReturnCode);
 }
 
+pub type DecodeOutput<E> = Result<(Vec<instruction::Info>, instruction::Info, u32), E>;
+
 impl<Rt: Target + Default> Runtime<Rt> {
-    pub fn execute_basic_block(
+    pub fn execute_basic_block<DecodeError>(
         &mut self,
         pc: &mut u32,
         regs: &mut [u32; crate::XLEN],
         memory: &mut [u8],
-    ) {
+        decode: impl FnOnce(u32, &[u8]) -> DecodeOutput<DecodeError>,
+    ) -> Result<(), DecodeError> {
         // assert memory size for now
         assert_eq!(memory.len(), crate::MEMORY_SIZE as usize);
+
+        if !self.lookup_block(*pc) {
+            let (block_instrs, branch, end_pc) = decode(*pc, memory)?;
+            self.generate_basic_block(block_instrs, branch, *pc, end_pc)
+        }
 
         let (address, return_code) = self.inner.execute_block(*pc, regs, memory);
 
@@ -50,6 +58,8 @@ impl<Rt: Target + Default> Runtime<Rt> {
             ReturnCode::EBreak => todo!("EBREAK"),
             ReturnCode::ECall => crate::sbi::call(regs),
         }
+
+        Ok(())
     }
 
     #[must_use]
@@ -58,7 +68,7 @@ impl<Rt: Target + Default> Runtime<Rt> {
     }
 
     #[must_use]
-    pub fn lookup_block(&self, start_address: u32) -> bool {
+    fn lookup_block(&self, start_address: u32) -> bool {
         self.inner.lookup_block(start_address).is_some()
     }
 

@@ -217,22 +217,8 @@ impl ExecutionEngine {
         Self { xregs, pc, memory, jit, test_ctx: TestAddrs::from_elf(&elf) }
     }
 
-    fn create_block(&mut self) -> Result<(), ribit_decode::DecodeError> {
-        let (block_instrs, terminator, end_pc) = decode_block(self.pc, &self.memory)?;
-
-        self.jit.generate_basic_block(block_instrs, terminator, self.pc, end_pc);
-
-        Ok(())
-    }
-
     pub fn run(&mut self) -> Result<(), ribit_decode::DecodeError> {
-        if !self.jit.lookup_block(self.pc) {
-            self.create_block()?;
-        }
-
-        self.jit.execute_basic_block(&mut self.pc, &mut self.xregs, &mut self.memory);
-
-        Ok(())
+        self.jit.execute_basic_block(&mut self.pc, &mut self.xregs, &mut self.memory, decode_block)
     }
 
     #[must_use]

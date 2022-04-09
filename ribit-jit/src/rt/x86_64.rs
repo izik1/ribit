@@ -67,7 +67,7 @@ mod test {
 
         let mut pc = 0;
 
-        ctx.execute_basic_block(&mut pc, &mut regs, &mut memory);
+        ctx.execute_basic_block(&mut pc, &mut regs, &mut memory, |_, _| Err(())).unwrap();
         assert_eq!(pc, 4096);
 
         for idx in 1..regs.len() {
@@ -103,7 +103,7 @@ mod test {
         regs[1] = 1024;
         let mut pc = 48;
 
-        ctx.execute_basic_block(&mut pc, &mut regs, &mut memory);
+        ctx.execute_basic_block(&mut pc, &mut regs, &mut memory, |_, _| Err(())).unwrap();
 
         assert_eq!(pc, 2046 + 1024);
 
@@ -134,7 +134,7 @@ mod test {
         let (mut regs, mut memory) = init();
         let mut pc = 0;
 
-        ctx.execute_basic_block(&mut pc, &mut regs, &mut memory);
+        ctx.execute_basic_block(&mut pc, &mut regs, &mut memory, |_, _| Err(())).unwrap();
         assert_eq!(pc, 4096);
 
         for (idx, reg) in regs.iter().copied().enumerate() {
