@@ -17,7 +17,7 @@ use std::collections::HashMap;
 
 use rasen::params::Register;
 use ribit_ssa as ssa;
-pub use rt::{Block, Runtime, Target};
+pub use rt::{Runtime, Target};
 use ssa::Constant;
 
 #[cfg(any(target_arch = "x86_64"))]

@@ -1,8 +1,14 @@
 use std::collections::HashMap;
+use std::ops::Range;
 
 use ribit_ssa::{eval, ty, AnySource, Bitness, Constant, Id};
 
-pub struct Interpreter;
+use super::common;
+
+pub struct Interpreter {
+    blocks: Vec<Block>,
+    ranges: Vec<Range<u32>>,
+}
 
 pub struct Block(ribit_ssa::Block);
 
@@ -27,7 +33,7 @@ fn unwrap_bool(c: Constant) -> bool {
     }
 }
 
-impl crate::rt::Block for Block {
+impl Block {
     fn execute(
         &self,
         registers: &mut [u32; crate::XLEN],
@@ -157,12 +163,27 @@ impl crate::rt::Block for Block {
     }
 }
 
-unsafe impl crate::rt::Target for Interpreter {
-    type Buffer = ();
-
+impl crate::rt::Target for Interpreter {
     type Block = Block;
 
-    fn generate_block(_buffer: &mut Self::Buffer, block: ribit_ssa::Block) -> Self::Block {
-        Block(block)
+    fn generate_block(&mut self, block: ribit_ssa::Block, start_pc: u32, end_pc: u32) {
+        let insert_idx =
+            self.ranges.binary_search_by_key(&start_pc, |range| range.start).unwrap_or_else(|e| e);
+
+        self.blocks.insert(insert_idx, Block(block));
+        self.ranges.insert(insert_idx, start_pc..end_pc);
+    }
+
+    fn lookup_block(&self, start_address: u32) -> Option<&Self::Block> {
+        common::lookup_block(&self.ranges, &self.blocks, start_address)
+    }
+
+    fn execute_block(
+        &mut self,
+        pc: u32,
+        regs: &mut [u32; crate::XLEN],
+        memory: &mut [u8],
+    ) -> (u32, ribit_core::ReturnCode) {
+        self.lookup_block(pc).unwrap().execute(regs, memory)
     }
 }

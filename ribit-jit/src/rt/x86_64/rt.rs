@@ -2,13 +2,21 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::mem;
+use std::ops::Range;
 
 use rasen::params::Register;
 
 use super::generator::BlockBuilder;
+use crate::rt::common;
 use crate::rt::x86_64::{legalise, register_alloc, BasicBlock, ReturnCode};
 
-pub struct X86_64;
+#[derive(Default)]
+pub struct X86_64 {
+    // contract: blocks *must* be valid into the buffer.
+    blocks: Vec<Block>,
+    buffer: Buffer,
+    ranges: Vec<Range<u32>>,
+}
 
 impl X86_64 {
     fn make_fn(
@@ -81,12 +89,10 @@ impl X86_64 {
     }
 }
 
-unsafe impl crate::rt::Target for X86_64 {
-    type Buffer = Buffer;
-
+impl crate::rt::Target for X86_64 {
     type Block = Block;
 
-    fn generate_block(buffer: &mut Self::Buffer, mut block: ribit_ssa::Block) -> Self::Block {
+    fn generate_block(&mut self, mut block: ribit_ssa::Block, start_pc: u32, end_pc: u32) {
         let (allocs, clobbers) = loop {
             match register_alloc::allocate_registers(&block) {
                 Ok(allocs) => break allocs,
@@ -96,14 +102,32 @@ unsafe impl crate::rt::Target for X86_64 {
 
         legalise::legalise(&mut block, &allocs);
 
-        let funct = Self::make_fn(buffer, &block, &allocs, &clobbers);
-        Block(funct)
+        let funct = Self::make_fn(&mut self.buffer, &block, &allocs, &clobbers);
+
+        let insert_idx =
+            self.ranges.binary_search_by_key(&start_pc, |range| range.start).unwrap_or_else(|e| e);
+
+        self.blocks.insert(insert_idx, Block(funct));
+        self.ranges.insert(insert_idx, start_pc..end_pc);
+    }
+
+    fn lookup_block(&self, start_address: u32) -> Option<&Self::Block> {
+        common::lookup_block(&self.ranges, &self.blocks, start_address)
+    }
+
+    fn execute_block(
+        &mut self,
+        pc: u32,
+        regs: &mut [u32; crate::XLEN],
+        memory: &mut [u8],
+    ) -> (u32, ReturnCode) {
+        self.lookup_block(pc).unwrap().execute(regs, memory)
     }
 }
 
 pub struct Block(super::BasicBlock);
 
-impl crate::rt::Block for Block {
+impl Block {
     fn execute(&self, registers: &mut [u32; crate::XLEN], memory: &mut [u8]) -> (u32, ReturnCode) {
         // safety: contract of Runtime is that blocks *must* stay valid for as long as they exist.
         unsafe { self.0(registers.as_mut_ptr(), memory.as_mut_ptr()) }.into_parts()
