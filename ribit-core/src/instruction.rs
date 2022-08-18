@@ -11,7 +11,7 @@ pub struct Info {
 
 impl Info {
     #[must_use]
-    pub fn new(instruction: Instruction, len: u32) -> Self {
+    pub const fn new(instruction: Instruction, len: u32) -> Self {
         Self { instruction, len }
     }
 }
@@ -31,7 +31,7 @@ pub enum Instruction {
 
 impl Instruction {
     #[must_use]
-    pub fn is_terminator(&self) -> bool {
+    pub const fn is_terminator(&self) -> bool {
         matches!(self, Self::J(_) | Self::B(_) | Self::Sys(_) | Self::IJump(_))
     }
 }
@@ -43,7 +43,7 @@ pub struct Sys {
 
 impl Sys {
     #[must_use]
-    pub fn new(opcode: opcode::RSys) -> Self {
+    pub const fn new(opcode: opcode::RSys) -> Self {
         Self { opcode }
     }
 }
@@ -58,7 +58,7 @@ pub struct R {
 
 impl R {
     #[must_use]
-    pub fn new(
+    pub const fn new(
         rs1: Option<RiscVRegister>,
         rs2: Option<RiscVRegister>,
         rd: Option<RiscVRegister>,
@@ -78,7 +78,7 @@ pub struct I {
 
 impl I {
     #[must_use]
-    pub fn new(
+    pub const fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
         rd: Option<RiscVRegister>,
@@ -98,7 +98,7 @@ pub struct IJump {
 
 impl IJump {
     #[must_use]
-    pub fn new(
+    pub const fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
         rd: Option<RiscVRegister>,
@@ -118,7 +118,7 @@ pub struct IMem {
 
 impl IMem {
     #[must_use]
-    pub fn new(
+    pub const fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
         rd: Option<RiscVRegister>,
@@ -138,7 +138,7 @@ pub struct S {
 
 impl S {
     #[must_use]
-    pub fn new(
+    pub const fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
         rs2: Option<RiscVRegister>,
@@ -158,7 +158,7 @@ pub struct B {
 
 impl B {
     #[must_use]
-    pub fn new(
+    pub const fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
         rs2: Option<RiscVRegister>,
@@ -177,7 +177,7 @@ pub struct U {
 
 impl U {
     #[must_use]
-    pub fn new(imm: u32, rd: Option<RiscVRegister>, opcode: opcode::U) -> Self {
+    pub const fn new(imm: u32, rd: Option<RiscVRegister>, opcode: opcode::U) -> Self {
         Self { imm, rd, opcode }
     }
 }
@@ -191,7 +191,7 @@ pub struct J {
 
 impl J {
     #[must_use]
-    pub fn new(imm: u32, rd: Option<RiscVRegister>, opcode: opcode::J) -> Self {
+    pub const fn new(imm: u32, rd: Option<RiscVRegister>, opcode: opcode::J) -> Self {
         Self { imm, rd, opcode }
     }
 }

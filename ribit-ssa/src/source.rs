@@ -121,7 +121,7 @@ impl AnySource {
     pub fn downcast<T: ConstTy>(self) -> Option<Source<T>> {
         match self {
             AnySource::Const(c) => T::downcast(c).map(Source::Const),
-            AnySource::Ref(r) => (r.ty == T::TY).then(|| Source::Ref(r.id)),
+            AnySource::Ref(r) => (r.ty == T::TY).then_some(Source::Ref(r.id)),
         }
     }
 }

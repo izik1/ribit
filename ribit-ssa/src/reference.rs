@@ -20,10 +20,17 @@ impl fmt::Display for Reference {
     }
 }
 
-#[derive(Eq, PartialEq)]
 pub struct Ref<T> {
     pub id: Id,
     _phantom: PhantomData<fn(T) -> Type>,
+}
+
+impl<T> Eq for Ref<T> {}
+
+impl<T> PartialEq for Ref<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
 }
 
 impl<T> Clone for Ref<T> {

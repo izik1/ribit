@@ -77,7 +77,7 @@ impl X86_64 {
         };
 
         build_context
-            .complete(&block.terminator, allocs, &*final_clobbers)
+            .complete(&block.terminator, allocs, &final_clobbers)
             .expect("todo: handle block creation error");
 
         let start = mem::replace(&mut buffer.write_offset, writer.position()) as usize;

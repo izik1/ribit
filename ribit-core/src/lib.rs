@@ -70,7 +70,7 @@ pub enum ReturnCode {
 
 impl ReturnCode {
     #[must_use]
-    pub fn new(code: u32) -> Option<Self> {
+    pub const fn new(code: u32) -> Option<Self> {
         match code {
             0 => Some(Self::Normal),
             1 => Some(Self::EBreak),

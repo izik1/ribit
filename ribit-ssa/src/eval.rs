@@ -53,8 +53,8 @@ pub fn commutative_absorb(
             Constant::Int(i)
         }
 
-        (AnySource::Const(Constant::Bool(false)), CommutativeBinOp::And) => (Constant::Bool(false)),
-        (AnySource::Const(Constant::Bool(true)), CommutativeBinOp::Or) => (Constant::Bool(true)),
+        (AnySource::Const(Constant::Bool(false)), CommutativeBinOp::And) => Constant::Bool(false),
+        (AnySource::Const(Constant::Bool(true)), CommutativeBinOp::Or) => Constant::Bool(true),
 
         (AnySource::Ref(rhs), CommutativeBinOp::Xor) if (lhs.id == rhs.id) => match lhs.ty {
             crate::Type::Int(b) => Constant::Int(Int(b, 0)),

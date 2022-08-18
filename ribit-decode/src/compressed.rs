@@ -3,9 +3,9 @@ use crate::instruction::{self, Instruction};
 use crate::register::RiscV as RiscVRegister;
 use crate::{opcode, CompressedDecodeError, Extension, Width};
 
-fn decode_register(instruction: u16) -> RiscVRegister {
-    // safety: rnum ors in 0b1000 which prevents it from ever being 0
-    // safety: rnum ands out any bits that might cause it to be more than 31 (0b1_1111)
+const fn decode_register(instruction: u16) -> RiscVRegister {
+    // safety: rnum masks in 0b1000 which prevents it from ever being 0
+    // safety: rnum masks out any bits that might cause it to be more than 31 (0b1_1111)
     #[allow(unsafe_code)]
     unsafe {
         let rnum = ((instruction | 0b1000) & 0b1111) as u8;
@@ -120,7 +120,7 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
 
             let imm = sign_extend_32(imm, 12);
 
-            let link_reg = (funct3 == 0b001).then(|| RiscVRegister::X1);
+            let link_reg = (funct3 == 0b001).then_some(RiscVRegister::X1);
 
             Instruction::J(instruction::J::new(imm, link_reg, opcode::J::JAL))
         }
