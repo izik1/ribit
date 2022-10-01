@@ -23,10 +23,7 @@ pub struct BlockBuilder<'a, 'b: 'a> {
 
 impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
     pub(super) fn start(stream: Assembler<'a, 'b>) -> Self {
-        if !raw_cpuid::CpuId::new()
-            .get_extended_feature_info()
-            .map_or(false, |feats| feats.has_bmi2())
-        {
+        if !is_x86_feature_detected!("bmi2") {
             panic!("Make the crate author support code gen on x86 without bmi2");
         }
 

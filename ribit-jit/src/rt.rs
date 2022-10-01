@@ -46,7 +46,7 @@ impl<Rt: Target + Default> Runtime<Rt> {
 
         if !self.lookup_block(*pc) {
             let (block_instrs, branch, end_pc) = decode(*pc, memory)?;
-            self.generate_basic_block(block_instrs, branch, *pc, end_pc)
+            self.generate_basic_block(block_instrs, branch, *pc, end_pc);
         }
 
         let (address, return_code) = self.inner.execute_block(*pc, regs, memory);
