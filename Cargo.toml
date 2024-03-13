@@ -12,12 +12,12 @@ version = "0.1.0"
 
 [dependencies]
 log = "0.4.8"
-xmas-elf = "0.8.0"
+xmas-elf = "0.9.0"
 
 [dependencies.env_logger]
 default-features = false
-features = ["termcolor", "atty", "humantime"]
-version = "0.9.0"
+features = ["color", "auto-color", "humantime"]
+version = "0.11.3"
 
 [dependencies.ribit-core]
 features = ["disassemble"]
