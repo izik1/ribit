@@ -28,7 +28,7 @@
                 [
                   (rust-bin.selectLatestNightlyWith
                     (toolchain: toolchain.default.override {
-                      extensions = [ "rust-src" ];
+                      extensions = [ "rust-src" "llvm-tools-preview" ];
                     })
                   )
                   nixpkgs-fmt
