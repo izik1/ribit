@@ -6,7 +6,7 @@ mod interpreter;
 
 pub use interpreter::Interpreter;
 
-#[cfg(any(target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 pub mod x86_64;
 
 mod common;
@@ -89,7 +89,7 @@ impl<Rt: Target + Default> Runtime<Rt> {
 
         self.opt_pass_manager.run(&mut block);
 
-        let _ = self.inner.generate_block(block, start_pc, end_pc);
+        self.inner.generate_block(block, start_pc, end_pc);
     }
 }
 

@@ -20,14 +20,16 @@ use ribit_ssa as ssa;
 pub use rt::{Runtime, Target};
 use ssa::Constant;
 
-#[cfg(any(target_arch = "x86_64"))]
+pub type InterpreterRuntime = rt::Runtime<rt::Interpreter>;
+
+#[cfg(target_arch = "x86_64")]
 pub type DefaultRuntime = AMD64Runtime;
 
-#[cfg(not(any(target_arch = "x86_64")))]
-pub type DefaultRuntime = rt::Runtime<rt::Interpreter>;
+#[cfg(not(target_arch = "x86_64"))]
+pub type DefaultRuntime = InterpreterRuntime;
 
 /// Runtime for X86-64 hosts.
-#[cfg(any(target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 pub type AMD64Runtime = Runtime<rt::x86_64::rt::X86_64>;
 
 pub const XLEN: usize = 32;

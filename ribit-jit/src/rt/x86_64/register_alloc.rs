@@ -135,6 +135,10 @@ impl RegisterAllocator {
 
         None
     }
+
+    fn finish(self) -> AllocMap {
+        AllocMap { allocs: self.allocations, clobbers: self.clobbers }
+    }
 }
 
 impl Default for RegisterAllocator {
@@ -147,14 +151,17 @@ impl Default for RegisterAllocator {
 #[derive(Debug, Copy, Clone)]
 pub struct RegisterSpill(pub usize);
 
-pub fn allocate_registers(
-    block: &ribit_ssa::Block,
-) -> Result<(HashMap<Id, Register>, HashMap<usize, Vec<Register>>), RegisterSpill> {
+pub struct AllocMap {
+    pub allocs: HashMap<Id, Register>,
+    pub clobbers: HashMap<usize, Vec<Register>>,
+}
+
+pub fn try_alloc(block: &ribit_ssa::Block) -> Result<AllocMap, RegisterSpill> {
     let mut allocator = RegisterAllocator::new();
 
     let start = match allocator.allocate_args(&block.instructions) {
         Some(idx) => idx,
-        None => return Ok((allocator.allocations, allocator.clobbers)),
+        None => return Ok(allocator.finish()),
     };
 
     // todo: find an efficient way of pre-checking lifetimes to avoid unneeded work on spills.
@@ -201,7 +208,7 @@ pub fn allocate_registers(
         }
     }
 
-    Ok((allocator.allocations, allocator.clobbers))
+    Ok(allocator.finish())
 }
 
 pub fn spill(block: &mut ribit_ssa::Block, spill: RegisterSpill) {
@@ -236,6 +243,15 @@ pub fn spill(block: &mut ribit_ssa::Block, spill: RegisterSpill) {
     ssa::update_references(block, lt.end, id, end_id);
 }
 
+pub fn alloc(block: &mut ribit_ssa::Block) -> AllocMap {
+    loop {
+        match try_alloc(&block) {
+            Ok(allocs) => break allocs,
+            Err(spill) => self::spill(block, spill),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use expect_test::expect;
@@ -251,12 +267,7 @@ mod test {
         opt::dead_instruction_elimination(&mut block);
         opt::register_writeback_shrinking(&mut block);
 
-        let (allocs, clobbers) = loop {
-            match super::allocate_registers(&block) {
-                Ok(allocs) => break allocs,
-                Err(spill) => super::spill(&mut block, spill),
-            }
-        };
+        let super::AllocMap { allocs, clobbers } = super::alloc(&mut block);
 
         let lifetimes = analysis::lifetimes(&mut block);
         let mut lifetimes = format!(

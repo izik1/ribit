@@ -98,12 +98,7 @@ impl crate::rt::Target for X86_64 {
     type Block = Block;
 
     fn generate_block(&mut self, mut block: ribit_ssa::Block, start_pc: u32, end_pc: u32) {
-        let (allocs, clobbers) = loop {
-            match register_alloc::allocate_registers(&block) {
-                Ok(allocs) => break allocs,
-                Err(spill) => register_alloc::spill(&mut block, spill),
-            }
-        };
+        let register_alloc::AllocMap { allocs, clobbers } = register_alloc::alloc(&mut block);
 
         legalise::legalise(&mut block, &allocs);
 

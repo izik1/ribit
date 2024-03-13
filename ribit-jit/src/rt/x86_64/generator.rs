@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::io;
 
 use rasen::params::imm::{Imm16, Imm32, Imm8};
@@ -173,7 +172,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
 
                     let cond = *allocs.get(&it.cond.id).expect("cond not allocated!?");
 
-                    let clobber_reg = clobbers.get(&idx).and_then(|regs| regs.get(0)).copied();
+                    let clobber_reg = clobbers.get(&idx).and_then(|regs| regs.first()).copied();
                     cmp::select(self, dest, cond, if_true, if_false, clobber_reg)
                 }
 
@@ -256,7 +255,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                     }
 
                     (code, Source::Register(Register::Zax)) => {
-                        debug_assert_eq!(clobbers.get(0), Some(&Register::Zax));
+                        debug_assert_eq!(clobbers.first(), Some(&Register::Zax));
                         let clobber_reg =
                             *clobbers.get(1).expect("Expected 2 clobbers (first being Zax)");
 

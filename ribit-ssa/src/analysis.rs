@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::fmt::{self, Write};
 
 use crate::{Block, Id, Instruction, Source, StackIndex, Terminator};

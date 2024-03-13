@@ -120,12 +120,7 @@ mod test {
         opt::dead_instruction_elimination(&mut block);
         opt::register_writeback_shrinking(&mut block);
 
-        let (allocs, _clobbers) = loop {
-            match register_alloc::allocate_registers(&block) {
-                Ok(allocs) => break allocs,
-                Err(spill) => register_alloc::spill(&mut block, spill),
-            }
-        };
+        let register_alloc::AllocMap { allocs, clobbers: _ } = register_alloc::alloc(&mut block);
 
         super::legalise(&mut block, &allocs);
 
