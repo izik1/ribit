@@ -1,5 +1,5 @@
 [workspace]
-members = ["ribit-*"]
+members = ["ribit-*", "fuzz"]
 
 [package]
 authors = ["Skyler Ross <orangesnowfox@gmail.com>"]
