@@ -25,16 +25,16 @@ pub fn call(regs: &mut [u32; crate::XLEN], mem: &mut [u8]) {
     let extension_funct = regs[16]; // x16 -> a6
 
     let (code, value) = match (extension_id, extension_funct) {
-        (0x10, 0) => get_sbi_spec_version(),
-        (0x10, 1) => get_sbi_impl_id(),
-        (0x10, 2) => get_sbi_impl_version(),
-        (0x10, 3) => probe_extension(regs[10]),
-        (0x10, 4) => get_mvendorid(),
-        (0x10, 5) => get_marchid(),
-        (0x10, 6) => get_mimpid(),
-        (0x4442434E, 0) => debug_console_write(mem, regs[10], regs[11], regs[12]),
-        (0x4442434E, 1) => debug_console_read(mem, regs[10], regs[11], regs[12]),
-        (0x4442434E, 2) => debug_console_write_byte(regs[10]),
+        (EXT_BASE, 0) => get_sbi_spec_version(),
+        (EXT_BASE, 1) => get_sbi_impl_id(),
+        (EXT_BASE, 2) => get_sbi_impl_version(),
+        (EXT_BASE, 3) => probe_extension(regs[10]),
+        (EXT_BASE, 4) => get_mvendorid(),
+        (EXT_BASE, 5) => get_marchid(),
+        (EXT_BASE, 6) => get_mimpid(),
+        (EXT_CONSOLE, 0) => debug_console_write(mem, regs[10], regs[11], regs[12]),
+        (EXT_CONSOLE, 1) => debug_console_read(mem, regs[10], regs[11], regs[12]),
+        (EXT_CONSOLE, 2) => debug_console_write_byte(regs[10]),
         _ => {
             log::warn!("Unsupported!");
             unsupported()
