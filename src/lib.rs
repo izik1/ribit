@@ -198,20 +198,26 @@ impl ExecutionEngine {
 
         assert_eq!(entry, 0x10000);
 
-        let mut memory = vec![0; ribit_jit::MEMORY_SIZE as usize].into_boxed_slice();
-
+        // fill with `AA`s instead of zeros to hopefully failings to zero memory red-handed.
+        let mut memory = vec![0xaa; ribit_jit::MEMORY_SIZE as usize].into_boxed_slice();
         for header in elf.program_iter() {
             if header.get_type().unwrap() == xmas_elf::program::Type::Load {
-                memory[(header.physical_addr() as usize)..][..(header.mem_size() as usize)]
-                    .copy_from_slice(
-                        &program[(header.physical_addr() as usize)..]
-                            [..(header.mem_size() as usize)],
-                    );
+                // the memory segment we're loading could be bigger than is stored in the program,
+                let memory_segment = &mut memory[(header.physical_addr() as usize)..]
+                    [..(header.mem_size() as usize)];
+
+                let (load, zeroize) = memory_segment.split_at_mut(header.file_size() as usize);
+
+                load.copy_from_slice(
+                    &program[(header.offset() as usize)..][..(header.file_size() as usize)],
+                );
+
+                zeroize.fill(0);
             }
         }
 
         let xregs = [0; ribit_jit::XLEN];
-        let pc = 0x10000;
+        let pc = entry;
         let jit = ribit_jit::DefaultRuntime::new();
 
         Self { xregs, pc, memory, jit, test_ctx: TestAddrs::from_elf(&elf) }

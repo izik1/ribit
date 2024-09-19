@@ -46,7 +46,8 @@ pub fn tokenize(input: &str, enable_compressed: bool) -> ParseOutput {
     };
 
     for line in input.lines() {
-        let line = line.trim().split_once(';').map(|(line, _comment)| line).unwrap_or(line);
+        let line = line.trim();
+        let line = line.split_once(';').map(|(line, _comment)| line).unwrap_or(line);
 
         tokenize_instruction(&mut output, line);
     }

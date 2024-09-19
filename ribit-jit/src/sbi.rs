@@ -1,3 +1,6 @@
+use core::ops::Range;
+use std::io::{Read, Write};
+
 #[repr(u32)]
 #[derive(Copy, Clone, Debug)]
 enum StatusCode {
@@ -14,20 +17,24 @@ enum StatusCode {
     ErrInvalidAddress = -5_i32 as u32,
 }
 
-pub fn call(regs: &mut [u32; crate::XLEN]) {
+const EXT_BASE: u32 = 0x10;
+const EXT_CONSOLE: u32 = 0x4442434E;
+
+pub fn call(regs: &mut [u32; crate::XLEN], mem: &mut [u8]) {
     let extension_id = regs[17]; // x17 -> a7
     let extension_funct = regs[16]; // x16 -> a6
 
     let (code, value) = match (extension_id, extension_funct) {
-        (0x01, _) => console_putchar(regs[12]),
-        (0x02, _) => console_getchar(),
         (0x10, 0) => get_sbi_spec_version(),
         (0x10, 1) => get_sbi_impl_id(),
         (0x10, 2) => get_sbi_impl_version(),
-        (0x10, 3) => probe_extension(regs[12]),
+        (0x10, 3) => probe_extension(regs[10]),
         (0x10, 4) => get_mvendorid(),
         (0x10, 5) => get_marchid(),
         (0x10, 6) => get_mimpid(),
+        (0x4442434E, 0) => debug_console_write(mem, regs[10], regs[11], regs[12]),
+        (0x4442434E, 1) => debug_console_read(mem, regs[10], regs[11], regs[12]),
+        (0x4442434E, 2) => debug_console_write_byte(regs[10]),
         _ => {
             log::warn!("Unsupported!");
             unsupported()
@@ -79,25 +86,77 @@ fn get_mimpid() -> (StatusCode, u32) {
     (StatusCode::Success, 0)
 }
 
-fn console_getchar() -> (StatusCode, u32) {
-    use std::io::Read;
-
-    let stdin = std::io::stdin();
-    let mut stdin = stdin.lock();
-    let mut buf = [0];
-    let code = match stdin.read_exact(&mut buf) {
-        Ok(_) => StatusCode::Success,
-        Err(_) => StatusCode::ErrFailure,
+fn addr_range(
+    num_bytes: u32,
+    base_addr_lo: u32,
+    base_addr_hi: u32,
+) -> Result<Range<usize>, StatusCode> {
+    // if we're somehow running this on a 16 bit system (Please don't!) I don't want to see any complaints lol.
+    let Ok(num_bytes) = usize::try_from(num_bytes) else {
+        return Err(StatusCode::ErrFailure);
     };
 
-    log::debug!("{}", u32::from(buf[0]));
-    log::debug!("{code:?}");
+    let base_addr = ((base_addr_hi as u64) << 32) + base_addr_lo as u64;
+    let Ok(base_addr) = usize::try_from(base_addr) else {
+        return Err(StatusCode::ErrInvalidAddress);
+    };
 
-    (code, u32::from(buf[0]))
+    let Some(end_addr) = base_addr.checked_add(num_bytes) else {
+        return Err(StatusCode::ErrInvalidAddress);
+    };
+
+    Ok(base_addr..end_addr)
 }
 
-fn console_putchar(ch: u32) -> (StatusCode, u32) {
-    println!("{:08x}", ch);
-    print!("{}", char::from(ch as u8));
-    (StatusCode::Success, 0)
+fn debug_console_write(
+    mem: &[u8],
+    num_bytes: u32,
+    base_addr_lo: u32,
+    base_addr_hi: u32,
+) -> (StatusCode, u32) {
+    let range = match addr_range(num_bytes, base_addr_lo, base_addr_hi) {
+        Ok(it) => it,
+        Err(code) => return (code, 0),
+    };
+
+    let Some(bytes) = mem.get(range) else {
+        return (StatusCode::ErrInvalidAddress, 0);
+    };
+
+    match std::io::stdout().write(bytes) {
+        // `num_bytes` comes from a u32, `written` is at most `num_bytes`, ergo, we're fine.
+        Ok(written) => (StatusCode::Success, written as u32),
+        Err(_) => (StatusCode::ErrFailure, 0),
+    }
+}
+
+fn debug_console_read(
+    mem: &mut [u8],
+    num_bytes: u32,
+    base_addr_lo: u32,
+    base_addr_hi: u32,
+) -> (StatusCode, u32) {
+    let range = match addr_range(num_bytes, base_addr_lo, base_addr_hi) {
+        Ok(it) => it,
+        Err(code) => return (code, 0),
+    };
+
+    let Some(bytes) = mem.get_mut(range) else {
+        return (StatusCode::ErrInvalidAddress, 0);
+    };
+
+    match std::io::stdin().read(bytes) {
+        // `num_bytes` comes from a u32, `read` is at most `num_bytes`, ergo, we're fine.
+        Ok(read) => (StatusCode::Success, read as u32),
+        Err(_) => (StatusCode::ErrFailure, 0),
+    }
+}
+
+fn debug_console_write_byte(byte: u32) -> (StatusCode, u32) {
+    let byte = byte as u8;
+
+    match std::io::stdout().lock().write(&[byte]) {
+        Ok(_read) => (StatusCode::Success, 0),
+        Err(_) => (StatusCode::ErrFailure, 0),
+    }
 }

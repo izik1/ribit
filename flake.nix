@@ -29,6 +29,7 @@
                   (rust-bin.selectLatestNightlyWith
                     (toolchain: toolchain.default.override {
                       extensions = [ "rust-src" "llvm-tools-preview" ];
+                      targets = [ "riscv32i-unknown-none-elf" ];
                     })
                   )
                   nixpkgs-fmt

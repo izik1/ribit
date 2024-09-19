@@ -56,7 +56,7 @@ impl<Rt: Target + Default> Runtime<Rt> {
         match return_code {
             ReturnCode::Normal => {}
             ReturnCode::EBreak => todo!("EBREAK"),
-            ReturnCode::ECall => crate::sbi::call(regs),
+            ReturnCode::ECall => crate::sbi::call(regs, memory),
         }
 
         Ok(())
