@@ -20,11 +20,13 @@ pub struct Block {
 }
 
 impl Block {
+    pub fn find(&self, id: Id) -> Option<&Instruction> {
+        self.instructions.iter().find(|it| it.id() == Some(id))
+    }
+
     #[must_use]
     pub fn reference(&self, id: Id) -> Option<Reference> {
-        self.instructions
-            .iter()
-            .find_map(|it| it.id().filter(|it| *it == id).map(|id| Reference { ty: it.ty(), id }))
+        self.find(id).map(|it| Reference { ty: it.ty(), id })
     }
 
     #[must_use]

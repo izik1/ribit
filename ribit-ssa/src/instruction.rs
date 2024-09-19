@@ -217,6 +217,11 @@ impl Instruction {
             | Self::Fence => None,
         }
     }
+
+    #[must_use]
+    pub fn reference(&self) -> Option<Reference> {
+        self.id().map(|id| Reference { ty: self.ty(), id })
+    }
 }
 
 impl fmt::Display for Instruction {

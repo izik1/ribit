@@ -78,6 +78,9 @@ pub fn lifetimes(block: &Block) -> Lifetimes {
     lifetimes
 }
 
+/// For each ID, finds the last time it was used (or its def) up to `needle`, and the first time ID was used after `needle`.
+///
+/// An ID will only be present in the map if its def is up to `needle`, and it will only be non-empty if it has a use after `needle`.
 #[must_use]
 pub fn surrounding_usages(block: &Block, needle: usize) -> Lifetimes {
     fn update_post_needle(lifetimes: &mut HashMap<Id, Lifetime>, id: Id, idx: usize) {
