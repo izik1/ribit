@@ -44,8 +44,13 @@ impl Lifetime {
     }
 
     #[must_use]
+    pub fn len(self) -> usize {
+        self.end - self.start
+    }
+
+    #[must_use]
     pub fn is_empty(self) -> bool {
-        self.start == self.end
+        self.len() == 0
     }
 }
 
@@ -101,6 +106,8 @@ pub fn surrounding_usages(block: &Block, needle: usize) -> Lifetimes {
         &mut lifetimes,
         update_post_needle,
     );
+
+    lifetimes.retain(|_, v| !v.is_empty());
 
     lifetimes
 }

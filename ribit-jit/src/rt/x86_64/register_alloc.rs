@@ -217,8 +217,7 @@ pub fn spill(block: &mut ribit_ssa::Block, spill: RegisterSpill) {
 
     let (id, lt) = surrounds
         .into_iter()
-        .filter(|(_, lt)| !lt.is_empty())
-        .max_by_key(|(_, lt)| lt.end - lt.start)
+        .max_by_key(|(id, lt)| (lt.len(), *id))
         .expect("Impossible to solve spill");
 
     // fixme: no unwrap
