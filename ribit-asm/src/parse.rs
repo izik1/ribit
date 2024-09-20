@@ -151,9 +151,46 @@ fn parse_general_purpose_register(register: &str) -> Result<Option<register::Ris
         return Ok(register::RiscV::with_u8(num));
     }
 
-    // todo: abi names.
+    let reg = match register {
+        "zero" => None,
+        "ra" => Some(register::RiscV::X1),
+        "sp" => Some(register::RiscV::X2),
+        "gp" => Some(register::RiscV::X3),
+        "tp" => Some(register::RiscV::X4),
+        "t0" => Some(register::RiscV::X5),
+        "t1" => Some(register::RiscV::X6),
+        "t2" => Some(register::RiscV::X7),
+        "s0" | "fp" => Some(register::RiscV::X8),
+        "s1" => Some(register::RiscV::X9),
+        "a0" => Some(register::RiscV::X10),
+        "a1" => Some(register::RiscV::X11),
+        "a2" => Some(register::RiscV::X12),
+        "a3" => Some(register::RiscV::X13),
+        "a4" => Some(register::RiscV::X14),
+        "a5" => Some(register::RiscV::X15),
+        "a6" => Some(register::RiscV::X16),
+        "a7" => Some(register::RiscV::X17),
+        "s2" => Some(register::RiscV::X18),
+        "s3" => Some(register::RiscV::X19),
+        "s4" => Some(register::RiscV::X20),
+        "s5" => Some(register::RiscV::X21),
+        "s6" => Some(register::RiscV::X22),
+        "s7" => Some(register::RiscV::X23),
+        "s8" => Some(register::RiscV::X24),
+        "s9" => Some(register::RiscV::X25),
+        "s10" => Some(register::RiscV::X26),
+        "s11" => Some(register::RiscV::X27),
+        "t3" => Some(register::RiscV::X28),
+        "t4" => Some(register::RiscV::X29),
+        "t5" => Some(register::RiscV::X30),
+        "t6" => Some(register::RiscV::X31),
 
-    Err(format!("Unexpected register name `{register}`"))
+        _ => return Err(format!("Unexpected register name `{register}`")),
+    };
+
+    Ok(reg)
+
+    // todo: abi names.
 }
 fn parse_compressed_register(register: &str) -> Result<Option<register::RiscV>, String> {
     let res = parse_general_purpose_register(register)?;
