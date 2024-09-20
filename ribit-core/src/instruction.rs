@@ -16,6 +16,12 @@ impl Info {
     }
 }
 
+impl<T: Into<Instruction>> From<T> for Info {
+    fn from(value: T) -> Self {
+        Self { instruction: value.into(), len: 4 }
+    }
+}
+
 #[derive(Debug)]
 pub enum Instruction {
     R(R),
@@ -48,6 +54,12 @@ impl Sys {
     }
 }
 
+impl From<Sys> for Instruction {
+    fn from(value: Sys) -> Self {
+        Self::Sys(value)
+    }
+}
+
 #[derive(Debug)]
 pub struct R {
     pub rs1: Option<RiscVRegister>,
@@ -65,6 +77,12 @@ impl R {
         opcode: opcode::R,
     ) -> Self {
         Self { rs1, rs2, rd, opcode }
+    }
+}
+
+impl From<R> for Instruction {
+    fn from(value: R) -> Self {
+        Self::R(value)
     }
 }
 
@@ -88,6 +106,12 @@ impl I {
     }
 }
 
+impl From<I> for Instruction {
+    fn from(value: I) -> Self {
+        Self::I(value)
+    }
+}
+
 #[derive(Debug)]
 pub struct IJump {
     pub imm: u16,
@@ -105,6 +129,12 @@ impl IJump {
         opcode: opcode::IJump,
     ) -> Self {
         Self { imm, rs1, rd, opcode }
+    }
+}
+
+impl From<IJump> for Instruction {
+    fn from(value: IJump) -> Self {
+        Self::IJump(value)
     }
 }
 
@@ -128,6 +158,12 @@ impl IMem {
     }
 }
 
+impl From<IMem> for Instruction {
+    fn from(value: IMem) -> Self {
+        Self::IMem(value)
+    }
+}
+
 #[derive(Debug)]
 pub struct S {
     pub imm: u16,
@@ -145,6 +181,12 @@ impl S {
         width: Width,
     ) -> Self {
         Self { imm, rs1, rs2, width }
+    }
+}
+
+impl From<S> for Instruction {
+    fn from(value: S) -> Self {
+        Self::S(value)
     }
 }
 
@@ -168,6 +210,12 @@ impl B {
     }
 }
 
+impl From<B> for Instruction {
+    fn from(value: B) -> Self {
+        Self::B(value)
+    }
+}
+
 #[derive(Debug)]
 pub struct U {
     pub imm: u32,
@@ -182,6 +230,12 @@ impl U {
     }
 }
 
+impl From<U> for Instruction {
+    fn from(value: U) -> Self {
+        Self::U(value)
+    }
+}
+
 #[derive(Debug)]
 pub struct J {
     pub imm: u32,
@@ -193,5 +247,11 @@ impl J {
     #[must_use]
     pub const fn new(imm: u32, rd: Option<RiscVRegister>, opcode: opcode::J) -> Self {
         Self { imm, rd, opcode }
+    }
+}
+
+impl From<J> for Instruction {
+    fn from(value: J) -> Self {
+        Self::J(value)
     }
 }

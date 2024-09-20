@@ -26,6 +26,18 @@ struct ParseContext {
     supports_compressed: bool,
 }
 
+impl ParseContext {
+    fn consume<T>(&mut self, res: Result<T, String>) -> Option<T> {
+        match res {
+            Ok(it) => Some(it),
+            Err(e) => {
+                self.errors.push(e);
+                None
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct ParseOutput {
     pub instructions: Vec<ribit_core::instruction::Info>,
@@ -141,7 +153,7 @@ fn test_len(context: &mut ParseContext, op: &str, expected: usize, actual: usize
     false
 }
 
-fn parse_general_purpose_register(register: &str) -> Result<Option<register::RiscV>, String> {
+fn integer_register(register: &str) -> Result<Option<register::RiscV>, String> {
     if let Some(num) = register.strip_prefix('x') {
         let num = num.parse::<u8>().map_err(|_| format!("Invalid register number: `{num}`"))?;
         if num >= 32 {
@@ -192,8 +204,8 @@ fn parse_general_purpose_register(register: &str) -> Result<Option<register::Ris
 
     // todo: abi names.
 }
-fn parse_compressed_register(register: &str) -> Result<Option<register::RiscV>, String> {
-    let res = parse_general_purpose_register(register)?;
+fn compressed_integer_register(register: &str) -> Result<Option<register::RiscV>, String> {
+    let res = integer_register(register)?;
 
     let register = res.map_or(0, |it| it.get());
     if register < 8 || register >= 16 {
@@ -238,4 +250,12 @@ fn parse_immediate(src: &str, bits: u8) -> Result<u32, String> {
         false if unsigned <= unsigned_max => Ok(unsigned),
         false => Err(format!("invalid {bits}bit literal ({unsigned} > {unsigned_max})")),
     }
+}
+
+fn parse_imm_sx32(src: &str, bits: u8) -> Result<u32, String> {
+    parse_immediate(src, bits).map(|it| sign_extend_32(it, bits))
+}
+
+fn parse_imm_sx(src: &str, bits: u8) -> Result<u16, String> {
+    parse_immediate(src, bits).map(|it| sign_extend(it as u16, bits))
 }

@@ -3,8 +3,8 @@ use ribit_core::opcode::{self, Cmp};
 use ribit_core::{register, Width};
 
 use super::{
-    parse_compressed_register, parse_general_purpose_register, parse_immediate, sign_extend,
-    sign_extend_32, test_len, ParseContext,
+    compressed_integer_register, integer_register, parse_imm_sx, parse_imm_sx32, parse_immediate,
+    sign_extend, test_len, ParseContext,
 };
 
 pub(super) fn r_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
@@ -31,10 +31,7 @@ pub(super) fn r_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
     };
 
     if let Some([rd, rs1, rs2]) = r_args(context, full_op, &args) {
-        context.instructions.push(instruction::Info {
-            instruction: Instruction::R(instruction::R::new(rs1, rs2, rd, opcode)),
-            len: 4,
-        })
+        context.instructions.push(instruction::R::new(rs1, rs2, rd, opcode).into())
     }
 
     true
@@ -45,45 +42,17 @@ fn r_args(
     full_op: &str,
     args: &[&str],
 ) -> Option<[Option<register::RiscV>; 3]> {
-    let mut has_error = test_len(context, full_op, 3, args.len());
+    let len_err = test_len(context, full_op, 3, args.len());
+    let mut args = args.iter();
 
-    let rd = match args.get(0) {
-        Some(reg) => match parse_general_purpose_register(reg) {
-            Ok(it) => it,
-            Err(e) => {
-                has_error = true;
-                context.errors.push(e);
-                None
-            }
-        },
-        None => None,
-    };
+    let rd = context.consume(integer_register(args.next()?));
+    let rs1 = context.consume(integer_register(args.next()?));
+    let rs2 = context.consume(integer_register(args.next()?));
 
-    let rs1 = match args.get(1) {
-        Some(reg) => match parse_general_purpose_register(reg) {
-            Ok(it) => it,
-            Err(e) => {
-                has_error = true;
-                context.errors.push(e);
-                None
-            }
-        },
-        None => None,
-    };
-
-    let rs2 = match args.get(2) {
-        Some(reg) => match parse_general_purpose_register(reg) {
-            Ok(it) => it,
-            Err(e) => {
-                has_error = true;
-                context.errors.push(e);
-                None
-            }
-        },
-        None => None,
-    };
-
-    (!has_error).then(|| [rd, rs1, rs2])
+    match len_err {
+        false => Some([rd?, rs1?, rs2?]),
+        true => None,
+    }
 }
 
 pub(super) fn i_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
@@ -101,10 +70,7 @@ pub(super) fn i_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
     };
 
     if let Some(([rd, rs1], imm)) = i_args(context, full_op, &args) {
-        context.instructions.push(instruction::Info {
-            instruction: Instruction::I(instruction::I::new(imm, rs1, rd, opcode)),
-            len: 4,
-        })
+        context.instructions.push(instruction::I::new(imm, rs1, rd, opcode).into())
     }
 
     true
@@ -115,45 +81,17 @@ fn i_args(
     full_op: &str,
     args: &[&str],
 ) -> Option<([Option<register::RiscV>; 2], u16)> {
-    let mut has_error = test_len(context, full_op, 3, args.len());
+    let len_err = test_len(context, full_op, 3, args.len());
+    let mut args = args.iter();
 
-    let rd = match args.get(0) {
-        Some(reg) => match parse_general_purpose_register(reg) {
-            Ok(it) => it,
-            Err(e) => {
-                has_error = true;
-                context.errors.push(e);
-                None
-            }
-        },
-        None => None,
-    };
+    let rd = context.consume(integer_register(args.next()?));
+    let rs1 = context.consume(integer_register(args.next()?));
+    let imm = context.consume(parse_imm_sx(args.next()?, 12));
 
-    let rs1 = match args.get(1) {
-        Some(reg) => match parse_general_purpose_register(reg) {
-            Ok(it) => it,
-            Err(e) => {
-                has_error = true;
-                context.errors.push(e);
-                None
-            }
-        },
-        None => None,
-    };
-
-    let imm = match args.get(2) {
-        Some(it) => match parse_immediate(it, 12) {
-            Ok(it) => sign_extend(it as u16, 12),
-            Err(e) => {
-                has_error = true;
-                context.errors.push(e);
-                0
-            }
-        },
-        None => 0,
-    };
-
-    (!has_error).then(|| ([rd, rs1], imm))
+    match len_err {
+        false => Some(([rd?, rs1?], imm?)),
+        true => None,
+    }
 }
 
 pub(super) fn ijump_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
@@ -163,10 +101,7 @@ pub(super) fn ijump_32(context: &mut ParseContext, op: &str, full_op: &str, args
     };
 
     if let Some((rd, imm, rs1)) = rir_args(context, full_op, &args, 12) {
-        context.instructions.push(instruction::Info {
-            instruction: Instruction::IJump(instruction::IJump::new(imm, rs1, rd, opcode)),
-            len: 4,
-        })
+        context.instructions.push(instruction::IJump::new(imm, rs1, rd, opcode).into())
     }
 
     true
@@ -185,20 +120,14 @@ pub(super) fn imem_32(context: &mut ParseContext, op: &str, full_op: &str, args:
 
     if opcode == opcode::IMem::FENCE {
         if !test_len(context, full_op, 0, args.len()) {
-            context.instructions.push(instruction::Info {
-                instruction: Instruction::IMem(instruction::IMem::new(0, None, None, opcode)),
-                len: 4,
-            })
+            context.instructions.push(instruction::IMem::new(0, None, None, opcode).into())
         }
 
         return true;
     }
 
     if let Some((rd, imm, rs1)) = rir_args(context, full_op, &args, 12) {
-        context.instructions.push(instruction::Info {
-            instruction: Instruction::IMem(instruction::IMem::new(imm, rs1, rd, opcode)),
-            len: 4,
-        })
+        context.instructions.push(instruction::IMem::new(imm, rs1, rd, opcode).into())
     }
 
     true
@@ -213,10 +142,7 @@ pub(super) fn s_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
     };
 
     if let Some((rs2, imm, rs1)) = rir_args(context, full_op, &args, 12) {
-        context.instructions.push(instruction::Info {
-            instruction: Instruction::S(instruction::S::new(imm, rs1, rs2, width)),
-            len: 4,
-        })
+        context.instructions.push(instruction::S::new(imm, rs1, rs2, width).into())
     }
 
     true
@@ -239,13 +165,16 @@ pub(super) fn b_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
             false => imm << 2,
         };
 
-        context.instructions.push(instruction::Info {
-            instruction: Instruction::B(instruction::B::new(imm, rs1, rs2, cmp)),
-            len: 4,
-        })
+        context.instructions.push(instruction::B::new(imm, rs1, rs2, cmp).into())
     }
 
     true
+}
+
+fn split_offset_index(arg: &str) -> Result<(&str, &str), String> {
+    arg.split_once('(')
+        .and_then(|(imm, r)| r.strip_suffix(')').map(|r| (imm, r)))
+        .ok_or_else(|| format!("expected an arg in the format 0(x16), found `{arg}`"))
 }
 
 fn rir_args(
@@ -254,58 +183,20 @@ fn rir_args(
     args: &[&str],
     immediate_width: u8,
 ) -> Option<(Option<register::RiscV>, u16, Option<register::RiscV>)> {
-    let mut has_error = test_len(context, full_op, 2, args.len());
+    let len_err = test_len(context, full_op, 2, args.len());
+    let mut args = args.iter();
 
-    let r1 = match args.get(0) {
-        Some(reg) => match parse_general_purpose_register(reg) {
-            Ok(it) => it,
-            Err(e) => {
-                has_error = true;
-                context.errors.push(e);
-                None
-            }
-        },
-        None => None,
-    };
+    let r1 = context.consume(integer_register(args.next()?));
 
-    let (imm, r2) = match args.get(1) {
-        Some(it) => {
-            match it.split_once('(').and_then(|(imm, r)| r.strip_suffix(')').map(|r| (imm, r))) {
-                Some((imm, r2)) => {
-                    let imm = match parse_immediate(imm, immediate_width) {
-                        Ok(it) => sign_extend(it as u16, immediate_width),
-                        Err(e) => {
-                            has_error = true;
-                            context.errors.push(e);
-                            0
-                        }
-                    };
+    let (offset, index) = context.consume(split_offset_index(args.next()?))?;
 
-                    let r2 = match parse_general_purpose_register(r2) {
-                        Ok(it) => it,
-                        Err(e) => {
-                            has_error = true;
-                            context.errors.push(e);
-                            None
-                        }
-                    };
+    let offset = context.consume(parse_imm_sx(offset, immediate_width));
+    let index = context.consume(integer_register(index));
 
-                    (imm, r2)
-                }
-                None => {
-                    has_error = true;
-                    context
-                        .errors
-                        .push(format!("expected an arg in the format 0(x2), found `{it}`"));
-
-                    (0, None)
-                }
-            }
-        }
-        None => (0, None),
-    };
-
-    (!has_error).then(|| (r1, imm, r2))
+    match len_err {
+        false => Some((r1?, offset?, index?)),
+        true => None,
+    }
 }
 
 pub(super) fn rir_args_16(
@@ -315,59 +206,22 @@ pub(super) fn rir_args_16(
     immediate_width: u8,
     sign_extend_imm: bool,
 ) -> Option<(Option<register::RiscV>, u16, Option<register::RiscV>)> {
-    let mut has_error = test_len(context, full_op, 2, args.len());
+    let len_err = test_len(context, full_op, 2, args.len());
+    let mut args = args.iter();
 
-    let r1 = match args.get(0) {
-        Some(reg) => match parse_compressed_register(reg) {
-            Ok(it) => it,
-            Err(e) => {
-                has_error = true;
-                context.errors.push(e);
-                None
-            }
-        },
-        None => None,
-    };
+    let r1 = context.consume(compressed_integer_register(args.next()?));
 
-    let (imm, r2) = match args.get(1) {
-        Some(it) => {
-            match it.split_once('(').and_then(|(imm, r)| r.strip_suffix(')').map(|r| (imm, r))) {
-                Some((imm, r2)) => {
-                    let imm = match parse_immediate(imm, immediate_width) {
-                        Ok(it) if sign_extend_imm => sign_extend(it as u16, immediate_width),
-                        Ok(it) => it as u16,
-                        Err(e) => {
-                            has_error = true;
-                            context.errors.push(e);
-                            0
-                        }
-                    };
+    let (offset, index) = context.consume(split_offset_index(args.next()?))?;
 
-                    let r2 = match parse_compressed_register(r2) {
-                        Ok(it) => it,
-                        Err(e) => {
-                            has_error = true;
-                            context.errors.push(e);
-                            None
-                        }
-                    };
+    let offset = context.consume(parse_immediate(offset, immediate_width)).map(|it| {
+        if sign_extend_imm { sign_extend(it as u16, immediate_width) } else { it as u16 }
+    });
+    let index = context.consume(compressed_integer_register(index));
 
-                    (imm, r2)
-                }
-                None => {
-                    has_error = true;
-                    context
-                        .errors
-                        .push(format!("expected an arg in the format 0(x16), found `{it}`"));
-
-                    (0, None)
-                }
-            }
-        }
-        None => (0, None),
-    };
-
-    (!has_error).then(|| (r1, imm, r2))
+    match len_err {
+        false => Some((r1?, offset?, index?)),
+        true => None,
+    }
 }
 
 pub(super) fn u_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
@@ -378,10 +232,7 @@ pub(super) fn u_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
     };
 
     if let Some((rd, imm)) = ri_args(context, full_op, &args, 20) {
-        context.instructions.push(instruction::Info {
-            instruction: Instruction::U(instruction::U::new(imm << 12, rd, opcode)),
-            len: 4,
-        })
+        context.instructions.push(instruction::U::new(imm << 12, rd, opcode).into())
     }
 
     true
@@ -399,10 +250,7 @@ pub(super) fn j_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
             false => imm << 2,
         };
 
-        context.instructions.push(instruction::Info {
-            instruction: Instruction::J(instruction::J::new(imm, rd, opcode)),
-            len: 4,
-        })
+        context.instructions.push(instruction::J::new(imm, rd, opcode).into())
     }
 
     true
@@ -414,33 +262,16 @@ fn ri_args(
     args: &[&str],
     imm_bits: u8,
 ) -> Option<(Option<register::RiscV>, u32)> {
-    let mut has_error = test_len(context, full_op, 2, args.len());
+    let len_err = test_len(context, full_op, 2, args.len());
+    let mut args = args.iter();
 
-    let rd = match args.get(0) {
-        Some(reg) => match parse_general_purpose_register(reg) {
-            Ok(it) => it,
-            Err(e) => {
-                has_error = true;
-                context.errors.push(e);
-                None
-            }
-        },
-        None => None,
-    };
+    let rd = context.consume(integer_register(args.next()?));
+    let imm = context.consume(parse_imm_sx32(args.next()?, imm_bits));
 
-    let imm = match args.get(1) {
-        Some(it) => match parse_immediate(it, imm_bits) {
-            Ok(it) => sign_extend_32(it, imm_bits),
-            Err(e) => {
-                has_error = true;
-                context.errors.push(e);
-                0
-            }
-        },
-        None => 0,
-    };
-
-    (!has_error).then(|| (rd, imm))
+    match len_err {
+        false => Some((rd?, imm?)),
+        true => None,
+    }
 }
 
 pub(super) fn sys_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
@@ -451,10 +282,7 @@ pub(super) fn sys_32(context: &mut ParseContext, op: &str, full_op: &str, args: 
     };
 
     if !test_len(context, full_op, 0, args.len()) {
-        context.instructions.push(instruction::Info {
-            instruction: Instruction::Sys(instruction::Sys::new(opcode)),
-            len: 4,
-        })
+        context.instructions.push(instruction::Sys::new(opcode).into())
     }
 
     true
@@ -566,19 +394,13 @@ pub(super) fn compressed(
 }
 
 fn compressed_jump_args(context: &mut ParseContext, full_op: &str, args: &[&str]) -> Option<u32> {
-    let mut has_error = test_len(context, full_op, 1, args.len());
+    let len_err = test_len(context, full_op, 1, args.len());
+    let mut args = args.iter();
 
-    let imm = match args.get(0) {
-        Some(it) => match parse_immediate(it, 10) {
-            Ok(it) => sign_extend_32(it, 10),
-            Err(e) => {
-                has_error = true;
-                context.errors.push(e);
-                0
-            }
-        },
-        None => 0,
-    };
+    let imm = context.consume(parse_imm_sx32(args.next()?, 10));
 
-    (!has_error).then(|| imm)
+    match len_err {
+        false => imm,
+        true => None,
+    }
 }
