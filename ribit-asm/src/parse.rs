@@ -36,6 +36,16 @@ impl ParseContext {
             }
         }
     }
+
+    fn push32<I: Into<ribit_core::instruction::Instruction>>(&mut self, instruction: I) {
+        self.instructions
+            .push(ribit_core::instruction::Info { instruction: instruction.into(), len: 4 })
+    }
+
+    fn push16<I: Into<ribit_core::instruction::Instruction>>(&mut self, instruction: I) {
+        self.instructions
+            .push(ribit_core::instruction::Info { instruction: instruction.into(), len: 2 })
+    }
 }
 
 #[derive(Debug)]

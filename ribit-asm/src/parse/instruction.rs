@@ -1,6 +1,5 @@
-use ribit_core::instruction::{self, Instruction};
 use ribit_core::opcode::{self, Cmp};
-use ribit_core::{register, Width};
+use ribit_core::{instruction, register, Width};
 
 use super::{
     compressed_integer_register, integer_register, parse_imm_sx, parse_imm_sx32, parse_immediate,
@@ -31,7 +30,7 @@ pub(super) fn r_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
     };
 
     if let Some([rd, rs1, rs2]) = r_args(context, full_op, &args) {
-        context.instructions.push(instruction::R::new(rs1, rs2, rd, opcode).into())
+        context.push32(instruction::R::new(rs1, rs2, rd, opcode))
     }
 
     true
@@ -70,7 +69,7 @@ pub(super) fn i_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
     };
 
     if let Some(([rd, rs1], imm)) = i_args(context, full_op, &args) {
-        context.instructions.push(instruction::I::new(imm, rs1, rd, opcode).into())
+        context.push32(instruction::I::new(imm, rs1, rd, opcode))
     }
 
     true
@@ -101,7 +100,7 @@ pub(super) fn ijump_32(context: &mut ParseContext, op: &str, full_op: &str, args
     };
 
     if let Some((rd, imm, rs1)) = rir_args(context, full_op, &args, 12) {
-        context.instructions.push(instruction::IJump::new(imm, rs1, rd, opcode).into())
+        context.push32(instruction::IJump::new(imm, rs1, rd, opcode))
     }
 
     true
@@ -120,14 +119,14 @@ pub(super) fn imem_32(context: &mut ParseContext, op: &str, full_op: &str, args:
 
     if opcode == opcode::IMem::FENCE {
         if !test_len(context, full_op, 0, args.len()) {
-            context.instructions.push(instruction::IMem::new(0, None, None, opcode).into())
+            context.push32(instruction::IMem::new(0, None, None, opcode))
         }
 
         return true;
     }
 
     if let Some((rd, imm, rs1)) = rir_args(context, full_op, &args, 12) {
-        context.instructions.push(instruction::IMem::new(imm, rs1, rd, opcode).into())
+        context.push32(instruction::IMem::new(imm, rs1, rd, opcode))
     }
 
     true
@@ -142,7 +141,7 @@ pub(super) fn s_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
     };
 
     if let Some((rs2, imm, rs1)) = rir_args(context, full_op, &args, 12) {
-        context.instructions.push(instruction::S::new(imm, rs1, rs2, width).into())
+        context.push32(instruction::S::new(imm, rs1, rs2, width))
     }
 
     true
@@ -165,7 +164,7 @@ pub(super) fn b_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
             false => imm << 2,
         };
 
-        context.instructions.push(instruction::B::new(imm, rs1, rs2, cmp).into())
+        context.push32(instruction::B::new(imm, rs1, rs2, cmp))
     }
 
     true
@@ -232,7 +231,7 @@ pub(super) fn u_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
     };
 
     if let Some((rd, imm)) = ri_args(context, full_op, &args, 20) {
-        context.instructions.push(instruction::U::new(imm << 12, rd, opcode).into())
+        context.push32(instruction::U::new(imm << 12, rd, opcode))
     }
 
     true
@@ -250,7 +249,7 @@ pub(super) fn j_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
             false => imm << 2,
         };
 
-        context.instructions.push(instruction::J::new(imm, rd, opcode).into())
+        context.push32(instruction::J::new(imm, rd, opcode))
     }
 
     true
@@ -282,7 +281,7 @@ pub(super) fn sys_32(context: &mut ParseContext, op: &str, full_op: &str, args: 
     };
 
     if !test_len(context, full_op, 0, args.len()) {
-        context.instructions.push(instruction::Sys::new(opcode).into())
+        context.push32(instruction::Sys::new(opcode))
     }
 
     true
@@ -296,10 +295,7 @@ fn compressed_jump(context: &mut ParseContext, op: &str, full_op: &str, args: &[
     };
 
     if let Some(imm) = compressed_jump_args(context, full_op, args) {
-        context.instructions.push(instruction::Info {
-            instruction: Instruction::J(instruction::J::new(imm << 1, rd, opcode::J::JAL)),
-            len: 2,
-        });
+        context.push16(instruction::J::new(imm << 1, rd, opcode::J::JAL));
     }
 
     true
@@ -328,43 +324,24 @@ pub(super) fn compressed(
             if let Some((rd, imm, rs1)) = rir_args_16(context, full_op, args, 5, false) {
                 let imm = imm << 2;
 
-                context.instructions.push(instruction::Info {
-                    instruction: Instruction::IMem(instruction::IMem::new(
-                        imm,
-                        rs1,
-                        rd,
-                        opcode::IMem::LD(Width::DWord),
-                    )),
-                    len: 2,
-                })
+                context.push16(instruction::IMem::new(imm, rs1, rd, opcode::IMem::LD(Width::DWord)))
             }
         }
 
         "nop" | "NOP" => {
             if !test_len(context, full_op, 0, args.len()) {
-                context.instructions.push(instruction::Info {
-                    instruction: Instruction::I(instruction::I::new(
-                        0,
-                        None,
-                        None,
-                        opcode::I::ADDI,
-                    )),
-                    len: 2,
-                })
+                context.push16(instruction::I::new(0, None, None, opcode::I::ADDI))
             }
         }
 
         "ret" | "RET" => {
             if !test_len(context, full_op, 0, args.len()) {
-                context.instructions.push(instruction::Info {
-                    instruction: Instruction::IJump(instruction::IJump::new(
-                        0,
-                        Some(register::RiscV::X1),
-                        None,
-                        opcode::IJump::JALR,
-                    )),
-                    len: 2,
-                })
+                context.push16(instruction::IJump::new(
+                    0,
+                    Some(register::RiscV::X1),
+                    None,
+                    opcode::IJump::JALR,
+                ))
             }
         }
 
@@ -376,15 +353,7 @@ pub(super) fn compressed(
                 }
 
                 let imm = imm as u16;
-                context.instructions.push(instruction::Info {
-                    instruction: Instruction::I(instruction::I::new(
-                        imm,
-                        None,
-                        rd,
-                        opcode::I::ADDI,
-                    )),
-                    len: 2,
-                });
+                context.push16(instruction::I::new(imm, None, rd, opcode::I::ADDI));
             }
         }
         _ => return false,
