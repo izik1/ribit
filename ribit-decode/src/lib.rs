@@ -5,6 +5,7 @@
     clippy::match_bool
 )]
 #![deny(unsafe_op_in_unsafe_fn)]
+#![no_std]
 
 use ribit_core::instruction::{self, Instruction};
 use ribit_core::{opcode, register, Width};

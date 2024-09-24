@@ -1,3 +1,5 @@
+use core::fmt;
+
 // todo: support trapping
 #[derive(Debug)]
 pub enum DecodeError {
@@ -25,8 +27,8 @@ pub enum Extension {
     F,
 }
 
-impl std::fmt::Display for Extension {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl fmt::Display for Extension {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::D => f.write_str("RV32-D"),
             Self::F => f.write_str("RV32-F"),

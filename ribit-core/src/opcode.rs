@@ -1,6 +1,6 @@
 // these opcode names are _exact_, and naming rules don't apply to them
 
-use std::fmt;
+use core::fmt;
 
 use crate::Width;
 

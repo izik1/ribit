@@ -1,4 +1,4 @@
-use std::num::NonZeroU8;
+use core::num::NonZeroU8;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct RiscV(NonZeroU8);

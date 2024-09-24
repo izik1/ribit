@@ -6,8 +6,9 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #![allow(clippy::match_bool)]
 #![warn(clippy::must_use_candidate, clippy::clone_on_copy)]
+#![no_std]
 
-use std::fmt;
+use core::fmt;
 
 #[cfg(feature = "disassemble")]
 pub mod disassemble;
@@ -33,20 +34,18 @@ impl fmt::Display for Width {
     }
 }
 
-pub struct DisplayDeferSlice<'a, T: std::fmt::Display>(pub &'a [T]);
+pub struct DisplayDeferSlice<'a, T: fmt::Display>(pub &'a [T]);
 
-impl<'a, T: std::fmt::Display> std::fmt::Display for DisplayDeferSlice<'a, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl<'a, T: fmt::Display> fmt::Display for DisplayDeferSlice<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         DisplayDeferIter(self.0).fmt(f)
     }
 }
 
-pub struct DisplayDeferIter<I: IntoIterator<Item = T> + Copy, T: std::fmt::Display>(pub I);
+pub struct DisplayDeferIter<I: IntoIterator<Item = T> + Copy, T: fmt::Display>(pub I);
 
-impl<I: IntoIterator<Item = T> + Copy, T: std::fmt::Display> std::fmt::Display
-    for DisplayDeferIter<I, T>
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl<I: IntoIterator<Item = T> + Copy, T: fmt::Display> fmt::Display for DisplayDeferIter<I, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut iter = self.0.into_iter();
         if let Some(first) = iter.next() {
             first.fmt(f)?;
