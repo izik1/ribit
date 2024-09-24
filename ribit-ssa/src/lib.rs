@@ -9,6 +9,7 @@
 
 use std::fmt;
 
+use instruction::CmpArgs;
 use reference::Ref;
 use ribit_core::{opcode, ReturnCode};
 use ty::ConstTy;
@@ -16,6 +17,7 @@ use ty::ConstTy;
 pub mod analysis;
 mod block;
 pub mod eval;
+pub mod icmp;
 mod id;
 pub mod instruction;
 pub mod lower;
@@ -49,14 +51,112 @@ impl StackIndex {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+// bitpacked: [(signed/unsigned):2, (lt/gt):1, (eq/no):0]
+#[repr(u8)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+pub enum Inequality {
+    Ult = 0b000,
+    Ule = 0b001,
+    Ugt = 0b010,
+    Uge = 0b011,
+    Slt = 0b100,
+    Sle = 0b101,
+    Sgt = 0b110,
+    Sge = 0b111,
+}
+
+impl Inequality {
+    const SIGNED_UNSIGNED_BIT: u8 = 2;
+    const LESS_GREATER_BIT: u8 = 1;
+    const EQUAL_NOT_EQUAL_BIT: u8 = 0;
+
+    #[inline(always)]
+    pub const fn is_signed(self) -> bool {
+        (self as u8 & (1 << Inequality::SIGNED_UNSIGNED_BIT)) != 0
+    }
+
+    #[inline(always)]
+    pub const fn include_eq(self) -> bool {
+        (self as u8 & (1 << Inequality::EQUAL_NOT_EQUAL_BIT)) != 0
+    }
+
+    #[inline(always)]
+    pub const fn is_less(self) -> bool {
+        (self as u8 & (1 << Inequality::LESS_GREATER_BIT)) != 0
+    }
+
+    #[inline(always)]
+    pub const fn is_greater(self) -> bool {
+        (self as u8 & (1 << Inequality::LESS_GREATER_BIT)) != 0
+    }
+
+    /// Turns `a {ineq} b` to `b {ineq} a` without changing the result.
+    /// equalness is preserved, signedness is preserved, and `<` swaps with `>`
+    ///
+    /// Reverse might've been a better name, but that's taken by `cmp::Ordering` and means something completely different.
+    pub fn swap(self) -> Self {
+        let mask: u8 = const { 1 << Self::LESS_GREATER_BIT };
+
+        // this optimizes better than just swapping variants around because the compiler can prove the `unreachable!` truly is unreachable.
+        // so we go enum -> u8 -> u8 -> enum
+        // and since the bits match the enum variants we really go enum -> enum.
+        match (self as u8) ^ mask {
+            0b000 => Self::Ult,
+            0b001 => Self::Ule,
+            0b010 => Self::Ugt,
+            0b011 => Self::Uge,
+            0b100 => Self::Slt,
+            0b101 => Self::Sle,
+            0b110 => Self::Sgt,
+            0b111 => Self::Sge,
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum CmpKind {
     Eq,
     Ne,
-    Sge,
-    Sl,
-    Uge,
-    Ul,
+    Inequality(Inequality),
+}
+
+impl CmpKind {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Eq => "eq",
+            Self::Ne => "ne",
+            Self::Inequality(Inequality::Ult) => "ult",
+            Self::Inequality(Inequality::Ule) => "ule",
+            Self::Inequality(Inequality::Ugt) => "ugt",
+            Self::Inequality(Inequality::Uge) => "uge",
+            Self::Inequality(Inequality::Slt) => "slt",
+            Self::Inequality(Inequality::Sle) => "sle",
+            Self::Inequality(Inequality::Sgt) => "sgt",
+            Self::Inequality(Inequality::Sge) => "sge",
+        }
+    }
+
+    pub fn swap(self) -> Self {
+        match self {
+            // equality is symmetric.
+            Self::Eq => Self::Eq,
+            Self::Ne => Self::Ne,
+            Self::Inequality(inequality) => Self::Inequality(inequality.swap()),
+        }
+    }
+}
+
+impl fmt::Display for CmpKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl fmt::Debug for CmpKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("CmpKind").field(&self.as_str()).finish()
+    }
 }
 
 impl From<opcode::Cmp> for CmpKind {
@@ -64,23 +164,10 @@ impl From<opcode::Cmp> for CmpKind {
         match cmp {
             opcode::Cmp::Eq => Self::Eq,
             opcode::Cmp::Ne => Self::Ne,
-            opcode::Cmp::Lt => Self::Sl,
-            opcode::Cmp::Ltu => Self::Ul,
-            opcode::Cmp::Ge => Self::Sge,
-            opcode::Cmp::Geu => Self::Uge,
-        }
-    }
-}
-
-impl fmt::Display for CmpKind {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Eq => f.write_str("EQ"),
-            Self::Ne => f.write_str("NE"),
-            Self::Sge => f.write_str("SGE"),
-            Self::Sl => f.write_str("SL"),
-            Self::Uge => f.write_str("UGE"),
-            Self::Ul => f.write_str("UL"),
+            opcode::Cmp::Lt => Self::Inequality(Inequality::Slt),
+            opcode::Cmp::Ltu => Self::Inequality(Inequality::Ult),
+            opcode::Cmp::Ge => Self::Inequality(Inequality::Sge),
+            opcode::Cmp::Geu => Self::Inequality(Inequality::Uge),
         }
     }
 }
@@ -175,27 +262,29 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
         match instr {
             Instruction::Fence | Instruction::Arg { .. } | Instruction::ReadStack { .. } => {}
 
-            Instruction::ShiftOp { dest: _, src, .. } | Instruction::Cmp { dest: _, src, .. } => {
-                match src {
-                    SourcePair::RefRef(lhs, rhs) => {
-                        if lhs.id == old {
-                            lhs.id = new;
-                        }
-
-                        if rhs.id == old {
-                            rhs.id = new;
-                        }
+            Instruction::ShiftOp { dest: _, src, .. } => match src {
+                SourcePair::RefRef(lhs, rhs) => {
+                    if lhs.id == old {
+                        lhs.id = new;
                     }
-                    SourcePair::RefConst(it, _) | SourcePair::ConstRef(_, it) => {
-                        if it.id == old {
-                            it.id = new;
-                        }
+
+                    if rhs.id == old {
+                        rhs.id = new;
                     }
                 }
-            }
+                SourcePair::RefConst(it, _) | SourcePair::ConstRef(_, it) => {
+                    if it.id == old {
+                        it.id = new;
+                    }
+                }
+            },
 
             Instruction::CommutativeBinOp { dest: _, src1: reference, src2: source, .. }
-            | Instruction::Sub { dest: _, src1: source, src2: reference } => {
+            | Instruction::Sub { dest: _, src1: source, src2: reference }
+            | Instruction::Cmp {
+                dest: _,
+                args: CmpArgs { src1: reference, src2: source, kind: _ },
+            } => {
                 if reference.id == old {
                     reference.id = new;
                 }

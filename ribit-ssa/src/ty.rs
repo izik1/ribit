@@ -4,6 +4,8 @@ mod bitness;
 
 pub use bitness::Bitness;
 
+use crate::icmp::PartialICmp;
+
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum Type {
     Int(Bitness),
@@ -118,6 +120,24 @@ impl From<u32> for Constant {
     }
 }
 
+impl PartialICmp for Constant {
+    fn partial_unsigned_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Self::Bool(lhs), Self::Bool(rhs)) => lhs.partial_unsigned_cmp(rhs),
+            (Self::Int(lhs), Self::Int(rhs)) => lhs.partial_unsigned_cmp(rhs),
+            _ => None,
+        }
+    }
+
+    fn partial_signed_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Self::Bool(lhs), Self::Bool(rhs)) => lhs.partial_signed_cmp(rhs),
+            (Self::Int(lhs), Self::Int(rhs)) => lhs.partial_signed_cmp(rhs),
+            _ => None,
+        }
+    }
+}
+
 impl fmt::Display for Constant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -189,4 +209,21 @@ impl fmt::LowerHex for Int {
         let width = width as usize;
         write!(f, "{:01$x}", self.1, width)
     }
+}
+
+impl PartialICmp for Int {
+    fn partial_unsigned_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        (self.bits() == other.bits()).then(|| self.unsigned().cmp(&other.unsigned()))
+    }
+
+    fn partial_signed_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        (self.bits() == other.bits()).then(|| self.signed().cmp(&other.signed()))
+    }
+}
+
+#[inline(never)]
+#[cold]
+pub fn mismatch(ty1: Type, ty2: Type) -> ! {
+    assert_ne!(ty1, ty2, "BUG: Fake type mismatch!");
+    panic!("mismatched types: ({} != {})", ty1, ty2)
 }

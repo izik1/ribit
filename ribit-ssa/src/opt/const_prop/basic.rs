@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use super::{lookup, typed_lookup};
+use crate::instruction::CmpArgs;
 use crate::{
     eval, instruction, AnySource, Block, CommutativeBinOp, Constant, Id, Instruction, SourcePair,
     Terminator,
@@ -107,38 +108,21 @@ fn run_instruction(
             Some((*dest, res))
         }
 
-        Instruction::Cmp { dest, src, kind } => {
+        Instruction::Cmp { dest, args } => {
             // note: this explicitly doesn't simplify things like
             // `cmp eq %0, %0`, that's for a different pass
             // todo: write pass for the above.
 
-            let lhs = lookup(consts, src.lhs());
-            let rhs = lookup(consts, src.rhs());
+            let lhs = lookup(consts, AnySource::Ref(args.src1));
+            let rhs = lookup(consts, args.src2);
 
-            let (lhs, rhs) = match SourcePair::try_from((lhs, rhs)) {
+            match CmpArgs::new(lhs, rhs, args.kind) {
                 Ok(it) => {
-                    *src = it;
-                    return None;
+                    *args = it;
+                    None
                 }
-
-                Err(it) => it,
-            };
-
-            let result = match (lhs, rhs) {
-                (Constant::Int(lhs), Constant::Int(rhs)) if lhs.bits() == rhs.bits() => {
-                    Constant::Bool(eval::cmp_int(lhs, rhs, *kind))
-                }
-
-                (Constant::Int(lhs), Constant::Int(rhs)) => {
-                    panic!("mismatched integral bitness: ({} != {})", lhs.bits(), rhs.bits())
-                }
-                (Constant::Bool(_lhs), Constant::Bool(_rhs)) => {
-                    todo!("cmp between bools?")
-                }
-                (lhs, rhs) => panic!("mismatched types: ({} != {})", lhs.ty(), rhs.ty()),
-            };
-
-            Some((*dest, result))
+                Err(result) => Some((*dest, Constant::Bool(result))),
+            }
         }
 
         Instruction::Select(it) => select(consts, it),

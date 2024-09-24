@@ -1,7 +1,8 @@
 use core::fmt;
 
+use crate::icmp::PartialICmp;
 use crate::reference::Reference;
-use crate::ty::{Constant, Int};
+use crate::ty::{self, Constant, Int};
 use crate::{AnySource, Bitness, CmpKind, CommutativeBinOp, ShiftOp};
 
 #[must_use]
@@ -96,22 +97,8 @@ pub fn sub(lhs: Constant, rhs: Constant) -> Constant {
 }
 
 #[must_use]
-pub fn cmp(src1: u32, src2: u32, mode: CmpKind) -> bool {
-    cmp_int(Int::i32(src1), Int::i32(src2), mode)
-}
-
-#[must_use]
-pub fn cmp_int(lhs: Int, rhs: Int, op: CmpKind) -> bool {
-    assert_eq!(lhs.bits(), rhs.bits());
-
-    match op {
-        CmpKind::Eq => lhs.unsigned() == rhs.unsigned(),
-        CmpKind::Ne => lhs.unsigned() != rhs.unsigned(),
-        CmpKind::Sge => lhs.signed() >= rhs.signed(),
-        CmpKind::Sl => lhs.signed() < rhs.signed(),
-        CmpKind::Uge => lhs.unsigned() >= rhs.unsigned(),
-        CmpKind::Ul => lhs.unsigned() < rhs.unsigned(),
-    }
+pub fn icmp(lhs: Constant, rhs: Constant, kind: CmpKind) -> bool {
+    lhs.partial_cmp_with(&rhs, kind).unwrap_or_else(|| ty::mismatch(lhs.ty(), rhs.ty()))
 }
 
 // todo: "just work with arbitrary constants of compatable types"

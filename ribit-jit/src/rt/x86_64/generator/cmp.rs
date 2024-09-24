@@ -3,10 +3,10 @@ use std::io;
 use rasen::params::imm::Imm32;
 use rasen::params::reg::Reg32;
 use rasen::params::Register;
-use ribit_ssa::CmpKind;
+use ribit_ssa::{CmpKind, Inequality};
 
 use super::BlockBuilder;
-use crate::{Source, SourcePair};
+use crate::Source;
 
 pub fn select(
     builder: &mut BlockBuilder<'_, '_>,
@@ -69,45 +69,42 @@ pub fn select(
     }
 }
 
-fn bool_cmp(src: SourcePair, false_value: u32, true_value: u32, mode: CmpKind) -> CmpValue {
-    match src {
-        SourcePair::RegVal(src, 0) => match zero(false_value, true_value, mode) {
+fn bool_cmp(
+    src1: Register,
+    src2: Source,
+    false_value: u32,
+    true_value: u32,
+    mode: CmpKind,
+) -> CmpValue {
+    match src2 {
+        Source::Val(0) => match zero(false_value, true_value, mode) {
             Some(const_value) => CmpValue::Const(const_value),
-            None => CmpValue::Test(src, false),
+            None => CmpValue::Test(src1),
         },
+        Source::Val(val) => CmpValue::CmpImm(src1, val),
 
-        SourcePair::RegVal(src, val) => CmpValue::CmpImm(src, val, false),
-
-        SourcePair::ValReg(0, src) => {
-            let (true_value, false_value) = (false_value, true_value);
-            match zero(false_value, true_value, mode) {
-                Some(const_value) => CmpValue::Const(const_value),
-                None => CmpValue::Test(src, !matches!(mode, CmpKind::Eq | CmpKind::Ne)),
-            }
-        }
-
-        SourcePair::ValReg(val, src) => CmpValue::CmpImm(src, val, true),
-
-        SourcePair::RegReg(rs1, rs2) if rs1 == rs2 => {
+        Source::Register(src2) if src1 == src2 => {
             CmpValue::Const(same_val(false_value, true_value, mode))
         }
 
-        SourcePair::RegReg(src1, src2) => CmpValue::CmpReg(src1, src2),
+        Source::Register(src2) => CmpValue::CmpReg(src1, src2),
     }
 }
 
 pub fn same_val<T>(false_val: T, true_val: T, cmp_mode: CmpKind) -> T {
     match cmp_mode {
-        CmpKind::Eq | CmpKind::Sge | CmpKind::Uge => true_val,
-        CmpKind::Ne | CmpKind::Sl | CmpKind::Ul => false_val,
+        CmpKind::Eq => true_val,
+        CmpKind::Ne => false_val,
+        CmpKind::Inequality(it) if it.include_eq() => true_val,
+        CmpKind::Inequality(_) => false_val,
     }
 }
 
 // returns one of the input Ts if the branch becomes unconditional
 pub fn zero<T>(false_val: T, true_val: T, cmp_mode: CmpKind) -> Option<T> {
     match cmp_mode {
-        CmpKind::Uge => Some(true_val),
-        CmpKind::Ul => Some(false_val),
+        CmpKind::Inequality(Inequality::Uge) => Some(true_val),
+        CmpKind::Inequality(Inequality::Ult) => Some(false_val),
         _ => None,
     }
 }
@@ -122,44 +119,42 @@ enum CmpValue {
     /// this means that the comparision gets flipped as well,
     /// so we need to invert the test at the end.
     /// However, eq/ne *don't* flip in that situation.
-    Test(Register, bool),
+    Test(Register),
     CmpReg(Register, Register),
     /// A register to compare, an immediate to compare it to, and whether or not the result
     /// of this comparision should be flipped.
-    CmpImm(Register, u32, bool),
+    CmpImm(Register, u32),
 }
 
-fn cmp_bit(
-    builder: &mut BlockBuilder,
-    dest: Register,
-    mode: CmpKind,
-    flip: bool,
-) -> io::Result<()> {
-    match (mode, flip) {
-        (CmpKind::Eq, false) | (CmpKind::Ne, true) => builder.stream.sete_reg8(dest),
-        (CmpKind::Ne, false) | (CmpKind::Eq, true) => builder.stream.setne_reg8(dest),
-        (CmpKind::Sl, false) => builder.stream.setl_reg8(dest),
-        (CmpKind::Sge, false) => builder.stream.setge_reg8(dest),
-        (CmpKind::Ul, false) => builder.stream.setb_reg8(dest),
-        (CmpKind::Uge, false) => builder.stream.setae_reg8(dest),
-        (CmpKind::Sl, true) => builder.stream.setnl_reg8(dest),
-        (CmpKind::Sge, true) => builder.stream.setnge_reg8(dest),
-        (CmpKind::Ul, true) => builder.stream.setnb_reg8(dest),
-        (CmpKind::Uge, true) => builder.stream.setnae_reg8(dest),
+fn cmp_bit(builder: &mut BlockBuilder, dest: Register, kind: CmpKind) -> io::Result<()> {
+    match kind {
+        CmpKind::Eq => builder.stream.sete_reg8(dest),
+        CmpKind::Ne => builder.stream.setne_reg8(dest),
+        CmpKind::Inequality(kind) => match kind {
+            Inequality::Ult => builder.stream.setb_reg8(dest),
+            Inequality::Ule => builder.stream.setbe_reg8(dest),
+            Inequality::Ugt => builder.stream.seta_reg8(dest),
+            Inequality::Uge => builder.stream.setae_reg8(dest),
+            Inequality::Slt => builder.stream.setl_reg8(dest),
+            Inequality::Sle => builder.stream.setle_reg8(dest),
+            Inequality::Sgt => builder.stream.setg_reg8(dest),
+            Inequality::Sge => builder.stream.setge_reg8(dest),
+        },
     }
 }
 
 pub fn set_bool_conditional(
     builder: &mut BlockBuilder,
     dest: Register,
-    src: SourcePair,
+    src1: Register,
+    src2: Source,
     mode: CmpKind,
 ) -> io::Result<()> {
-    let cmp = bool_cmp(src, 0, 1, mode);
+    let cmp = bool_cmp(src1, src2, 0, 1, mode);
 
     let xor = match cmp {
         CmpValue::Const(_) => false,
-        CmpValue::Test(r, _) | CmpValue::CmpImm(r, _, _) => r != dest,
+        CmpValue::Test(r) | CmpValue::CmpImm(r, _) => r != dest,
         CmpValue::CmpReg(r1, r2) => r1 != dest && r2 != dest,
     };
 
@@ -167,25 +162,22 @@ pub fn set_bool_conditional(
         builder.stream.xor_reg_reg(Reg32(dest), Reg32(dest))?;
     }
 
-    let flip = match cmp {
+    match cmp {
         CmpValue::Const(v) => {
             builder.mov_r32_imm32(dest, v)?;
             return Ok(());
         }
 
-        CmpValue::Test(r, flip) => {
+        CmpValue::Test(r) => {
             builder.stream.test_reg_reg(Reg32(r), Reg32(r))?;
-            flip
         }
 
-        CmpValue::CmpImm(src, val, flip) => {
+        CmpValue::CmpImm(src, val) => {
             builder.stream.cmp_reg_imm(Reg32(src), Imm32(val))?;
-            flip
         }
 
         CmpValue::CmpReg(src1, src2) => {
             builder.stream.cmp_reg_reg(Reg32(src1), Reg32(src2))?;
-            false
         }
     };
 
@@ -194,5 +186,5 @@ pub fn set_bool_conditional(
         builder.stream.mov_reg_imm(Reg32(dest), Imm32(0))?;
     }
 
-    cmp_bit(builder, dest, mode, flip)
+    cmp_bit(builder, dest, mode)
 }

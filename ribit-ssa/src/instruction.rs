@@ -4,8 +4,8 @@ use ribit_core::{register, Width};
 
 use crate::reference::Reference;
 use crate::{
-    ty, AnySource, Arg, CmpKind, CommutativeBinOp, Id, ShiftOp, Source, SourcePair, StackIndex,
-    Type,
+    eval, ty, AnySource, Arg, CmpKind, CommutativeBinOp, Id, ShiftOp, Source, SourcePair,
+    StackIndex, Type,
 };
 
 mod ext_int;
@@ -69,8 +69,7 @@ pub enum Instruction {
     },
     Cmp {
         dest: Id,
-        src: SourcePair,
-        kind: CmpKind,
+        args: CmpArgs,
     },
     CommutativeBinOp {
         dest: Id,
@@ -117,7 +116,7 @@ impl Instruction {
                 }
             }
 
-            Self::ShiftOp { src, .. } | Self::Cmp { src, .. } => match src {
+            Self::ShiftOp { src, .. } => match src {
                 SourcePair::RefRef(l, r) => {
                     visit(l.id);
                     visit(r.id);
@@ -126,7 +125,8 @@ impl Instruction {
             },
 
             Self::CommutativeBinOp { src1: reference, src2: source, .. }
-            | Self::Sub { src1: source, src2: reference, .. } => {
+            | Self::Sub { src1: source, src2: reference, .. }
+            | Self::Cmp { dest: _, args: CmpArgs { src1: reference, src2: source, kind: _ } } => {
                 visit(reference.id);
 
                 if let AnySource::Ref(it) = source {
@@ -181,10 +181,9 @@ impl Instruction {
 
                 ty
             }
-            Self::Cmp { dest: _, src, kind: _ } => {
-                let ty = src.lhs().ty();
 
-                assert_eq!(ty, src.rhs().ty());
+            Self::Cmp { dest: _, args: CmpArgs { src1, src2, kind: _ } } => {
+                assert_eq!(src1.ty, src2.ty());
 
                 Type::Boolean
             }
@@ -256,13 +255,34 @@ impl fmt::Display for Instruction {
 
             Self::Sub { dest, src1, src2 } => write!(f, "{dest} = sub {src1}, {src2}"),
 
-            Self::Cmp { dest, src, kind } => {
-                write!(f, "{dest} = cmp {kind} {}, {}", src.lhs(), src.rhs())
+            Self::Cmp { dest, args: CmpArgs { src1, src2, kind } } => {
+                write!(f, "{dest} = cmp {kind} {}, {}", src1, src2)
             }
 
             Self::Select(it) => it.fmt(f),
             Self::Fence => f.write_str("fence"),
             Self::ExtInt(it) => it.fmt(f),
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub struct CmpArgs {
+    pub src1: Reference,
+    pub src2: AnySource,
+    pub kind: CmpKind,
+}
+
+impl CmpArgs {
+    pub fn new(src1: AnySource, src2: AnySource, kind: CmpKind) -> Result<Self, bool> {
+        let (src1, src2, kind) = match (src1, src2) {
+            (AnySource::Const(src1), AnySource::Const(src2)) => {
+                return Err(eval::icmp(src1, src2, kind));
+            }
+            (src1 @ AnySource::Const(_), AnySource::Ref(src2)) => (src2, src1, kind.swap()),
+            (AnySource::Ref(src1), src2) => (src1, src2, kind),
+        };
+
+        Ok(Self { src1, src2, kind })
     }
 }

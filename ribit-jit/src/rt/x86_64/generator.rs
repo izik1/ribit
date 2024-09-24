@@ -150,13 +150,14 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                     }
                 }
 
-                &ssa::Instruction::Cmp { dest, src, kind } => {
+                &ssa::Instruction::Cmp { dest, args } => {
                     let dest = *allocs.get(&dest).expect("dest not allocated!?");
 
-                    let src =
-                        crate::SourcePair::from_ssa(src, allocs).expect("sources not allocated");
+                    let src1 = *allocs.get(&args.src1.id).expect("src1 not allocated!?");
+                    let src2 = crate::Source::from_ssa_src(args.src2, allocs)
+                        .expect("src2 not allocated!?");
 
-                    cmp::set_bool_conditional(self, dest, src, kind)
+                    cmp::set_bool_conditional(self, dest, src1, src2, args.kind)
                 }
 
                 // todo(perf): split into `dest = if cond { if_true } else { <undefined> }; dest = if !cond { if_false } else { dest }

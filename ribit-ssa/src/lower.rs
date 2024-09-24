@@ -4,7 +4,7 @@ mod test;
 use ribit_core::{instruction, opcode, register, ReturnCode, Width};
 
 use super::{AnySource, CmpKind, Id, Instruction, ShiftOp};
-use crate::instruction::{ExtInt, Select};
+use crate::instruction::{CmpArgs, ExtInt, Select};
 use crate::reference::Reference;
 use crate::ty::{self, ConstTy, Constant};
 use crate::{eval, Arg, Block, CommutativeBinOp, IdAllocator, Ref, Source, SourcePair, Terminator};
@@ -237,22 +237,10 @@ impl Context {
         self.instruction(|dest| Instruction::Sub { dest, src1, src2 })
     }
 
-    pub fn cmp(&mut self, src1: AnySource, src2: AnySource, mode: CmpKind) -> Source<ty::Bool> {
-        let consts = match SourcePair::try_from((src1, src2)) {
-            Ok(src) => {
-                return self.typed_instruction(|dest| Instruction::Cmp { dest, src, kind: mode });
-            }
-            Err(consts) => consts,
-        };
-
-        match consts {
-            (Constant::Int(lhs), Constant::Int(rhs)) => {
-                Source::Const(eval::cmp_int(lhs, rhs, mode))
-            }
-
-            (src1, src2) => {
-                panic!("can't compare constants of types `{}` and `{}`", src1.ty(), src2.ty())
-            }
+    pub fn cmp(&mut self, src1: AnySource, src2: AnySource, kind: CmpKind) -> Source<ty::Bool> {
+        match CmpArgs::new(src1, src2, kind) {
+            Ok(args) => self.typed_instruction(|dest| Instruction::Cmp { dest, args }),
+            Err(c) => Source::Const(c),
         }
     }
 
