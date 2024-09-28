@@ -1,7 +1,0 @@
-[package]
-name = "ribit-decode"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies.ribit-core]
-path = "../ribit-core"

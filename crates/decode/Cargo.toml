@@ -1,0 +1,9 @@
+[package]
+authors.workspace = true
+edition.workspace = true
+name = "ribit-decode"
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+ribit-core.workspace = true

@@ -1,0 +1,22 @@
+[package]
+authors.workspace = true
+description = "A Risc-V 32i-mc JIT"
+edition = "2021"
+name = "ribit"
+version.workspace = true
+
+[dependencies]
+log.workspace = true
+ribit-decode.workspace = true
+ribit-jit.workspace = true
+ribit-ssa.workspace = true
+xmas-elf = "0.9.0"
+
+[dependencies.env_logger]
+default-features = false
+features = ["color", "auto-color", "humantime"]
+version = "0.11.3"
+
+[dependencies.ribit-core]
+features = ["disassemble"]
+workspace = true

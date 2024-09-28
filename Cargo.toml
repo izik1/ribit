@@ -1,33 +1,18 @@
 [workspace]
-members = ["ribit-*", "fuzz"]
+members = ["crates/*"]
+resolver = "2"
 
-[package]
+[workspace.package]
 authors = ["Skyler Ross <orangesnowfox@gmail.com>"]
-description = "A Risc-V 32i-mc JIT"
 edition = "2021"
-name = "ribit"
+publish = false
 version = "0.1.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
+[workspace.dependencies]
+expect-test = "1.2.1"
 log = "0.4.8"
-xmas-elf = "0.9.0"
-
-[dependencies.env_logger]
-default-features = false
-features = ["color", "auto-color", "humantime"]
-version = "0.11.3"
-
-[dependencies.ribit-core]
-features = ["disassemble"]
-path = "ribit-core"
-
-[dependencies.ribit-ssa]
-path = "ribit-ssa"
-
-[dependencies.ribit-jit]
-path = "ribit-jit"
-
-[dependencies.ribit-decode]
-path = "ribit-decode"
+ribit-asm.path = "crates/asm"
+ribit-core.path = "crates/core"
+ribit-decode.path = "crates/decode"
+ribit-jit.path = "crates/jit"
+ribit-ssa.path = "crates/ssa"

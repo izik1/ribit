@@ -1,0 +1,11 @@
+[package]
+authors.workspace = true
+edition.workspace = true
+name = "ribit-core"
+publish.workspace = true
+version.workspace = true
+
+[features]
+disassemble = []
+
+[dependencies]

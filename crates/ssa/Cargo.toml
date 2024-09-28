@@ -1,0 +1,13 @@
+[package]
+authors.workspace = true
+edition.workspace = true
+name = "ribit-ssa"
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+ribit-core.workspace = true
+
+[dev-dependencies]
+expect-test.workspace = true
+ribit-asm.workspace = true
