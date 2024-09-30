@@ -49,7 +49,7 @@ fn register_from_index(bit: u8) -> Register {
     }
 }
 
-fn arg_register(arg: Arg) -> Register {
+pub fn arg_register(arg: Arg) -> Register {
     match arg {
         Arg::Register => Register::Zdi,
         Arg::Memory => Register::Zsi,

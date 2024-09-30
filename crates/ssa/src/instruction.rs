@@ -4,8 +4,7 @@ use ribit_core::{register, Width};
 
 use crate::reference::Reference;
 use crate::{
-    eval, ty, AnySource, Arg, CmpKind, CommutativeBinOp, Id, ShiftOp, Source, SourcePair,
-    StackIndex, Type,
+    eval, ty, AnySource, Arg, CmpKind, CommutativeBinOp, Id, ShiftKind, Source, SourcePair, StackIndex, Type
 };
 
 mod ext_int;
@@ -57,7 +56,7 @@ pub enum Instruction {
     ShiftOp {
         dest: Id,
         src: SourcePair,
-        op: ShiftOp,
+        op: ShiftKind,
     },
 
     /// Subtraction is special, and not in a good way.

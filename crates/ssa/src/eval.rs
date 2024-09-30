@@ -3,7 +3,7 @@ use core::fmt;
 use crate::icmp::PartialICmp;
 use crate::reference::Reference;
 use crate::ty::{self, Constant, Int};
-use crate::{AnySource, Bitness, CmpKind, CommutativeBinOp, ShiftOp};
+use crate::{AnySource, Bitness, CmpKind, CommutativeBinOp, ShiftKind};
 
 #[must_use]
 pub fn commutative_identity(
@@ -73,7 +73,8 @@ pub fn commutative_absorb(
 pub(crate) fn neg(v: Constant) -> Constant {
     match v {
         Constant::Int(it) => {
-            let val = (-it.signed()) as u32;
+            // the only weird case here is -MIN = MIN, which is fine for this function, and weirdly also fine for turning `sub ref, const` into `add ref, -const`
+            let val = it.signed().wrapping_neg() as u32;
 
             // can't do `(1 << bits) - 1` because of underflows.
             let mask = if it.bits() >= 32 { u32::MAX } else { (1 << (it.bits() as u32)) - 1 };
@@ -103,16 +104,16 @@ pub fn icmp(lhs: Constant, rhs: Constant, kind: CmpKind) -> bool {
 
 // todo: "just work with arbitrary constants of compatable types"
 #[must_use]
-pub fn shift(src1: Constant, src2: Constant, op: ShiftOp) -> Constant {
+pub fn shift(src1: Constant, src2: Constant, op: ShiftKind) -> Constant {
     u32_op_consts(shift_u32, src1, src2, op)
 }
 
 #[must_use]
-fn shift_u32(src1: u32, src2: u32, op: ShiftOp) -> u32 {
+fn shift_u32(src1: u32, src2: u32, op: ShiftKind) -> u32 {
     match op {
-        ShiftOp::Sll => src1 << (src2 & 0x1f),
-        ShiftOp::Srl => src1 >> (src2 & 0x1f),
-        ShiftOp::Sra => ((src1 as i32) >> (src2 & 0x1f)) as u32,
+        ShiftKind::Sll => src1 << (src2 & 0x1f),
+        ShiftKind::Srl => src1 >> (src2 & 0x1f),
+        ShiftKind::Sra => ((src1 as i32) >> (src2 & 0x1f)) as u32,
     }
 }
 
@@ -174,11 +175,11 @@ pub fn extend_int(width: ribit_core::Width, src: Constant, signed: bool) -> Int 
 
 #[cfg(test)]
 mod test {
-    use crate::ShiftOp;
+    use crate::ShiftKind;
 
     #[test]
     fn sra_1() {
-        let res = super::shift_u32(0x80000 << 12, 0x8, ShiftOp::Sra);
+        let res = super::shift_u32(0x80000 << 12, 0x8, ShiftKind::Sra);
         assert_eq!(0xff800000, res);
     }
 }

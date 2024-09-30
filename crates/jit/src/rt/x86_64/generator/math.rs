@@ -3,7 +3,7 @@ use std::io;
 use rasen::params::imm::Imm32;
 use rasen::params::reg::Reg32;
 use rasen::params::Register;
-use ribit_ssa::{CommutativeBinOp, ShiftOp};
+use ribit_ssa::{CommutativeBinOp, ShiftKind};
 
 use super::BlockBuilder;
 use crate::{Source, SourcePair};
@@ -100,15 +100,15 @@ fn shift_3arg(
     dest: Register,
     lhs: Register,
     rhs: Register,
-    op: ShiftOp,
+    op: ShiftKind,
 ) -> io::Result<()> {
     let dest = Reg32(dest);
     let lhs = Reg32(lhs);
     let rhs = Reg32(rhs);
     match op {
-        ShiftOp::Sll => builder.stream.shlx_reg_reg_reg(dest, lhs, rhs),
-        ShiftOp::Srl => builder.stream.shrx_reg_reg_reg(dest, lhs, rhs),
-        ShiftOp::Sra => builder.stream.sarx_reg_reg_reg(dest, lhs, rhs),
+        ShiftKind::Sll => builder.stream.shlx_reg_reg_reg(dest, lhs, rhs),
+        ShiftKind::Srl => builder.stream.shrx_reg_reg_reg(dest, lhs, rhs),
+        ShiftKind::Sra => builder.stream.sarx_reg_reg_reg(dest, lhs, rhs),
     }
 }
 
@@ -116,7 +116,7 @@ pub fn shift(
     builder: &mut BlockBuilder,
     dest: Register,
     src: SourcePair,
-    op: ShiftOp,
+    op: ShiftKind,
 ) -> io::Result<()> {
     // todo: if not 3-arg
 
@@ -128,9 +128,9 @@ pub fn shift(
             }
 
             match op {
-                ShiftOp::Sll => builder.stream.shl_reg_imm8(Reg32(dest), rhs as u8),
-                ShiftOp::Srl => builder.stream.shr_reg_imm8(Reg32(dest), rhs as u8),
-                ShiftOp::Sra => builder.stream.sar_reg_imm8(Reg32(dest), rhs as u8),
+                ShiftKind::Sll => builder.stream.shl_reg_imm8(Reg32(dest), rhs as u8),
+                ShiftKind::Srl => builder.stream.shr_reg_imm8(Reg32(dest), rhs as u8),
+                ShiftKind::Sra => builder.stream.sar_reg_imm8(Reg32(dest), rhs as u8),
             }
         }
 

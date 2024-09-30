@@ -1,5 +1,6 @@
 mod generator;
 
+pub mod ir;
 mod legalise;
 mod register_alloc;
 pub mod rt;

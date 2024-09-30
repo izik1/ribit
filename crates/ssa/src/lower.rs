@@ -3,7 +3,7 @@ mod test;
 
 use ribit_core::{instruction, opcode, register, ReturnCode, Width};
 
-use super::{AnySource, CmpKind, Id, Instruction, ShiftOp};
+use super::{AnySource, CmpKind, Id, Instruction, ShiftKind};
 use crate::instruction::{CmpArgs, ExtInt, Select};
 use crate::reference::Reference;
 use crate::ty::{self, ConstTy, Constant};
@@ -145,7 +145,7 @@ impl Context {
         self.instruction(|dest| Instruction::CommutativeBinOp { dest, src1, src2, op })
     }
 
-    pub fn shift(&mut self, op: ShiftOp, src1: AnySource, src2: AnySource) -> AnySource {
+    pub fn shift(&mut self, op: ShiftKind, src1: AnySource, src2: AnySource) -> AnySource {
         assert_eq!(src1.ty(), src2.ty());
 
         let consts = match SourcePair::try_from((src1, src2)) {
@@ -205,15 +205,15 @@ impl Context {
     }
 
     pub fn sll(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
-        self.shift(ShiftOp::Sll, src1, src2)
+        self.shift(ShiftKind::Sll, src1, src2)
     }
 
     pub fn srl(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
-        self.shift(ShiftOp::Srl, src1, src2)
+        self.shift(ShiftKind::Srl, src1, src2)
     }
 
     pub fn sra(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
-        self.shift(ShiftOp::Sra, src1, src2)
+        self.shift(ShiftKind::Sra, src1, src2)
     }
 
     pub fn xor(&mut self, src1: AnySource, src2: AnySource) -> AnySource {

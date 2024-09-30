@@ -25,6 +25,12 @@ impl IdAllocator {
     }
 }
 
+impl Default for IdAllocator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, PartialOrd, Ord)]
 pub struct Id(pub(crate) u16);
 

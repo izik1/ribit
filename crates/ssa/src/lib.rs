@@ -206,13 +206,13 @@ impl fmt::Display for CommutativeBinOp {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum ShiftOp {
+pub enum ShiftKind {
     Sll,
     Srl,
     Sra,
 }
 
-impl fmt::Display for ShiftOp {
+impl fmt::Display for ShiftKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Sll => f.write_str("sll"),
