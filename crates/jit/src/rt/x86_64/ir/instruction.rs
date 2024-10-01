@@ -11,25 +11,25 @@ pub enum UnaryOpKind {
 }
 
 pub struct UnaryOp {
-    pub operand: UnaryOperand,
+    pub args: UnaryArgs,
     pub kind: UnaryOpKind,
 }
 
 impl UnaryOp {
-    pub fn not(operand: UnaryOperand) -> Self {
-        Self { operand, kind: UnaryOpKind::Not }
+    pub fn not(args: UnaryArgs) -> Self {
+        Self { args, kind: UnaryOpKind::Not }
     }
 
-    pub fn neg(operand: UnaryOperand) -> Self {
-        Self { operand, kind: UnaryOpKind::Neg }
+    pub fn neg(args: UnaryArgs) -> Self {
+        Self { args, kind: UnaryOpKind::Neg }
     }
 
-    pub fn inc(operand: UnaryOperand) -> Self {
-        Self { operand, kind: UnaryOpKind::Inc }
+    pub fn inc(args: UnaryArgs) -> Self {
+        Self { args, kind: UnaryOpKind::Inc }
     }
 
-    pub fn dec(operand: UnaryOperand) -> Self {
-        Self { operand, kind: UnaryOpKind::Dec }
+    pub fn dec(args: UnaryArgs) -> Self {
+        Self { args, kind: UnaryOpKind::Dec }
     }
 }
 
@@ -42,35 +42,35 @@ pub enum BinaryOpKind {
 }
 
 pub struct BinaryOp {
-    pub operand: MaybeTiedBinaryOperand,
+    pub args: MaybeTiedBinaryArgs,
     pub kind: BinaryOpKind,
 }
 
 pub enum Instruction {
     Unary(UnaryOp),
 
-    Mov { op: UntiedBinaryOperand, width: Width },
-    MovZx32 { op: UntiedBinaryOperand, src_width: Width },
-    MovSx32 { op: UntiedBinaryOperand, src_width: Width },
+    Mov { args: UntiedBinaryArgs, width: Width },
+    MovZx32 { args: UntiedBinaryArgs, src_width: Width },
+    MovSx32 { args: UntiedBinaryArgs, src_width: Width },
 
     // HACK: these are just for returns, properly support 64-bit instructions everywhere please!
-    Mov64 { op: UntiedBinaryOp64 },
-    Or64 { op: TiedBinaryOp64 },
+    Mov64 { args: UntiedBinaryArgs64 },
+    Or64 { args: TiedBinaryArgs64 },
 
-    ShiftImm { unary: UnaryOperand, kind: ShiftKind, src2: u8 },
+    ShiftImm { args: UnaryArgs, kind: ShiftKind, src2: u8 },
     // src2 is always cl.
-    ShiftCl { unary: UnaryOperand, kind: ShiftKind },
+    ShiftCl { args: UnaryArgs, kind: ShiftKind },
 
     // fixme: handle FLAGS right.
-    Cmp { op: UntiedBinaryOperand },
+    Cmp { args: UntiedBinaryArgs },
     // fixme: handle FLAGS right.
-    Test { op: UntiedBinaryOperand },
+    Test { args: UntiedBinaryArgs },
 
     // fixme: handle FLAGs right.
     SetCC { dest: Register, condition: CmpKind },
     // fixme: handle FLAGs right.
     // note: things will absolutely explode if you try to `CMovCC` with an immediate (there's no instruction for that)
-    CMovCC { op: UntiedBinaryOperand, condition: CmpKind },
+    CMovCC { args: UntiedBinaryArgs, condition: CmpKind },
 
     Binary(BinaryOp),
 }
@@ -87,7 +87,7 @@ impl From<BinaryOp> for Instruction {
     }
 }
 
-pub enum MaybeTiedBinaryOperand {
+pub enum MaybeTiedBinaryArgs {
     RegReg { dest: Register, src1: Register, src2: Register },
     RegMem { dest: Register, src1: Register, src2: Memory },
     RegImm { dest: Register, src1: Register, src2: u32 },
@@ -95,12 +95,12 @@ pub enum MaybeTiedBinaryOperand {
     MemImm { lhs: Memory, rhs: u32 },
 }
 
-pub enum TiedBinaryOp64 {
+pub enum TiedBinaryArgs64 {
     RegReg { dest: Register, src1: Register, src2: Register },
     RegImm { dest: Register, src1: Register, src2: u64 },
 }
 
-pub enum UntiedBinaryOperand {
+pub enum UntiedBinaryArgs {
     RegReg(Register, Register),
     RegMem(Register, Memory),
     RegImm(Register, u32),
@@ -108,12 +108,12 @@ pub enum UntiedBinaryOperand {
     MemImm(Memory, u32),
 }
 
-pub enum UntiedBinaryOp64 {
+pub enum UntiedBinaryArgs64 {
     RegReg(Register, Register),
     RegImm(Register, u64),
 }
 
-pub enum UnaryOperand {
+pub enum UnaryArgs {
     // dest is tied to src.
     Reg { dest: Register, src: Register },
     Mem(Memory),
