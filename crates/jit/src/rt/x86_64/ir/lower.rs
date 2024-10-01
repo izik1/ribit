@@ -9,8 +9,8 @@ use ssa::ty::I32;
 use ssa::{AnySource, Constant};
 
 use super::instruction::{
-    Instruction, MaybeTiedBinaryOperand, Terminator, TiedBinaryOp64, UnaryOperand,
-    UntiedBinaryOp64, UntiedBinaryOperand,
+    self, BinaryOpKind, Instruction, MaybeTiedBinaryOperand, Terminator, TiedBinaryOp64,
+    UnaryOpKind, UnaryOperand, UntiedBinaryOp64, UntiedBinaryOperand,
 };
 use super::{Block, Id, IdAllocator, Memory, Register};
 use crate::rt::x86_64::{register_alloc, BlockReturn};
@@ -102,6 +102,21 @@ impl Context {
             op: UntiedBinaryOperand::RegReg(Register::Register(dest, false), src),
             width,
         });
+    }
+
+    fn unary_op(&mut self, operand: UnaryOperand, kind: UnaryOpKind) {
+        self.instructions.push(instruction::UnaryOp { operand, kind }.into());
+    }
+
+    fn binary_op(&mut self, operand: MaybeTiedBinaryOperand, kind: BinaryOpKind) {
+        self.instructions.push(instruction::BinaryOp { operand, kind }.into());
+    }
+
+    fn zeroize(&mut self, dest: Register) {
+        self.binary_op(
+            MaybeTiedBinaryOperand::RegReg { dest, src1: dest, src2: dest },
+            BinaryOpKind::Xor,
+        );
     }
 }
 
@@ -245,7 +260,7 @@ pub fn lower(ssa_block: &ribit_ssa::Block) -> Block {
                     }
                     Source::Register(src2) => {
                         ctx.mov_fixed_reg(crate::Register::Zcx, Width::Byte, src2);
-                        Instruction::ShiftCl { unary }
+                        Instruction::ShiftCl { unary, kind: *op }
                     }
                 };
 
@@ -261,11 +276,7 @@ pub fn lower(ssa_block: &ribit_ssa::Block) -> Block {
                 let src2 = ctx.map_src(&args.src2);
 
                 // zeroize `dest` (for a `setcc`).
-                ctx.instructions.push(Instruction::Xor(MaybeTiedBinaryOperand::RegReg {
-                    dest: dest,
-                    src1: dest,
-                    src2: dest,
-                }));
+                ctx.zeroize(dest);
 
                 // compare `src1` and `src2`.
                 let compare = match src2 {
@@ -294,34 +305,33 @@ pub fn lower(ssa_block: &ribit_ssa::Block) -> Block {
                     // we only care about values that are idioms for certain operations, not IR simplifications,
                     // we'd expect those to be optimized out already.
                     Source::Val(1) if *op == CommutativeBinOp::Add => {
-                        ctx.instructions
-                            .push(Instruction::Inc(UnaryOperand::Reg { dest, src: src1 }));
+                        ctx.unary_op(UnaryOperand::Reg { dest, src: src1 }, UnaryOpKind::Inc);
                         continue;
                     }
 
                     Source::Val(u32::MAX) if *op == CommutativeBinOp::Add => {
-                        ctx.instructions
-                            .push(Instruction::Dec(UnaryOperand::Reg { dest, src: src1 }));
+                        ctx.unary_op(UnaryOperand::Reg { dest, src: src1 }, UnaryOpKind::Dec);
+
                         continue;
                     }
 
                     Source::Val(u32::MAX) if *op == CommutativeBinOp::Xor => {
-                        ctx.instructions
-                            .push(Instruction::Not(UnaryOperand::Reg { dest, src: src1 }));
+                        ctx.unary_op(UnaryOperand::Reg { dest, src: src1 }, UnaryOpKind::Not);
+
                         continue;
                     }
                     Source::Val(src2) => MaybeTiedBinaryOperand::RegImm { dest, src1, src2 },
                     Source::Register(src2) => MaybeTiedBinaryOperand::RegReg { dest, src1, src2 },
                 };
 
-                let instruction = match op {
-                    CommutativeBinOp::And => Instruction::And(operands),
-                    CommutativeBinOp::Add => Instruction::Add(operands),
-                    CommutativeBinOp::Or => Instruction::Or(operands),
-                    CommutativeBinOp::Xor => Instruction::Xor(operands),
+                let kind = match op {
+                    CommutativeBinOp::And => BinaryOpKind::And,
+                    CommutativeBinOp::Add => BinaryOpKind::Add,
+                    CommutativeBinOp::Or => BinaryOpKind::Or,
+                    CommutativeBinOp::Xor => BinaryOpKind::Xor,
                 };
 
-                ctx.instructions.push(instruction);
+                ctx.binary_op(operands, kind);
             }
             ribit_ssa::Instruction::Select(select) => lower_select(&mut ctx, select),
             ribit_ssa::Instruction::ExtInt(ext_int) => lower_ext_int(&mut ctx, ext_int),
@@ -385,10 +395,13 @@ fn lower_sub(ctx: &mut Context, dest: ribit_ssa::Id, src1: &AnySource, src2: &Re
             let imm = get_val(*constant);
             // `0 - x` -> `neg x`
             if imm == 0 {
-                ctx.instructions.push(Instruction::Neg(UnaryOperand::Reg {
-                    dest: Register::symbolic(dest),
-                    src: Register::symbolic(src2),
-                }));
+                ctx.unary_op(
+                    UnaryOperand::Reg {
+                        dest: Register::symbolic(dest),
+                        src: Register::symbolic(src2),
+                    },
+                    UnaryOpKind::Neg,
+                );
 
                 return;
             }
@@ -399,24 +412,31 @@ fn lower_sub(ctx: &mut Context, dest: ribit_ssa::Id, src1: &AnySource, src2: &Re
         ribit_ssa::AnySource::Ref(reference) => ctx.map_id(reference.id),
     };
 
-    ctx.instructions.push(Instruction::Sub(MaybeTiedBinaryOperand::RegReg {
-        dest: Register::symbolic(dest),
-        src1: Register::symbolic(src1),
-        src2: Register::symbolic(src2),
-    }));
+    ctx.binary_op(
+        MaybeTiedBinaryOperand::RegReg {
+            dest: Register::symbolic(dest),
+            src1: Register::symbolic(src1),
+            src2: Register::symbolic(src2),
+        },
+        BinaryOpKind::Sub,
+    );
 }
 
 fn add_r32_imm(dest: Register, src: Register, v: u32) -> Instruction {
     // inc/dec is cheapest (on most modern cpus)
     if v == 1 {
-        return Instruction::Inc(UnaryOperand::Reg { dest, src });
+        return instruction::UnaryOp::inc(UnaryOperand::Reg { dest, src }).into();
     }
 
     if v == u32::MAX {
-        return Instruction::Dec(UnaryOperand::Reg { dest, src });
+        return instruction::UnaryOp::dec(UnaryOperand::Reg { dest, src }).into();
     }
 
-    Instruction::Add(MaybeTiedBinaryOperand::RegImm { dest, src1: src, src2: v })
+    instruction::BinaryOp {
+        operand: MaybeTiedBinaryOperand::RegImm { dest, src1: src, src2: v },
+        kind: BinaryOpKind::Add,
+    }
+    .into()
 }
 
 fn lower_select(ctx: &mut Context, Select { dest, cond, if_true, if_false }: &Select) {
@@ -500,7 +520,9 @@ fn lower_ext_int(ctx: &mut Context, ExtInt { dest, width: _, src, signed }: &Ext
         // 0 -> -0 -> 0
         // 1 -> -1 -> 0xffff_ffff
         // if width is < 32 the top `32 - x` bits become "don't care"
-        ribit_ssa::Type::Boolean => Instruction::Neg(UnaryOperand::Reg { dest, src: src_reg }),
+        ribit_ssa::Type::Boolean => {
+            instruction::UnaryOp::neg(UnaryOperand::Reg { dest, src: src_reg }).into()
+        }
         ribit_ssa::Type::Unit => panic!("Invalid extend type"),
     };
 

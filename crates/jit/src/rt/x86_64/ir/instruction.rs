@@ -1,15 +1,53 @@
-use core::fmt;
-
 use ribit_core::Width;
 use ribit_ssa::{CmpKind, ShiftKind};
 
 use super::{Memory, Register};
 
+pub enum UnaryOpKind {
+    Neg,
+    Not,
+    Inc,
+    Dec,
+}
+
+pub struct UnaryOp {
+    pub operand: UnaryOperand,
+    pub kind: UnaryOpKind,
+}
+
+impl UnaryOp {
+    pub fn not(operand: UnaryOperand) -> Self {
+        Self { operand, kind: UnaryOpKind::Not }
+    }
+
+    pub fn neg(operand: UnaryOperand) -> Self {
+        Self { operand, kind: UnaryOpKind::Neg }
+    }
+
+    pub fn inc(operand: UnaryOperand) -> Self {
+        Self { operand, kind: UnaryOpKind::Inc }
+    }
+
+    pub fn dec(operand: UnaryOperand) -> Self {
+        Self { operand, kind: UnaryOpKind::Dec }
+    }
+}
+
+pub enum BinaryOpKind {
+    Sub,
+    And,
+    Add,
+    Or,
+    Xor,
+}
+
+pub struct BinaryOp {
+    pub operand: MaybeTiedBinaryOperand,
+    pub kind: BinaryOpKind,
+}
+
 pub enum Instruction {
-    Neg(UnaryOperand),
-    Not(UnaryOperand),
-    Inc(UnaryOperand),
-    Dec(UnaryOperand),
+    Unary(UnaryOp),
 
     Mov { op: UntiedBinaryOperand, width: Width },
     MovZx32 { op: UntiedBinaryOperand, src_width: Width },
@@ -21,7 +59,7 @@ pub enum Instruction {
 
     ShiftImm { unary: UnaryOperand, kind: ShiftKind, src2: u8 },
     // src2 is always cl.
-    ShiftCl { unary: UnaryOperand },
+    ShiftCl { unary: UnaryOperand, kind: ShiftKind },
 
     // fixme: handle FLAGS right.
     Cmp { op: UntiedBinaryOperand },
@@ -34,11 +72,19 @@ pub enum Instruction {
     // note: things will absolutely explode if you try to `CMovCC` with an immediate (there's no instruction for that)
     CMovCC { op: UntiedBinaryOperand, condition: CmpKind },
 
-    Sub(MaybeTiedBinaryOperand),
-    And(MaybeTiedBinaryOperand),
-    Add(MaybeTiedBinaryOperand),
-    Or(MaybeTiedBinaryOperand),
-    Xor(MaybeTiedBinaryOperand),
+    Binary(BinaryOp),
+}
+
+impl From<UnaryOp> for Instruction {
+    fn from(value: UnaryOp) -> Self {
+        Self::Unary(value)
+    }
+}
+
+impl From<BinaryOp> for Instruction {
+    fn from(value: BinaryOp) -> Self {
+        Self::Binary(value)
+    }
 }
 
 pub enum MaybeTiedBinaryOperand {
@@ -61,6 +107,7 @@ pub enum UntiedBinaryOperand {
     MemReg(Memory, Register),
     MemImm(Memory, u32),
 }
+
 pub enum UntiedBinaryOp64 {
     RegReg(Register, Register),
     RegImm(Register, u64),
