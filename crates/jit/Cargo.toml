@@ -8,7 +8,7 @@ version.workspace = true
 [dependencies]
 log.workspace = true
 memmap2 = "0.9.4"
-rasen = { git = "https://github.com/izik1/rasen", rev = "f043eaf960703c671b9523b15a727cab8033d783" }
+rasen = { git = "https://github.com/izik1/rasen", rev = "765ed81642dc60111aab95144174f86fcebab79f" }
 ribit-core.workspace = true
 ribit-ssa.workspace = true
 static_assertions = "1.1.0"
