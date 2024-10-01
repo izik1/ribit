@@ -46,12 +46,23 @@ pub struct BinaryOp {
     pub kind: BinaryOpKind,
 }
 
+pub enum ExtKind {
+    Signed,
+    Zero,
+}
+
+pub struct MovExt32 {
+    pub args: UntiedBinaryArgs,
+    pub src_width: Width,
+    pub kind: ExtKind,
+}
+
 pub enum Instruction {
     Unary(UnaryOp),
+    Binary(BinaryOp),
 
     Mov { args: UntiedBinaryArgs, width: Width },
-    MovZx32 { args: UntiedBinaryArgs, src_width: Width },
-    MovSx32 { args: UntiedBinaryArgs, src_width: Width },
+    MovExt32(MovExt32),
 
     // HACK: these are just for returns, properly support 64-bit instructions everywhere please!
     Mov64 { args: UntiedBinaryArgs64 },
@@ -71,8 +82,6 @@ pub enum Instruction {
     // fixme: handle FLAGs right.
     // note: things will absolutely explode if you try to `CMovCC` with an immediate (there's no instruction for that)
     CMovCC { args: UntiedBinaryArgs, condition: CmpKind },
-
-    Binary(BinaryOp),
 }
 
 impl From<UnaryOp> for Instruction {
@@ -84,6 +93,12 @@ impl From<UnaryOp> for Instruction {
 impl From<BinaryOp> for Instruction {
     fn from(value: BinaryOp) -> Self {
         Self::Binary(value)
+    }
+}
+
+impl From<MovExt32> for Instruction {
+    fn from(value: MovExt32) -> Self {
+        Self::MovExt32(value)
     }
 }
 

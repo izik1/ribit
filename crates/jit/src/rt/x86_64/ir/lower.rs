@@ -9,8 +9,8 @@ use ssa::ty::I32;
 use ssa::{AnySource, Constant};
 
 use super::instruction::{
-    self, BinaryOpKind, Instruction, MaybeTiedBinaryArgs, Terminator, TiedBinaryArgs64, UnaryArgs,
-    UnaryOpKind, UntiedBinaryArgs, UntiedBinaryArgs64,
+    self, BinaryOpKind, ExtKind, Instruction, MaybeTiedBinaryArgs, MovExt32, Terminator,
+    TiedBinaryArgs64, UnaryArgs, UnaryOpKind, UntiedBinaryArgs, UntiedBinaryArgs64,
 };
 use super::{Block, Id, IdAllocator, Memory, Register};
 use crate::rt::x86_64::{register_alloc, BlockReturn};
@@ -207,16 +207,18 @@ pub fn lower(ssa_block: &ribit_ssa::Block) -> Block {
                         width: Width::DWord,
                     }),
                     (width, true) => {
-                        ctx.instructions.push(Instruction::MovSx32 {
+                        ctx.instructions.push(Instruction::MovExt32(MovExt32 {
                             args: UntiedBinaryArgs::RegMem(dest, mem),
                             src_width: *width,
-                        });
+                            kind: ExtKind::Signed,
+                        }));
                     }
                     (width, false) => {
-                        ctx.instructions.push(Instruction::MovZx32 {
+                        ctx.instructions.push(Instruction::MovExt32(MovExt32 {
                             args: UntiedBinaryArgs::RegMem(dest, mem),
                             src_width: *width,
-                        });
+                            kind: ExtKind::Zero,
+                        }));
                     }
                 }
             }
@@ -504,22 +506,24 @@ fn lower_ext_int(ctx: &mut Context, ExtInt { dest, width: _, src, signed }: &Ext
 
     // zero extending is refreshingly boring.
     if !signed {
-        ctx.instructions.push(Instruction::MovZx32 {
+        ctx.instructions.push(Instruction::MovExt32(MovExt32 {
             args: UntiedBinaryArgs::RegReg(dest, src_reg),
             src_width: match src.ty {
                 ribit_ssa::Type::Int(bitness) => bitness.to_width(),
                 ribit_ssa::Type::Boolean => Width::Byte,
                 ribit_ssa::Type::Unit => panic!("Invalid extend type"),
             },
-        });
+            kind: ExtKind::Zero,
+        }));
         return;
     }
 
     let instruction = match src.ty {
-        ribit_ssa::Type::Int(bitness) => Instruction::MovSx32 {
+        ribit_ssa::Type::Int(bitness) => Instruction::MovExt32(MovExt32 {
             args: UntiedBinaryArgs::RegReg(dest, src_reg),
             src_width: bitness.to_width(),
-        },
+            kind: ExtKind::Signed,
+        }),
         // 0 -> -0 -> 0
         // 1 -> -1 -> 0xffff_ffff
         // if width is < 32 the top `32 - x` bits become "don't care"
