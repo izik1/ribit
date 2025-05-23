@@ -92,7 +92,7 @@ fn tokenize_instruction(context: &mut ParseContext, line: &str) {
         }
     }
 
-    let op = full_op.split('.').last().unwrap();
+    let op = full_op.split('.').next_back().unwrap();
 
     let mut args: Vec<_> = args.split(',').map(str::trim).collect();
 
@@ -218,7 +218,7 @@ fn compressed_integer_register(register: &str) -> Result<Option<register::RiscV>
     let res = integer_register(register)?;
 
     let register = res.map_or(0, |it| it.get());
-    if register < 8 || register >= 16 {
+    if !(8..16).contains(&register) {
         return Err(format!("register out of range: `{register}` (x8..x16)"));
     }
 

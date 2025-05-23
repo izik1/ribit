@@ -1,11 +1,11 @@
 use std::fmt;
 
-use ribit_core::{register, Width};
+use ribit_core::{Width, register};
 
 use crate::reference::Reference;
 use crate::{
-    eval, ty, AnySource, Arg, CmpKind, CommutativeBinOp, Id, ShiftOp, Source, SourcePair,
-    StackIndex, Type,
+    AnySource, Arg, CmpKind, CommutativeBinOp, Id, ShiftOp, Source, SourcePair, StackIndex, Type,
+    eval, ty,
 };
 
 mod ext_int;
@@ -256,7 +256,7 @@ impl fmt::Display for Instruction {
             Self::Sub { dest, src1, src2 } => write!(f, "{dest} = sub {src1}, {src2}"),
 
             Self::Cmp { dest, args: CmpArgs { src1, src2, kind } } => {
-                write!(f, "{dest} = cmp {kind} {}, {}", src1, src2)
+                write!(f, "{dest} = cmp {kind} {src1}, {src2}")
             }
 
             Self::Select(it) => it.fmt(f),

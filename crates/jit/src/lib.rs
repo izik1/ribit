@@ -192,7 +192,7 @@ mod test {
     pub(crate) fn assemble_block(block: &str) -> Block {
         let output = ribit_asm::tokenize(block, true);
         for error in &output.errors {
-            eprintln!("error: {}", error);
+            eprintln!("error: {error}");
         }
 
         if !output.errors.is_empty() {

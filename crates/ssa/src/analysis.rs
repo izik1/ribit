@@ -247,7 +247,7 @@ mod test {
     use super::ShowLifetimes;
     use crate::opt;
     use crate::opt::pass_manager::InplacePass;
-    use crate::tests::{max_fn, MEM_SIZE};
+    use crate::tests::{MEM_SIZE, max_fn};
 
     #[test]
     fn dead_reads_give_valid_lifetimes() {
@@ -412,7 +412,7 @@ mod test {
 
         opt::PassManager::optimized().run(&mut block);
 
-        let lifetimes = super::lifetimes(&mut block);
+        let lifetimes = super::lifetimes(&block);
 
         expect![[r#"
             [61, --, -, -, -, -, -, -, -, -, -, -, -, -, -, -] %2 = args[0]
@@ -490,7 +490,7 @@ mod test {
 
         opt::PassManager::optimized().run(&mut block);
 
-        let lifetimes = super::lifetimes(&mut block);
+        let lifetimes = super::lifetimes(&block);
 
         expect![[r#"
             [10, -, -, -, -, -, -, -, -] %2 = args[0]

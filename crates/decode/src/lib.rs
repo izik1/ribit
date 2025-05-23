@@ -8,7 +8,7 @@
 #![no_std]
 
 use ribit_core::instruction::{self, Instruction};
-use ribit_core::{opcode, register, Width};
+use ribit_core::{Width, opcode, register};
 
 pub mod compressed;
 mod error;

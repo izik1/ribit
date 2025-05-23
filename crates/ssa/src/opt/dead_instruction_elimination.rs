@@ -14,7 +14,7 @@ pub fn run(block: &mut Block) {
     let mut all_live = true;
 
     for instruction in block.instructions.iter().rev() {
-        let live = instruction.id().map_or(true, |id| live_ids[id.0 as usize]);
+        let live = instruction.id().is_none_or(|id| live_ids[id.0 as usize]);
         if !live {
             all_live = false;
             continue;
@@ -30,5 +30,5 @@ pub fn run(block: &mut Block) {
         return;
     }
 
-    block.instructions.retain(|it| it.id().map_or(true, |id| live_ids[id.0 as usize]));
+    block.instructions.retain(|it| it.id().is_none_or(|id| live_ids[id.0 as usize]));
 }

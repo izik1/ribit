@@ -76,11 +76,11 @@ mod test {
         ctx.execute_basic_block(&mut pc, &mut regs, &mut memory, |_, _| Err(())).unwrap();
         assert_eq!(pc, 4096);
 
-        for idx in 1..regs.len() {
+        for (idx, &reg) in regs.iter().enumerate().skip(1) {
             match idx {
-                0 => assert_eq!(regs[idx], 0, "reg-num: {idx}"),
-                4 => assert_eq!(regs[idx], 4, "reg-num: {idx}"),
-                _ => assert_eq!(regs[idx], 0xaaaaaaaa, "reg-num: {idx}"),
+                0 => assert_eq!(reg, 0, "reg-num: {idx}"),
+                4 => assert_eq!(reg, 4, "reg-num: {idx}"),
+                _ => assert_eq!(reg, 0xaaaaaaaa, "reg-num: {idx}"),
             }
         }
     }
@@ -113,12 +113,12 @@ mod test {
 
         assert_eq!(pc, 2046 + 1024);
 
-        for idx in 0..regs.len() {
+        for (idx, &reg) in regs.iter().enumerate() {
             match idx {
-                0 => assert_eq!(regs[idx], 0, "reg-num={idx}"),
-                1 => assert_eq!(regs[idx], 1024, "reg-num={idx}"),
-                4 => assert_eq!(regs[idx], 52, "reg-num={idx}"),
-                _ => assert_eq!(regs[idx], 0xaaaaaaaa, "reg-num={idx}"),
+                0 => assert_eq!(reg, 0, "reg-num={idx}"),
+                1 => assert_eq!(reg, 1024, "reg-num={idx}"),
+                4 => assert_eq!(reg, 52, "reg-num={idx}"),
+                _ => assert_eq!(reg, 0xaaaaaaaa, "reg-num={idx}"),
             }
         }
     }

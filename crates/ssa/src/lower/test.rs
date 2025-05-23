@@ -2,7 +2,7 @@ use expect_test::expect;
 use ribit_core::{instruction, opcode, register};
 
 use super::Context;
-use crate::tests::{expect_block, MEM_SIZE};
+use crate::tests::{MEM_SIZE, expect_block};
 use crate::{AnySource, Constant};
 
 /// ensure register writes get placed *after* register reads, but *before* return.

@@ -11,7 +11,7 @@ use std::fmt;
 
 use instruction::CmpArgs;
 use reference::Ref;
-use ribit_core::{opcode, ReturnCode};
+use ribit_core::{ReturnCode, opcode};
 use ty::ConstTy;
 
 pub mod analysis;
@@ -71,21 +71,25 @@ impl Inequality {
     const EQUAL_NOT_EQUAL_BIT: u8 = 0;
 
     #[inline(always)]
+    #[must_use]
     pub const fn is_signed(self) -> bool {
         (self as u8 & (1 << Inequality::SIGNED_UNSIGNED_BIT)) != 0
     }
 
     #[inline(always)]
+    #[must_use]
     pub const fn include_eq(self) -> bool {
         (self as u8 & (1 << Inequality::EQUAL_NOT_EQUAL_BIT)) != 0
     }
 
     #[inline(always)]
+    #[must_use]
     pub const fn is_less(self) -> bool {
         (self as u8 & (1 << Inequality::LESS_GREATER_BIT)) != 0
     }
 
     #[inline(always)]
+    #[must_use]
     pub const fn is_greater(self) -> bool {
         (self as u8 & (1 << Inequality::LESS_GREATER_BIT)) != 0
     }
@@ -94,6 +98,7 @@ impl Inequality {
     /// equalness is preserved, signedness is preserved, and `<` swaps with `>`
     ///
     /// Reverse might've been a better name, but that's taken by `cmp::Ordering` and means something completely different.
+    #[must_use]
     pub fn swap(self) -> Self {
         let mask: u8 = const { 1 << Self::LESS_GREATER_BIT };
 
@@ -137,6 +142,7 @@ impl CmpKind {
         }
     }
 
+    #[must_use]
     pub fn swap(self) -> Self {
         match self {
             // equality is symmetric.

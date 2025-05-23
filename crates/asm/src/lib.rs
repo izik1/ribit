@@ -2,4 +2,4 @@
 
 mod parse;
 
-pub use parse::{tokenize, ParseOutput};
+pub use parse::{ParseOutput, tokenize};

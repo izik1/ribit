@@ -3,7 +3,7 @@ use core::fmt;
 use opcode::Cmp;
 
 use crate::instruction::{self, Instruction};
-use crate::{opcode, register, Width};
+use crate::{Width, opcode, register};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(u8)]

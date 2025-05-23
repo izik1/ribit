@@ -1,7 +1,7 @@
 use super::{sign_extend, sign_extend_32};
 use crate::instruction::{self, Instruction};
 use crate::register::RiscV as RiscVRegister;
-use crate::{opcode, CompressedDecodeError, Extension, Width};
+use crate::{CompressedDecodeError, Extension, Width, opcode};
 
 const fn decode_register(instruction: u16) -> RiscVRegister {
     // safety: rnum masks in 0b1000 which prevents it from ever being 0

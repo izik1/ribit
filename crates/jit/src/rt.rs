@@ -1,4 +1,4 @@
-use ribit_core::{instruction, ReturnCode};
+use ribit_core::{ReturnCode, instruction};
 use ribit_ssa::opt;
 use ribit_ssa::opt::pass_manager::InplacePass;
 

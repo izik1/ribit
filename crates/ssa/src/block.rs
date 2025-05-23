@@ -20,6 +20,7 @@ pub struct Block {
 }
 
 impl Block {
+    #[must_use]
     pub fn find(&self, id: Id) -> Option<&Instruction> {
         self.instructions.iter().find(|it| it.id() == Some(id))
     }

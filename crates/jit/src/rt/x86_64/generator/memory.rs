@@ -1,5 +1,5 @@
-use rasen::params::mem::Mem;
 use rasen::params::Register;
+use rasen::params::mem::Mem;
 use ribit_core::register;
 use ribit_ssa::StackIndex;
 

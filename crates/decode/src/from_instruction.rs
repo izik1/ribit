@@ -1,4 +1,4 @@
-use ribit_core::{instruction, opcode, Width};
+use ribit_core::{Width, instruction, opcode};
 
 use crate::{decode_rd, decode_rs, sign_extend, sign_extend_32};
 

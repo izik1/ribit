@@ -58,7 +58,7 @@ pub fn count_clobbers_for_terminal(
 
             let register_count = addr.reference().is_some() as usize;
 
-            let zax_used = addr.reference().map_or(false, |r| allocs[&r.id] == Register::Zax);
+            let zax_used = addr.reference().is_some_and(|r| allocs[&r.id] == Register::Zax);
 
             if register_count == 1 && zax_used { 2 } else { 0 }
         }

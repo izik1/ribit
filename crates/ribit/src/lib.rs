@@ -7,10 +7,10 @@
 )]
 #![warn(clippy::must_use_candidate)]
 
+use xmas_elf::ElfFile;
 use xmas_elf::header::Data;
 use xmas_elf::sections::SectionData;
 use xmas_elf::symbol_table::{Binding, Entry};
-use xmas_elf::ElfFile;
 
 struct TestAddrs {
     _from_host: u32,
@@ -229,7 +229,7 @@ impl ExecutionEngine {
 
     #[must_use]
     pub fn to_host(&self) -> bool {
-        self.test_ctx.as_ref().map_or(false, |it| {
+        self.test_ctx.as_ref().is_some_and(|it| {
             u32::from_le_bytes(self.memory[it.to_host as usize..][..4].try_into().unwrap()) != 0
         })
     }

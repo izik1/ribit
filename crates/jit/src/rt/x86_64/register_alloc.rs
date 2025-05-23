@@ -4,7 +4,7 @@ use rasen::params::Register;
 use ribit_ssa as ssa;
 use ribit_ssa::analysis::Lifetimes;
 use ribit_ssa::reference::Reference;
-use ribit_ssa::{analysis, Arg, Id, Instruction};
+use ribit_ssa::{Arg, Id, Instruction, analysis};
 
 use crate::rt::x86_64::legalise;
 
@@ -45,7 +45,7 @@ fn register_from_index(bit: u8) -> Register {
         13 => Register::R13,
         14 => Register::R14,
         15 => Register::R15,
-        _ => panic!("Bit number {} isn't a valid register", bit),
+        _ => panic!("Bit number {bit} isn't a valid register"),
     }
 }
 
@@ -257,7 +257,7 @@ pub fn spill(block: &mut ribit_ssa::Block, spill: RegisterSpill) {
 
 pub fn alloc(block: &mut ribit_ssa::Block) -> AllocMap {
     loop {
-        match try_alloc(&block) {
+        match try_alloc(block) {
             Ok(allocs) => break allocs,
             Err(spill) => self::spill(block, spill),
         }
@@ -266,10 +266,10 @@ pub fn alloc(block: &mut ribit_ssa::Block) -> AllocMap {
 
 #[cfg(test)]
 mod test {
-    use expect_test::{expect, Expect};
-    use ribit_ssa::opt::pass_manager::InplacePass;
+    use expect_test::{Expect, expect};
     use ribit_ssa::opt::PassManager;
-    use ribit_ssa::{analysis, Block};
+    use ribit_ssa::opt::pass_manager::InplacePass;
+    use ribit_ssa::{Block, analysis};
 
     use crate::test::{assemble_block, max_fn};
 
@@ -283,7 +283,7 @@ mod test {
 
         let super::AllocMap { allocs, clobbers } = super::alloc(&mut block);
 
-        let lifetimes = analysis::lifetimes(&mut block);
+        let lifetimes = analysis::lifetimes(&block);
         let mut lifetimes = format!(
             "{}",
             analysis::ShowLifetimes::new(&lifetimes, &block.instructions, &block.terminator)

@@ -1,9 +1,9 @@
 use ribit_core::opcode::{self, Cmp};
-use ribit_core::{instruction, register, Width};
+use ribit_core::{Width, instruction, register};
 
 use super::{
-    compressed_integer_register, integer_register, parse_imm_sx, parse_imm_sx32, parse_immediate,
-    sign_extend, test_len, ParseContext,
+    ParseContext, compressed_integer_register, integer_register, parse_imm_sx, parse_imm_sx32,
+    parse_immediate, sign_extend, test_len,
 };
 
 pub(super) fn r_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
@@ -29,7 +29,7 @@ pub(super) fn r_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
         _ => return false,
     };
 
-    if let Some([rd, rs1, rs2]) = r_args(context, full_op, &args) {
+    if let Some([rd, rs1, rs2]) = r_args(context, full_op, args) {
         context.push32(instruction::R::new(rs1, rs2, rd, opcode))
     }
 
@@ -68,7 +68,7 @@ pub(super) fn i_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
         _ => return false,
     };
 
-    if let Some(([rd, rs1], imm)) = i_args(context, full_op, &args) {
+    if let Some(([rd, rs1], imm)) = i_args(context, full_op, args) {
         context.push32(instruction::I::new(imm, rs1, rd, opcode))
     }
 
@@ -99,7 +99,7 @@ pub(super) fn ijump_32(context: &mut ParseContext, op: &str, full_op: &str, args
         _ => return false,
     };
 
-    if let Some((rd, imm, rs1)) = rir_args(context, full_op, &args, 12) {
+    if let Some((rd, imm, rs1)) = rir_args(context, full_op, args, 12) {
         context.push32(instruction::IJump::new(imm, rs1, rd, opcode))
     }
 
@@ -125,7 +125,7 @@ pub(super) fn imem_32(context: &mut ParseContext, op: &str, full_op: &str, args:
         return true;
     }
 
-    if let Some((rd, imm, rs1)) = rir_args(context, full_op, &args, 12) {
+    if let Some((rd, imm, rs1)) = rir_args(context, full_op, args, 12) {
         context.push32(instruction::IMem::new(imm, rs1, rd, opcode))
     }
 
@@ -140,7 +140,7 @@ pub(super) fn s_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
         _ => return false,
     };
 
-    if let Some((rs2, imm, rs1)) = rir_args(context, full_op, &args, 12) {
+    if let Some((rs2, imm, rs1)) = rir_args(context, full_op, args, 12) {
         context.push32(instruction::S::new(imm, rs1, rs2, width))
     }
 
@@ -158,7 +158,7 @@ pub(super) fn b_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
         _ => return false,
     };
 
-    if let Some((rs1, imm, rs2)) = rir_args(context, full_op, &args, 12) {
+    if let Some((rs1, imm, rs2)) = rir_args(context, full_op, args, 12) {
         let imm = match context.supports_compressed {
             true => imm << 1,
             false => imm << 2,
@@ -230,7 +230,7 @@ pub(super) fn u_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
         _ => return false,
     };
 
-    if let Some((rd, imm)) = ri_args(context, full_op, &args, 20) {
+    if let Some((rd, imm)) = ri_args(context, full_op, args, 20) {
         context.push32(instruction::U::new(imm << 12, rd, opcode))
     }
 
@@ -243,7 +243,7 @@ pub(super) fn j_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
         _ => return false,
     };
 
-    if let Some((rd, imm)) = ri_args(context, full_op, &args, 20) {
+    if let Some((rd, imm)) = ri_args(context, full_op, args, 20) {
         let imm = match context.supports_compressed {
             true => imm << 1,
             false => imm << 2,
@@ -346,7 +346,7 @@ pub(super) fn compressed(
         }
 
         "li" | "LI" => {
-            if let Some((rd, imm)) = ri_args(context, full_op, &args, 6) {
+            if let Some((rd, imm)) = ri_args(context, full_op, args, 6) {
                 if rd.is_none() {
                     context.errors.push(format!("`x0` is not a valid register for `{op}`"));
                     return true;

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Range;
 
-use ribit_ssa::{eval, ty, AnySource, Bitness, Constant, Id};
+use ribit_ssa::{AnySource, Bitness, Constant, Id, eval, ty};
 
 use super::common;
 

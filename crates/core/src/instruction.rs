@@ -1,5 +1,5 @@
 use crate::register::RiscV as RiscVRegister;
-use crate::{opcode, Width};
+use crate::{Width, opcode};
 
 // todo: decide on visibility of fields
 

@@ -8,7 +8,7 @@ use rasen::params::Register;
 
 use super::generator::BlockBuilder;
 use crate::rt::common;
-use crate::rt::x86_64::{legalise, register_alloc, BasicBlockFunc, Block, ReturnCode};
+use crate::rt::x86_64::{BasicBlockFunc, Block, ReturnCode, legalise, register_alloc};
 
 #[derive(Default)]
 pub struct X86_64 {

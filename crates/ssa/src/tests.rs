@@ -1,8 +1,8 @@
 use expect_test::Expect;
 
-use crate::opt::pass_manager::InplacePass;
 use crate::opt::PassManager;
-use crate::{lower, Block};
+use crate::opt::pass_manager::InplacePass;
+use crate::{Block, lower};
 
 pub const MEM_SIZE: u32 = 0x1000000;
 

@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use super::{lookup, typed_lookup};
 use crate::instruction::CmpArgs;
 use crate::{
-    eval, instruction, AnySource, Block, CommutativeBinOp, Constant, Id, Instruction, SourcePair,
-    Terminator,
+    AnySource, Block, CommutativeBinOp, Constant, Id, Instruction, SourcePair, Terminator, eval,
+    instruction,
 };
 
 fn run_instruction(

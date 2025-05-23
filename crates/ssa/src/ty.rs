@@ -187,7 +187,7 @@ impl Int {
         match self.0 {
             Bitness::B8 => self.1 as u8 as u32,
             Bitness::B16 => self.1 as u16 as u32,
-            Bitness::B32 => self.1 as u32,
+            Bitness::B32 => self.1,
         }
     }
 
@@ -225,5 +225,5 @@ impl PartialICmp for Int {
 #[cold]
 pub fn mismatch(ty1: Type, ty2: Type) -> ! {
     assert_ne!(ty1, ty2, "BUG: Fake type mismatch!");
-    panic!("mismatched types: ({} != {})", ty1, ty2)
+    panic!("mismatched types: ({ty1} != {ty2})")
 }

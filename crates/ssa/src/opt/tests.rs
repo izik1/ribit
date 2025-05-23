@@ -1,7 +1,7 @@
 use expect_test::expect;
 
-use super::pass_manager::{InplacePass, Pass};
 use super::PassManager;
+use super::pass_manager::{InplacePass, Pass};
 use crate::tests::{expect_block_with_opts, max_fn, min_fn};
 
 #[test]

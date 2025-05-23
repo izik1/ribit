@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 use std::io;
 
-use rasen::params::imm::{Imm16, Imm32, Imm8};
-use rasen::params::mem::Mem32;
-use rasen::params::reg::{Reg16, Reg32, Reg64, Reg8};
 use rasen::params::Register;
+use rasen::params::imm::{Imm8, Imm16, Imm32};
+use rasen::params::mem::Mem32;
+use rasen::params::reg::{Reg8, Reg16, Reg32, Reg64};
 use ribit_core::Width;
 use ribit_ssa as ssa;
-use ssa::{instruction, Bitness, StackIndex, Type};
+use ssa::{Bitness, StackIndex, Type, instruction};
 
-use crate::rt::x86_64::Assembler;
 use crate::Source;
+use crate::rt::x86_64::Assembler;
 
 mod cmp;
 mod math;

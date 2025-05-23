@@ -1,13 +1,13 @@
 #[cfg(test)]
 mod test;
 
-use ribit_core::{instruction, opcode, register, ReturnCode, Width};
+use ribit_core::{ReturnCode, Width, instruction, opcode, register};
 
 use super::{AnySource, CmpKind, Id, Instruction, ShiftOp};
 use crate::instruction::{CmpArgs, ExtInt, Select};
 use crate::reference::Reference;
 use crate::ty::{self, ConstTy, Constant};
-use crate::{eval, Arg, Block, CommutativeBinOp, IdAllocator, Ref, Source, SourcePair, Terminator};
+use crate::{Arg, Block, CommutativeBinOp, IdAllocator, Ref, Source, SourcePair, Terminator, eval};
 
 pub struct Context {
     id_allocator: IdAllocator,
@@ -285,14 +285,14 @@ impl Context {
         for (idx, src) in self.registers.iter().enumerate().skip(1) {
             let dest = register::RiscV::with_u8(idx as u8).unwrap();
 
-            if let Some(src) = *src {
-                if (self.registers_written >> dest.get()) & 1 == 1 {
-                    self.instructions.push(Instruction::WriteReg {
-                        dest,
-                        base: self.register_arg.expect("Register arg wasn't initialized?"),
-                        src,
-                    });
-                }
+            if let Some(src) = *src
+                && (self.registers_written >> dest.get()) & 1 == 1
+            {
+                self.instructions.push(Instruction::WriteReg {
+                    dest,
+                    base: self.register_arg.expect("Register arg wasn't initialized?"),
+                    src,
+                });
             }
         }
 

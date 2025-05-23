@@ -1,8 +1,8 @@
 use std::io;
 
+use rasen::params::Register;
 use rasen::params::imm::Imm32;
 use rasen::params::reg::Reg32;
-use rasen::params::Register;
 use ribit_ssa::{CmpKind, Inequality};
 
 use super::BlockBuilder;
