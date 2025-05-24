@@ -209,6 +209,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ribit-encode"
+version = "0.1.0"
+dependencies = [
+ "ribit-core",
+ "ribit-decode",
+]
+
+[[package]]
 name = "ribit-fuzz"
 version = "0.0.0"
 dependencies = [

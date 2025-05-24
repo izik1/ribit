@@ -141,18 +141,30 @@ pub fn instruction(instruction: u32) -> Result<Instruction, DecodeError> {
         (0b111_0011, _, _) if instruction & !0b111_0011 == (1 << 20) => {
             Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK))
         }
-        (0b011_0011, 0b000, _) => Instruction::R(from_instruction::r(instruction, opcode::R::MUL)),
-        (0b011_0011, 0b001, _) => Instruction::R(from_instruction::r(instruction, opcode::R::MULH)),
-        (0b011_0011, 0b010, _) => {
+        (0b011_0011, 0b000, 0b0000_0001) => {
+            Instruction::R(from_instruction::r(instruction, opcode::R::MUL))
+        }
+        (0b011_0011, 0b001, 0b0000_0001) => {
+            Instruction::R(from_instruction::r(instruction, opcode::R::MULH))
+        }
+        (0b011_0011, 0b010, 0b0000_0001) => {
             Instruction::R(from_instruction::r(instruction, opcode::R::MULHSU))
         }
-        (0b011_0011, 0b011, _) => {
+        (0b011_0011, 0b011, 0b0000_0001) => {
             Instruction::R(from_instruction::r(instruction, opcode::R::MULHU))
         }
-        (0b011_0011, 0b100, _) => Instruction::R(from_instruction::r(instruction, opcode::R::DIV)),
-        (0b011_0011, 0b101, _) => Instruction::R(from_instruction::r(instruction, opcode::R::DIVU)),
-        (0b011_0011, 0b110, _) => Instruction::R(from_instruction::r(instruction, opcode::R::REM)),
-        (0b011_0011, 0b111, _) => Instruction::R(from_instruction::r(instruction, opcode::R::REMU)),
+        (0b011_0011, 0b100, 0b0000_0001) => {
+            Instruction::R(from_instruction::r(instruction, opcode::R::DIV))
+        }
+        (0b011_0011, 0b101, 0b0000_0001) => {
+            Instruction::R(from_instruction::r(instruction, opcode::R::DIVU))
+        }
+        (0b011_0011, 0b110, 0b0000_0001) => {
+            Instruction::R(from_instruction::r(instruction, opcode::R::REM))
+        }
+        (0b011_0011, 0b111, 0b0000_0001) => {
+            Instruction::R(from_instruction::r(instruction, opcode::R::REMU))
+        }
         _ => return Err(DecodeError::InvalidInstruction(instruction)),
     };
 
