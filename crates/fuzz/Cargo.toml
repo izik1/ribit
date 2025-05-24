@@ -11,10 +11,24 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 ribit-asm.workspace = true
+ribit-decode.workspace = true
+ribit-ssa.workspace = true
+
+[dependencies.ribit-core]
+features = ["disassemble"]
+workspace = true
 
 [[bin]]
 bench = false
 doc = false
 name = "ribit-asm-fuzz"
 path = "fuzz_targets/ribit-asm-fuzz.rs"
+test = false
+
+
+[[bin]]
+bench = false
+doc = false
+name = "ribit-ssa-lower-fuzz"
+path = "fuzz_targets/ribit-ssa-lower-fuzz.rs"
 test = false

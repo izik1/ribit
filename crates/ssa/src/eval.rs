@@ -73,7 +73,10 @@ pub fn commutative_absorb(
 pub(crate) fn neg(v: Constant) -> Constant {
     match v {
         Constant::Int(it) => {
-            let val = (-it.signed()) as u32;
+            // `-SIGNED_MIN` -> `-SIGNED_MIN` -> `+SIGNED_MIN as unsigned`, which is perfect,
+            // it matches with what you'd expect for `0i8 - 128i8 -> 0 + (-128i8) -> 0 + 128u8`, likewise for bigger integers.
+            // this will only actually trigger for 32 bit integers because those are the biggest we can store.
+            let val = it.signed().wrapping_neg().cast_unsigned();
 
             // can't do `(1 << bits) - 1` because of underflows.
             let mask = if it.bits() >= 32 { u32::MAX } else { (1 << (it.bits() as u32)) - 1 };
@@ -174,11 +177,23 @@ pub fn extend_int(width: ribit_core::Width, src: Constant, signed: bool) -> Int 
 
 #[cfg(test)]
 mod test {
-    use crate::ShiftOp;
+    use crate::{Constant, ShiftOp};
 
     #[test]
     fn sra_1() {
         let res = super::shift_u32(0x80000 << 12, 0x8, ShiftOp::Sra);
         assert_eq!(0xff800000, res);
+    }
+
+    #[test]
+    fn neg_int_min() {
+        let res = super::neg(Constant::i8(i8::MIN.cast_unsigned()));
+        assert_eq!(res, Constant::i8(i8::MIN.cast_unsigned()));
+
+        let res = super::neg(Constant::i16(i16::MIN.cast_unsigned()));
+        assert_eq!(res, Constant::i16(i16::MIN.cast_unsigned()));
+
+        let res = super::neg(Constant::i32(i32::MIN.cast_unsigned()));
+        assert_eq!(res, Constant::i32(i32::MIN.cast_unsigned()));
     }
 }

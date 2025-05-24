@@ -36,6 +36,7 @@
                   cargo-outdated
                   cargo-edit
                   cargo-llvm-lines
+                  cargo-fuzz
                 ];
             };
         }
