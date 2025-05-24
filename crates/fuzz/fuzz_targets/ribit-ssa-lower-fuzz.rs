@@ -1,56 +1,65 @@
 #![no_main]
 
-use core::fmt;
 use std::hint::black_box;
 
-use libfuzzer_sys::{arbitrary, fuzz_target};
+use libfuzzer_sys::fuzz_target;
 use ribit_core::instruction::{self, Instruction};
 use ribit_core::opcode;
 use ribit_ssa::opt::pass_manager::InplacePass;
 
-struct ArbitraryInstruction(instruction::Info);
+const NOP: Instruction =
+    Instruction::I(instruction::I { imm: 0, rs1: None, rd: None, opcode: opcode::I::ADDI });
 
-impl fmt::Debug for ArbitraryInstruction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, r#""{}""#, ribit_core::disassemble::FmtInstruction::from_info(&self.0))
+const EBREAK: Instruction = Instruction::Sys(instruction::Sys { opcode: opcode::RSys::EBREAK });
+
+fn parse(mut data: &[u8]) -> (Vec<instruction::Info>, instruction::Info) {
+    let mut instructions = Vec::with_capacity(data.len() / 2);
+
+    while let Some((small, rest)) = data.split_at_checked(2) {
+        let info = if small[0] & 0b11 == 0b11 {
+            let Some((big, rest)) = data.split_at_checked(4) else {
+                break;
+            };
+
+            data = rest;
+
+            let raw = u32::from_le_bytes(big.try_into().unwrap());
+            let instruction = ribit_decode::instruction(raw).unwrap_or_else(|_| NOP);
+            instruction::Info { instruction, len: 4 }
+        } else {
+            data = rest;
+
+            let raw = u16::from_le_bytes(small.try_into().unwrap());
+            let instruction =
+                ribit_decode::compressed::decode_instruction(raw).unwrap_or_else(|_| NOP);
+            instruction::Info { instruction, len: 2 }
+        };
+
+        if info.instruction.is_terminator() {
+            return (instructions, info);
+        }
+
+        instructions.push(info);
+        //
     }
+
+    (instructions, instruction::Info { instruction: EBREAK, len: 4 })
 }
 
-impl<'a> arbitrary::Arbitrary<'a> for ArbitraryInstruction {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let raw = u32::arbitrary(u)?;
-        let instruction = ribit_decode::instruction(raw).unwrap_or_else(|_| {
-            Instruction::I(instruction::I { imm: 0, rs1: None, rd: None, opcode: opcode::I::ADDI })
-        });
+fuzz_target!(|data: &[u8]| {
+    let (instrutctions, term) = parse(data);
 
-        Ok(Self(instruction::Info { instruction, len: 4 }))
-    }
+    let mut block = black_box(lower(instrutctions, term));
 
-    fn arbitrary_take_rest(mut u: arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Self::arbitrary(&mut u)
-    }
-
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        u32::size_hint(depth)
-    }
-}
-
-fuzz_target!(|data: Vec<ArbitraryInstruction>| {
-    let block = black_box(lower(data));
-
-    if let Some(mut block) = block {
-        ribit_ssa::opt::PassManager::optimized().run(&mut block);
-        let _ = black_box(block);
-    }
+    ribit_ssa::opt::PassManager::optimized().run(&mut block);
+    let _ = black_box(block);
 });
 
-fn lower(instructions: Vec<ArbitraryInstruction>) -> Option<ribit_ssa::Block> {
+fn lower(instructions: Vec<instruction::Info>, term: instruction::Info) -> ribit_ssa::Block {
     let mut ctx = ribit_ssa::lower::Context::new(1024, 2_u32.pow(20));
 
-    for ArbitraryInstruction(instruction::Info { instruction, len }) in instructions {
-        if instruction.is_terminator() {
-            return Some(ribit_ssa::lower::terminal(ctx, instruction, len));
-        }
+    for instruction::Info { instruction, len } in instructions {
+        assert!(!instruction.is_terminator());
 
         match instruction {
             Instruction::R(instruction::R {
@@ -70,8 +79,10 @@ fn lower(instructions: Vec<ArbitraryInstruction>) -> Option<ribit_ssa::Block> {
             _ => {}
         }
 
-        ribit_ssa::lower::non_terminal(&mut ctx, instruction, 4);
+        ribit_ssa::lower::non_terminal(&mut ctx, instruction, len);
     }
 
-    None
+    assert!(term.instruction.is_terminator());
+
+    ribit_ssa::lower::terminal(ctx, term.instruction, term.len)
 }
