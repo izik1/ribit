@@ -1,6 +1,15 @@
 use ribit_core::instruction::{self, Instruction};
 use ribit_core::{Width, opcode, register};
 
+pub mod compressed;
+
+#[derive(Debug)]
+pub enum EncodeError {
+    InvalidInstruction,
+    /// the instruction doesn't have a two byte (C.) variant.
+    Incompressable,
+}
+
 #[inline]
 const fn encode_register(register: Option<register::RiscV>) -> u32 {
     match register {
@@ -23,7 +32,7 @@ fn encode_rd(rd: Option<register::RiscV>) -> u32 {
 }
 
 #[inline]
-fn signed_truncate<const BITS: u8>(imm: u16) -> Result<u16, ()> {
+fn signed_truncate<const BITS: u8>(imm: u16) -> Result<u16, EncodeError> {
     debug_assert!(BITS > 0);
 
     // truncate from 16 bits to BITS.
@@ -33,12 +42,36 @@ fn signed_truncate<const BITS: u8>(imm: u16) -> Result<u16, ()> {
     // basically for the bits we truncate out they must all be the same value (all 0s or 1s).
 
     // build a mask of zeros at the MSB end of `16 - BITS` bits by turning a full mask into "full mask except MSB end".
-    let mask = u16::MAX.wrapping_shr(16 - BITS as u32);
+    let mask = u16::MAX.wrapping_shr(u16::BITS - BITS as u32);
 
-    if imm & !mask == 0 || imm & !mask == !mask { Ok(imm & mask) } else { Err(()) }
+    if imm & !mask == 0 || imm & !mask == !mask {
+        Ok(imm & mask)
+    } else {
+        Err(EncodeError::InvalidInstruction)
+    }
 }
 
-pub fn i_32(regs: u32, opcode: u8, func3: u8, imm: u16) -> Result<u32, ()> {
+#[inline]
+fn signed_truncate_32<const BITS: u8>(imm: u32) -> Result<u32, EncodeError> {
+    debug_assert!(BITS > 0);
+
+    // truncate from 32 bits to BITS.
+    // the tricky thing here is that we want to error if we lose values.
+    // like, say we have the value `1000_0000_0000_0000`, that should error if `BITS < 32`, because otherwise it gets turned into 0.
+
+    // basically for the bits we truncate out they must all be the same value (all 0s or 1s).
+
+    // build a mask of zeros at the MSB end of `32 - BITS` bits by turning a full mask into "full mask except MSB end".
+    let mask = u32::MAX.wrapping_shr(u32::BITS - BITS as u32);
+
+    if imm & !mask == 0 || imm & !mask == !mask {
+        Ok(imm & mask)
+    } else {
+        Err(EncodeError::InvalidInstruction)
+    }
+}
+
+pub fn i_32(regs: u32, opcode: u8, func3: u8, imm: u16) -> Result<u32, EncodeError> {
     let opcode = opcode as u32;
     let func3 = (func3 as u32) << 12;
 
@@ -47,7 +80,7 @@ pub fn i_32(regs: u32, opcode: u8, func3: u8, imm: u16) -> Result<u32, ()> {
     Ok(regs | opcode | func3 | imm)
 }
 
-pub fn instruction(instruction: &Instruction) -> Result<u32, ()> {
+pub fn instruction(instruction: &Instruction) -> Result<u32, EncodeError> {
     match instruction {
         Instruction::R(instruction::R { rs1, rs2, rd, opcode }) => {
             let regs = encode_rs(*rs1, *rs2) | encode_rd(*rd);
@@ -58,7 +91,8 @@ pub fn instruction(instruction: &Instruction) -> Result<u32, ()> {
                 opcode::R::SLL => (0b011_0011, 0b001, 0b000_0000),
                 opcode::R::SCond(opcode::Cmp::Lt) => (0b011_0011, 0b010, 0b000_0000),
                 opcode::R::SCond(opcode::Cmp::Ltu) => (0b011_0011, 0b011, 0b000_0000),
-                opcode::R::SCond(_) => return Err(()),
+                // these don't exist.
+                opcode::R::SCond(_) => return Err(EncodeError::InvalidInstruction),
                 opcode::R::XOR => (0b011_0011, 0b100, 0b000_0000),
                 opcode::R::SRL => (0b011_0011, 0b101, 0b000_0000),
                 opcode::R::SRA => (0b011_0011, 0b101, 0b010_0000),
@@ -96,7 +130,8 @@ pub fn instruction(instruction: &Instruction) -> Result<u32, ()> {
                 opcode::I::ADDI => (0b001_0011, 0b000),
                 opcode::I::SICond(opcode::Cmp::Lt) => (0b001_0011, 0b010),
                 opcode::I::SICond(opcode::Cmp::Ltu) => (0b001_0011, 0b011),
-                opcode::I::SICond(_) => return Err(()),
+                // these don't exist
+                opcode::I::SICond(_) => return Err(EncodeError::InvalidInstruction),
                 opcode::I::XORI => (0b001_0011, 0b100),
                 opcode::I::ORI => (0b001_0011, 0b110),
                 opcode::I::ANDI => (0b001_0011, 0b111),
@@ -129,7 +164,7 @@ pub fn instruction(instruction: &Instruction) -> Result<u32, ()> {
                 opcode::IMem::LDU(Width::Byte) => (0b000_0011, 0b100),
                 opcode::IMem::LDU(Width::Word) => (0b000_0011, 0b101),
                 // LWU doesn't exist
-                opcode::IMem::LDU(Width::DWord) => return Err(()),
+                opcode::IMem::LDU(Width::DWord) => return Err(EncodeError::InvalidInstruction),
             };
 
             i_32(regs, opcode, func3, *imm)
@@ -188,7 +223,7 @@ pub fn instruction(instruction: &Instruction) -> Result<u32, ()> {
             };
 
             if imm & 0xffff_f000 != *imm {
-                return Err(());
+                return Err(EncodeError::InvalidInstruction);
             }
 
             Ok(imm | regs | (opcode as u32))
@@ -220,7 +255,7 @@ pub fn instruction(instruction: &Instruction) -> Result<u32, ()> {
 #[cfg(test)]
 mod tests {
     #[test]
-    #[ignore = "Test is very slow"]
+    #[ignore = "test is very slow"]
     fn roundtrip_all() {
         for raw in 0_u32..=u32::MAX {
             if let Ok(instruction) = ribit_decode::instruction(raw) {

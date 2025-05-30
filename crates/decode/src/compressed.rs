@@ -137,7 +137,6 @@ pub fn decode_instruction(instruction: u16) -> Result<Instruction, CompressedDec
 
             match r {
                 Some(r) if r.get() == 2 => {
-                    // 0001_0000_0001_1100
                     // 000a_0000_0bcd_de00 -> 0000_00ad_dceb_0000
                     let imm = ((imm >> 3) & 0b0010_0000_0000)
                         | ((imm >> 2) & 0b0000_0001_0000)
