@@ -19,9 +19,9 @@ impl IdAllocator {
     pub fn allocate(&mut self) -> Id {
         let id_num = self.next_id.0;
 
-        assert!(id_num < u16::MAX);
+        let new_id = id_num.checked_add(1).expect("ID overflow");
 
-        std::mem::replace(&mut self.next_id, Id(id_num + 1))
+        std::mem::replace(&mut self.next_id, Id(new_id))
     }
 }
 

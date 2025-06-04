@@ -1,3 +1,5 @@
+use core::fmt;
+
 use crate::Block;
 
 pub trait InplacePass {
@@ -20,7 +22,20 @@ pub enum Pass {
     RegisterWritebackShrinking,
 }
 
-#[derive(Default)]
+impl fmt::Debug for Pass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let data = match self {
+            Self::Inplace(_) => return f.debug_tuple("Inplace").finish_non_exhaustive(),
+            Self::ConstProp => "ConstProp",
+            Self::DeadInstructionElimination => "DeadInstructionElimination",
+            Self::RegisterWritebackShrinking => "RegisterWritebackShrinking",
+        };
+
+        f.write_str(data)
+    }
+}
+
+#[derive(Default, Debug)]
 pub struct PassManager {
     pub passes: Vec<Pass>,
 }

@@ -10,8 +10,10 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+rand = "0.9.1"
 ribit-asm.workspace = true
 ribit-decode.workspace = true
+ribit-encode.workspace = true
 ribit-ssa.workspace = true
 
 [dependencies.ribit-core]

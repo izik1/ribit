@@ -148,7 +148,15 @@ impl Context {
     pub fn shift(&mut self, op: ShiftOp, src1: AnySource, src2: AnySource) -> AnySource {
         assert_eq!(src1.ty(), src2.ty());
 
-        let consts = match SourcePair::try_from((src1, src2)) {
+        // shift identity.
+        if matches!(src2, AnySource::Const(Constant::Int(i)) if i.unsigned() == 0) {
+            return src1;
+        }
+
+        // todo: some kind of shift folding, up until the total folded shift turns into an absorb.
+        // doesn't work for sra without knowing the MSB, but it does work for sll, srl.
+
+        let consts: (Constant, Constant) = match SourcePair::try_from((src1, src2)) {
             Ok(src) => return self.instruction(|dest| Instruction::ShiftOp { dest, src, op }),
             Err(consts) => consts,
         };
