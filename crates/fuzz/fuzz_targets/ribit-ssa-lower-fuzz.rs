@@ -2,14 +2,16 @@
 
 use std::hint::black_box;
 use std::mem;
+use std::ops::ControlFlow;
 use std::sync::OnceLock;
 
 use libfuzzer_sys::arbitrary::{self, Arbitrary};
 use libfuzzer_sys::{fuzz_mutator, fuzz_target};
-use rand::distr::{Bernoulli, Distribution};
+use rand::distr::{Bernoulli, Distribution, StandardUniform};
+use rand::seq::{IndexedMutRandom, SliceRandom};
 use rand::{Rng, SeedableRng};
 use ribit_core::instruction::{self, Instruction};
-use ribit_core::{opcode, register};
+use ribit_core::{Width, opcode, register};
 use ribit_ssa::opt::PassManager;
 use ribit_ssa::opt::pass_manager::{InplacePass, Pass};
 
@@ -241,6 +243,14 @@ fn lower(instructions: Vec<instruction::Info>, term: instruction::Info) -> ribit
     ribit_ssa::lower::terminal(ctx, term.instruction, term.len)
 }
 
+fn trial_encode(instruction: &Instruction, len: u32) -> Result<(), ()> {
+    match len {
+        2 if ribit_encode::compressed::instruction(&instruction).is_ok() => Ok(()),
+        4 if ribit_encode::instruction(&instruction).is_ok() => Ok(()),
+        _ => Err(()),
+    }
+}
+
 fuzz_mutator!(|data: &mut [u8], size: usize, max_size: usize, seed: u32| {
     mutator(data, size, max_size, seed)
 });
@@ -266,7 +276,7 @@ fn mutator(data: &mut [u8], size: usize, max_size: usize, seed: u32) -> usize {
         return libfuzzer_sys::fuzzer_mutate(data, size, max_size);
     };
 
-    match rng.random_range::<usize, _>(..7) {
+    match rng.random_range::<usize, _>(..8) {
         _ if instructions.is_empty() => {}
         // randomly delete an instruction (we have the power of being able to do it on aligned boundaries)
         0 => {
@@ -283,9 +293,13 @@ fn mutator(data: &mut [u8], size: usize, max_size: usize, seed: u32) -> usize {
                 let info = &mut instructions[idx];
 
                 let new_len = match info.len {
-                    2 if ribit_encode::instruction(&info.instruction).is_ok() => 4,
-                    4 if ribit_encode::compressed::instruction(&info.instruction).is_ok() => 2,
-                    _ => continue,
+                    2 => 4,
+                    4 => 2,
+                    _ => unreachable!(),
+                };
+
+                let Ok(()) = trial_encode(&info.instruction, new_len) else {
+                    continue;
                 };
 
                 info.len = new_len;
@@ -340,6 +354,32 @@ fn mutator(data: &mut [u8], size: usize, max_size: usize, seed: u32) -> usize {
             }
         }
 
+        // mutate an instruction randomly.
+        // - replace an immediate with some other immediate.
+        // - replace a register with some other register.
+        // - swap an opcode with one of the same class.
+        // - swap arguments.
+        // and so on.
+        6 => {
+            let max_replacements = rng.random_range(1..4_u8);
+            let mut replacements = 0;
+            for _ in 0..5 {
+                let idx = rng.random_range(..instructions.len());
+                let info = &mut instructions[idx];
+                match mutate_instruction(info, &mut rng) {
+                    ControlFlow::Continue(()) => continue,
+                    ControlFlow::Break(new) => {
+                        *info = new;
+
+                        replacements += 1;
+                        if replacements >= max_replacements {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         // Nothing (Just let clean up)
         _ => {}
     }
@@ -347,7 +387,7 @@ fn mutator(data: &mut [u8], size: usize, max_size: usize, seed: u32) -> usize {
     match rng.random_range(..=20_usize) {
         // pick a pass, add it somewhere.
         0 => {
-            let pass = match rng.random_range(1..=3) {
+            let pass = match rng.random_range(1..=3_u8) {
                 1 => Pass::ConstProp,
                 2 => Pass::DeadInstructionElimination,
                 3 => Pass::RegisterWritebackShrinking,
@@ -544,10 +584,9 @@ fn instruction_neogenesis<R: rand::Rng>(instructions: &mut Vec<instruction::Info
         // move a value from one register to another
         1 => {
             let rd = rng.random_range(1..=31);
-            let rs2 = rng.random_range(0..=32);
 
             let rd = register::RiscV::with_u8(rd).unwrap();
-            let rs2 = register::RiscV::with_u8(rs2);
+            let rs2 = rng.random::<Register>().0;
 
             instructions.insert(
                 idx,
@@ -567,4 +606,362 @@ fn instruction_neogenesis<R: rand::Rng>(instructions: &mut Vec<instruction::Info
         }
         _ => unreachable!(),
     };
+}
+
+struct Register(Option<register::RiscV>);
+
+impl Distribution<Register> for StandardUniform {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Register {
+        let register = rng.next_u32() as u8 & 0b1_1111;
+
+        Register(register::RiscV::with_u8(register))
+    }
+}
+
+fn mutate_instruction<R: rand::Rng + ?Sized>(
+    info: &instruction::Info,
+    rng: &mut R,
+) -> ControlFlow<instruction::Info> {
+    #[must_use]
+    const fn sign_extend(value: u16, data_bits: u8) -> u16 {
+        let mask = 16 - data_bits;
+        (((value << mask) as i16) >> mask) as u16
+    }
+
+    #[must_use]
+    const fn sign_extend_32(value: u32, data_bits: u8) -> u32 {
+        let mask = 32 - data_bits;
+        (((value << mask) as i32) >> mask) as u32
+    }
+
+    // returns a `I-type` instruction for `I` and `I` subtype instructions (loads and jumps)
+    fn random_i_instruction_op<R: rand::Rng + ?Sized>(
+        rd: Option<register::RiscV>,
+        rs1: Option<register::RiscV>,
+        imm: u16,
+        rng: &mut R,
+    ) -> Instruction {
+        match rng.random_range(..15_u8) {
+            0 => instruction::I::new(imm, rs1, rd, opcode::I::ADDI).into(),
+            1 => instruction::I::new(imm, rs1, rd, opcode::I::ANDI).into(),
+            2 => instruction::I::new(imm, rs1, rd, opcode::I::ORI).into(),
+            3 => instruction::I::new(imm, rs1, rd, opcode::I::SLLI).into(),
+            4 => instruction::I::new(imm, rs1, rd, opcode::I::SRLI).into(),
+            5 => instruction::I::new(imm, rs1, rd, opcode::I::SRAI).into(),
+            6 => instruction::I::new(imm, rs1, rd, opcode::I::SICond(opcode::Cmp::Lt)).into(),
+            7 => instruction::I::new(imm, rs1, rd, opcode::I::SICond(opcode::Cmp::Ltu)).into(),
+            8 => instruction::IJump::new(imm, rs1, rd, opcode::IJump::JALR).into(),
+            9 => instruction::IMem::new(imm, rs1, rd, opcode::IMem::FENCE).into(),
+            10 => instruction::IMem::new(imm, rs1, rd, opcode::IMem::LD(Width::Byte)).into(),
+            11 => instruction::IMem::new(imm, rs1, rd, opcode::IMem::LD(Width::Word)).into(),
+            12 => instruction::IMem::new(imm, rs1, rd, opcode::IMem::LD(Width::DWord)).into(),
+            13 => instruction::IMem::new(imm, rs1, rd, opcode::IMem::LDU(Width::Byte)).into(),
+            14 => instruction::IMem::new(imm, rs1, rd, opcode::IMem::LDU(Width::Word)).into(),
+            _ => unreachable!(),
+        }
+    }
+
+    let encode = |new| match trial_encode(&new, 2) {
+        Ok(()) => ControlFlow::Break(instruction::Info { instruction: new, len: 2 }),
+        // try expanding just in case.
+        Err(()) => match trial_encode(&new, 4) {
+            Ok(()) => ControlFlow::Break(instruction::Info { instruction: new, len: 4 }),
+            Err(()) => ControlFlow::Continue(()),
+        },
+    };
+
+    match &info.instruction {
+        Instruction::R(r) => {
+            // 4 real options here.
+            let new = match rng.random_range(..4_u8) {
+                // swap opcodes.
+                0 => {
+                    let new_op = match rng.random_range(..10_u8) {
+                        0 => opcode::R::ADD,
+                        1 => opcode::R::AND,
+                        2 => opcode::R::OR,
+                        3 => opcode::R::SLL,
+                        4 => opcode::R::SRL,
+                        5 => opcode::R::SRA,
+                        6 => opcode::R::SUB,
+                        7 => opcode::R::XOR,
+                        8 => opcode::R::SCond(opcode::Cmp::Lt),
+                        9 => opcode::R::SCond(opcode::Cmp::Ltu),
+                        _ => unreachable!(),
+                    };
+
+                    instruction::R { opcode: new_op, ..*r }
+                }
+
+                // shuffle registers.
+                1 => {
+                    let mut registers = [r.rd, r.rs1, r.rs2];
+
+                    registers.shuffle(rng);
+
+                    let [rd, rs1, rs2] = registers;
+
+                    instruction::R { rd, rs1, rs2, ..*r }
+                }
+                // replace one register with another.
+                2 => {
+                    let mut registers = [r.rd, r.rs1, r.rs2];
+                    let reg = registers.choose_mut(rng).unwrap();
+                    *reg = rng.random::<Register>().0;
+
+                    let [rd, rs1, rs2] = registers;
+
+                    instruction::R { rd, rs1, rs2, ..*r }
+                }
+                // replace all registers with others.
+                3 => {
+                    let [rd, rs1, rs2] = std::array::from_fn(|_| rng.random::<Register>().0);
+
+                    instruction::R { rd, rs1, rs2, ..*r }
+                }
+                _ => unreachable!(),
+            };
+
+            encode(new.into())
+        }
+        Instruction::I(i) => {
+            let new = match rng.random_range(..5_u8) {
+                // swap opcode (including across I sub-types)
+                0 => random_i_instruction_op(i.rd, i.rs1, i.imm, rng),
+                // replace imm
+                1 => instruction::I { imm: sign_extend(rng.random_range(..(1 << 12)), 12), ..*i }
+                    .into(),
+
+                // swap rd and rs1
+                2 => instruction::I { rd: i.rs1, rs1: i.rd, ..*i }.into(),
+                // replace rd or rs1
+                3 => {
+                    let mut registers = [i.rd, i.rs1];
+                    let reg = registers.choose_mut(rng).unwrap();
+                    *reg = rng.random::<Register>().0;
+
+                    let [rd, rs1] = registers;
+
+                    instruction::I { rd, rs1, ..*i }.into()
+                }
+
+                // replace both rd and rs1
+                4 => {
+                    let [rd, rs1] = std::array::from_fn(|_| rng.random::<Register>().0);
+
+                    instruction::I { rd, rs1, ..*i }.into()
+                }
+
+                _ => unreachable!(),
+            };
+
+            encode(new)
+        }
+        Instruction::IJump(i) => {
+            let new = match 0_u8 {
+                // swap opcode (including across I sub-types)
+                0 => random_i_instruction_op(i.rd, i.rs1, i.imm, rng),
+                // replace imm
+                1 => {
+                    instruction::IJump { imm: sign_extend(rng.random_range(..(1 << 12)), 12), ..*i }
+                        .into()
+                }
+
+                // swap rd and rs1
+                2 => instruction::IJump { rd: i.rs1, rs1: i.rd, ..*i }.into(),
+                // replace rd or rs1
+                3 => {
+                    let mut registers = [i.rd, i.rs1];
+                    let reg = registers.choose_mut(rng).unwrap();
+                    *reg = rng.random::<Register>().0;
+
+                    let [rd, rs1] = registers;
+
+                    instruction::IJump { rd, rs1, ..*i }.into()
+                }
+
+                // replace both rd and rs1
+                4 => {
+                    let [rd, rs1] = std::array::from_fn(|_| rng.random::<Register>().0);
+
+                    instruction::IJump { rd, rs1, ..*i }.into()
+                }
+
+                _ => unreachable!(),
+            };
+
+            encode(new)
+        }
+        Instruction::IMem(i) => {
+            let new = match 0_u8 {
+                // swap opcode (including across I sub-types)
+                0 => random_i_instruction_op(i.rd, i.rs1, i.imm, rng),
+                // replace imm
+                1 => {
+                    instruction::IMem { imm: sign_extend(rng.random_range(..(1 << 12)), 12), ..*i }
+                        .into()
+                }
+
+                // swap rd and rs1
+                2 => instruction::IMem { rd: i.rs1, rs1: i.rd, ..*i }.into(),
+                // replace rd or rs1
+                3 => {
+                    let mut registers = [i.rd, i.rs1];
+                    let reg = registers.choose_mut(rng).unwrap();
+                    *reg = rng.random::<Register>().0;
+
+                    let [rd, rs1] = registers;
+
+                    instruction::IMem { rd, rs1, ..*i }.into()
+                }
+
+                // replace both rd and rs1
+                4 => {
+                    let [rd, rs1] = std::array::from_fn(|_| rng.random::<Register>().0);
+
+                    instruction::IMem { rd, rs1, ..*i }.into()
+                }
+
+                _ => unreachable!(),
+            };
+
+            encode(new)
+        }
+        Instruction::S(s) => {
+            let new = match rng.random_range(..5_u8) {
+                // swap width
+                0 => instruction::S {
+                    width: match rng.random_range(..3_u8) {
+                        0 => Width::Byte,
+                        1 => Width::Word,
+                        2 => Width::DWord,
+                        _ => unreachable!(),
+                    },
+                    ..*s
+                },
+                // replace imm
+                1 => instruction::S { imm: sign_extend(rng.random_range(..(1 << 12)), 12), ..*s },
+                // swap rs1 and rs2
+                2 => instruction::S { rs1: s.rs2, rs2: s.rs1, ..*s },
+                // replace rs1 or rs2
+                3 => {
+                    let mut registers = [s.rs1, s.rs2];
+                    let reg = registers.choose_mut(rng).unwrap();
+                    *reg = rng.random::<Register>().0;
+
+                    let [rs1, rs2] = registers;
+
+                    instruction::S { rs1, rs2, ..*s }
+                }
+
+                // replace both rs1 and rs2
+                4 => {
+                    let [rs1, rs2] = std::array::from_fn(|_| rng.random::<Register>().0);
+
+                    instruction::S { rs1, rs2, ..*s }
+                }
+
+                _ => unreachable!(),
+            };
+
+            encode(new.into())
+        }
+        Instruction::B(b) => {
+            let new = match rng.random_range(..4_u8) {
+                0 => instruction::B {
+                    cmp_mode: match rng.random_range(..6_u8) {
+                        0 => opcode::Cmp::Eq,
+                        1 => opcode::Cmp::Ne,
+                        2 => opcode::Cmp::Lt,
+                        3 => opcode::Cmp::Ltu,
+                        4 => opcode::Cmp::Ge,
+                        5 => opcode::Cmp::Geu,
+                        _ => unreachable!(),
+                    },
+                    ..*b
+                },
+
+                // replace imm
+                1 => instruction::B {
+                    imm: sign_extend(rng.random_range(..(1 << 12)), 12) << 1,
+                    ..*b
+                },
+
+                // swap rs1 and rs2
+                2 => instruction::B { rs1: b.rs2, rs2: b.rs1, ..*b },
+
+                // replace rs1 or rs2
+                3 => {
+                    let mut registers = [b.rs1, b.rs2];
+                    let reg = registers.choose_mut(rng).unwrap();
+                    *reg = rng.random::<Register>().0;
+
+                    let [rs1, rs2] = registers;
+
+                    instruction::B { rs1, rs2, ..*b }
+                }
+
+                // replace both rs1 and rs2
+                4 => {
+                    let [rs1, rs2] = std::array::from_fn(|_| rng.random::<Register>().0);
+
+                    instruction::B { rs1, rs2, ..*b }
+                }
+
+                _ => unreachable!(),
+            };
+
+            encode(new.into())
+        }
+        Instruction::U(u) => {
+            let new = match rng.random_range(..3_u8) {
+                // swap opcode
+                0 => match u.opcode {
+                    opcode::U::AUIPC => instruction::U { opcode: opcode::U::LUI, ..*u },
+                    opcode::U::LUI => instruction::U { opcode: opcode::U::AUIPC, ..*u },
+                },
+                // replace imm
+                1 => {
+                    let imm = rng.next_u32() & !0xfff;
+                    instruction::U { imm, ..*u }
+                }
+
+                // replace rd
+                2 => {
+                    let rd = rng.random::<Register>().0;
+
+                    instruction::U { rd, ..*u }
+                }
+                _ => unreachable!(),
+            };
+
+            encode(new.into())
+        }
+        Instruction::J(j) => {
+            // few options
+            let j = match rng.random_range(..2_u8) {
+                // change around dest register
+                0 => instruction::J { rd: rng.random::<Register>().0, ..*j },
+                // change around the immediate.
+                1 => {
+                    // even integers in the range +-1MiB
+                    let imm = sign_extend_32(rng.random_range(..(1 << 20)), 20) << 1;
+                    instruction::J { imm, ..*j }
+                }
+                _ => unreachable!(),
+            };
+
+            encode(Instruction::J(j))
+        }
+
+        // yeah, not exactly rocket science here.
+        Instruction::Sys(sys) => {
+            let opcode = match sys.opcode {
+                opcode::RSys::ECALL => opcode::RSys::EBREAK,
+                opcode::RSys::EBREAK => opcode::RSys::ECALL,
+            };
+
+            encode(Instruction::Sys(instruction::Sys { opcode }))
+        }
+    }
 }
