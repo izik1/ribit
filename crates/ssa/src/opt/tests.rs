@@ -18,6 +18,26 @@ fn jal_basic_const_prop() {
 }
 
 #[test]
+fn register_writeback_multiple_stores() {
+    expect_block_with_opts(
+        PassManager::with_passes(Vec::from([Pass::RegisterWritebackShrinking])),
+        r#"
+        add x20, x0, x26
+        add x21, x0, x26
+        add x26, x0, x26
+        ebreak
+        "#,
+        expect![[r#"
+            %2 = args[0]
+            %3 = args[1]
+            %4 = x(%2)26
+            x(%2)21 = %4
+            x(%2)20 = %4
+            ret 1, 00000410"#]],
+    );
+}
+
+#[test]
 fn mem_read_write_all_opts() {
     expect_block_with_opts(
         PassManager::optimized(),
@@ -62,7 +82,7 @@ fn max() {
         %10 = x(%2)1
         %11 = and %10, fffffffe
         ret 0, %11"#]]
-    .assert_eq(&block.display_instructions().to_string())
+    .assert_eq(&block.display_instructions().to_string());
 }
 
 #[test]
@@ -86,7 +106,7 @@ fn min() {
         %12 = x(%2)1
         %13 = and %12, fffffffe
         ret 0, %13"#]]
-    .assert_eq(&block.display_instructions().to_string())
+    .assert_eq(&block.display_instructions().to_string());
 }
 
 #[test]
@@ -131,7 +151,7 @@ fn max_opt_ori_ori() {
             %6 = or %4, 00000009
             x(%2)10 = %6
             ret 1, 0000040c"#]],
-    )
+    );
 }
 
 #[test]
@@ -153,7 +173,7 @@ fn max_opt_many_addis() {
             %10 = add %4, 0000000e
             x(%2)10 = %10
             ret 1, 0000041c"#]],
-    )
+    );
 }
 
 #[test]
