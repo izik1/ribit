@@ -205,7 +205,7 @@ impl fmt::Display for Int {
 
 impl fmt::LowerHex for Int {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let width = (self.0.to_bits() / 4) + (self.0.to_bits() & 0b11 > 0) as u8;
+        let width = (self.0.to_bits() / 4) + u8::from(self.0.to_bits() & 0b11 > 0);
         let width = width as usize;
         write!(f, "{:01$x}", self.1, width)
     }

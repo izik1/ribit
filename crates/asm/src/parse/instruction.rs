@@ -30,7 +30,7 @@ pub(super) fn r_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
     };
 
     if let Some([rd, rs1, rs2]) = r_args(context, full_op, args) {
-        context.push32(instruction::R::new(rs1, rs2, rd, opcode))
+        context.push32(instruction::R::new(rs1, rs2, rd, opcode));
     }
 
     true
@@ -69,7 +69,7 @@ pub(super) fn i_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
     };
 
     if let Some(([rd, rs1], imm)) = i_args(context, full_op, args) {
-        context.push32(instruction::I::new(imm, rs1, rd, opcode))
+        context.push32(instruction::I::new(imm, rs1, rd, opcode));
     }
 
     true
@@ -100,7 +100,7 @@ pub(super) fn ijump_32(context: &mut ParseContext, op: &str, full_op: &str, args
     };
 
     if let Some((rd, imm, rs1)) = rir_args(context, full_op, args, 12) {
-        context.push32(instruction::IJump::new(imm, rs1, rd, opcode))
+        context.push32(instruction::IJump::new(imm, rs1, rd, opcode));
     }
 
     true
@@ -119,14 +119,14 @@ pub(super) fn imem_32(context: &mut ParseContext, op: &str, full_op: &str, args:
 
     if opcode == opcode::IMem::FENCE {
         if !test_len(context, full_op, 0, args.len()) {
-            context.push32(instruction::IMem::new(0, None, None, opcode))
+            context.push32(instruction::IMem::new(0, None, None, opcode));
         }
 
         return true;
     }
 
     if let Some((rd, imm, rs1)) = rir_args(context, full_op, args, 12) {
-        context.push32(instruction::IMem::new(imm, rs1, rd, opcode))
+        context.push32(instruction::IMem::new(imm, rs1, rd, opcode));
     }
 
     true
@@ -141,7 +141,7 @@ pub(super) fn s_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
     };
 
     if let Some((rs2, imm, rs1)) = rir_args(context, full_op, args, 12) {
-        context.push32(instruction::S::new(imm, rs1, rs2, width))
+        context.push32(instruction::S::new(imm, rs1, rs2, width));
     }
 
     true
@@ -164,7 +164,7 @@ pub(super) fn b_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
             false => imm << 2,
         };
 
-        context.push32(instruction::B::new(imm, rs1, rs2, cmp))
+        context.push32(instruction::B::new(imm, rs1, rs2, cmp));
     }
 
     true
@@ -231,7 +231,7 @@ pub(super) fn u_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
     };
 
     if let Some((rd, imm)) = ri_args(context, full_op, args, 20) {
-        context.push32(instruction::U::new(imm << 12, rd, opcode))
+        context.push32(instruction::U::new(imm << 12, rd, opcode));
     }
 
     true
@@ -249,7 +249,7 @@ pub(super) fn j_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
             false => imm << 2,
         };
 
-        context.push32(instruction::J::new(imm, rd, opcode))
+        context.push32(instruction::J::new(imm, rd, opcode));
     }
 
     true
@@ -281,7 +281,7 @@ pub(super) fn sys_32(context: &mut ParseContext, op: &str, full_op: &str, args: 
     };
 
     if !test_len(context, full_op, 0, args.len()) {
-        context.push32(instruction::Sys::new(opcode))
+        context.push32(instruction::Sys::new(opcode));
     }
 
     true
@@ -324,13 +324,18 @@ pub(super) fn compressed(
             if let Some((rd, imm, rs1)) = rir_args_16(context, full_op, args, 5, false) {
                 let imm = imm << 2;
 
-                context.push16(instruction::IMem::new(imm, rs1, rd, opcode::IMem::LD(Width::DWord)))
+                context.push16(instruction::IMem::new(
+                    imm,
+                    rs1,
+                    rd,
+                    opcode::IMem::LD(Width::DWord),
+                ));
             }
         }
 
         "nop" | "NOP" => {
             if !test_len(context, full_op, 0, args.len()) {
-                context.push16(instruction::I::new(0, None, None, opcode::I::ADDI))
+                context.push16(instruction::I::new(0, None, None, opcode::I::ADDI));
             }
         }
 
@@ -341,7 +346,7 @@ pub(super) fn compressed(
                     Some(register::RiscV::X1),
                     None,
                     opcode::IJump::JALR,
-                ))
+                ));
             }
         }
 
@@ -357,7 +362,7 @@ pub(super) fn compressed(
             }
         }
         _ => return false,
-    };
+    }
 
     true
 }

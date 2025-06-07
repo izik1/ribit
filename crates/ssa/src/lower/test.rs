@@ -22,7 +22,7 @@ fn jalr_link_eq_src() {
         %3 = args[1]
         x(%2)17 = 00010138
         ret 0, 00010148"#]]
-    .assert_eq(&block.display_instructions().to_string())
+    .assert_eq(&block.display_instructions().to_string());
 }
 
 #[test]
@@ -49,7 +49,7 @@ fn jalr_bit() {
         %6 = and %5, fffffffe
         x(%2)4 = 00000034
         ret 0, %6"#]]
-    .assert_eq(&block.display_instructions().to_string())
+    .assert_eq(&block.display_instructions().to_string());
 }
 
 #[test]
@@ -83,7 +83,7 @@ fn sub_imm_into_add() {
             x(%2)10 = 0000000a
             x(%2)11 = %5
             ret 1, 0000040c"#]],
-    )
+    );
 }
 
 #[test]

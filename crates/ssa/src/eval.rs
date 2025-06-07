@@ -28,10 +28,7 @@ pub fn commutative_identity(
             CommutativeBinOp::Xor | CommutativeBinOp::Add | CommutativeBinOp::Or,
         ) if i.unsigned() == 0 => Some(lhs),
 
-        (AnySource::Ref(rhs), CommutativeBinOp::And)
-        | (AnySource::Ref(rhs), CommutativeBinOp::Or)
-            if lhs.id == rhs.id =>
-        {
+        (AnySource::Ref(rhs), CommutativeBinOp::And | CommutativeBinOp::Or) if lhs.id == rhs.id => {
             Some(lhs)
         }
 
@@ -57,7 +54,7 @@ pub fn commutative_absorb(
         (AnySource::Const(Constant::Bool(false)), CommutativeBinOp::And) => Constant::Bool(false),
         (AnySource::Const(Constant::Bool(true)), CommutativeBinOp::Or) => Constant::Bool(true),
 
-        (AnySource::Ref(rhs), CommutativeBinOp::Xor) if (lhs.id == rhs.id) => match lhs.ty {
+        (AnySource::Ref(rhs), CommutativeBinOp::Xor) if lhs.id == rhs.id => match lhs.ty {
             crate::Type::Int(b) => Constant::Int(Int(b, 0)),
             crate::Type::Unit => panic!(),
             crate::Type::Boolean => Constant::Bool(false),
@@ -79,7 +76,7 @@ pub(crate) fn neg(v: Constant) -> Constant {
             let val = it.signed().wrapping_neg().cast_unsigned();
 
             // can't do `(1 << bits) - 1` because of underflows.
-            let mask = if it.bits() >= 32 { u32::MAX } else { (1 << (it.bits() as u32)) - 1 };
+            let mask = if it.bits() >= 32 { u32::MAX } else { (1 << u32::from(it.bits())) - 1 };
 
             Constant::Int(Int(it.0, val & mask))
         }
@@ -159,15 +156,15 @@ pub fn extend_int(width: ribit_core::Width, src: Constant, signed: bool) -> Int 
         Constant::Int(i) => {
             assert!(target_bitness >= i.0);
             match signed {
-                true => i.signed() as u32,
+                true => i.signed().cast_unsigned(),
                 false => i.unsigned(),
             }
         }
         Constant::Bool(b) => {
             assert!(target_bitness.to_bits() >= 1);
             match signed {
-                true => -(b as u32 as i32) as u32,
-                false => b as u32,
+                true => (-u32::from(b).cast_signed()).cast_unsigned(),
+                false => u32::from(b),
             }
         }
     };
@@ -181,8 +178,8 @@ mod test {
 
     #[test]
     fn sra_1() {
-        let res = super::shift_u32(0x80000 << 12, 0x8, ShiftOp::Sra);
-        assert_eq!(0xff800000, res);
+        let res = super::shift_u32(0x8_0000 << 12, 0x8, ShiftOp::Sra);
+        assert_eq!(0xff80_0000, res);
     }
 
     #[test]

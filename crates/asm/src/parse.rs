@@ -7,14 +7,14 @@ mod tests;
 
 #[must_use]
 const fn sign_extend(value: u16, data_bits: u8) -> u16 {
-    let mask = 16 - data_bits;
-    (((value << mask) as i16) >> mask) as u16
+    let mask = u16::BITS - (data_bits as u32);
+    ((value << mask).cast_signed() >> mask).cast_unsigned()
 }
 
 #[must_use]
 const fn sign_extend_32(value: u32, data_bits: u8) -> u32 {
-    let mask = 32 - data_bits;
-    (((value << mask) as i32) >> mask) as u32
+    let mask = u32::BITS - (data_bits as u32);
+    ((value << mask).cast_signed() >> mask).cast_unsigned()
 }
 
 // v0.0.1 we don't support fancy things like labels.
@@ -39,12 +39,12 @@ impl ParseContext {
 
     fn push32<I: Into<ribit_core::instruction::Instruction>>(&mut self, instruction: I) {
         self.instructions
-            .push(ribit_core::instruction::Info { instruction: instruction.into(), len: 4 })
+            .push(ribit_core::instruction::Info { instruction: instruction.into(), len: 4 });
     }
 
     fn push16<I: Into<ribit_core::instruction::Instruction>>(&mut self, instruction: I) {
         self.instructions
-            .push(ribit_core::instruction::Info { instruction: instruction.into(), len: 2 })
+            .push(ribit_core::instruction::Info { instruction: instruction.into(), len: 2 });
     }
 }
 
@@ -60,16 +60,17 @@ impl From<ParseContext> for ParseOutput {
     }
 }
 
+#[must_use]
 pub fn tokenize(input: &str, enable_compressed: bool) -> ParseOutput {
     let mut output = ParseContext {
-        instructions: Default::default(),
-        errors: Default::default(),
+        instructions: Vec::new(),
+        errors: Vec::new(),
         supports_compressed: enable_compressed,
     };
 
     for line in input.lines() {
         let line = line.trim();
-        let line = line.split_once(';').map(|(line, _comment)| line).unwrap_or(line);
+        let line = line.split_once(';').map_or(line, |(line, _comment)| line);
 
         tokenize_instruction(&mut output, line);
     }
@@ -217,7 +218,7 @@ fn integer_register(register: &str) -> Result<Option<register::RiscV>, String> {
 fn compressed_integer_register(register: &str) -> Result<Option<register::RiscV>, String> {
     let res = integer_register(register)?;
 
-    let register = res.map_or(0, |it| it.get());
+    let register = res.map_or(0, register::RiscV::get);
     if !(8..16).contains(&register) {
         return Err(format!("register out of range: `{register}` (x8..x16)"));
     }
@@ -255,7 +256,9 @@ fn parse_immediate(src: &str, bits: u8) -> Result<u32, String> {
     let unsigned_max = (1 << bits) - 1;
 
     match negative {
-        true if unsigned <= signed_min => Ok((-(unsigned as i32) as u32) & unsigned_max),
+        true if unsigned <= signed_min => {
+            Ok(((-unsigned.cast_signed()).cast_unsigned()) & unsigned_max)
+        }
         true => Err(format!("invalid {bits}bit literal (-{unsigned} < -{signed_min})")),
         false if unsigned <= unsigned_max => Ok(unsigned),
         false => Err(format!("invalid {bits}bit literal ({unsigned} > {unsigned_max})")),

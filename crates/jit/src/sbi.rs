@@ -18,7 +18,7 @@ enum StatusCode {
 }
 
 const EXT_BASE: u32 = 0x10;
-const EXT_CONSOLE: u32 = 0x4442434E;
+const EXT_CONSOLE: u32 = 0x4442_434e;
 
 pub fn call(regs: &mut [u32; crate::XLEN], mem: &mut [u8]) {
     let extension_id = regs[17]; // x17 -> a7
@@ -96,7 +96,7 @@ fn addr_range(
         return Err(StatusCode::ErrFailure);
     };
 
-    let base_addr = ((base_addr_hi as u64) << 32) + base_addr_lo as u64;
+    let base_addr = (u64::from(base_addr_hi) << u32::BITS) + u64::from(base_addr_lo);
     let Ok(base_addr) = usize::try_from(base_addr) else {
         return Err(StatusCode::ErrInvalidAddress);
     };

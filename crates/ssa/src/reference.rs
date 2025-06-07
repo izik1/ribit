@@ -46,6 +46,11 @@ impl<T: ConstTy> Ref<T> {
     pub fn new(id: Id) -> Self {
         Self { id, _phantom: PhantomData }
     }
+
+    #[must_use]
+    pub const fn ty(self) -> Type {
+        T::TY
+    }
 }
 
 impl<T: ConstTy> fmt::Debug for Ref<T> {

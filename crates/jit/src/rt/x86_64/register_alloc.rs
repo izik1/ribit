@@ -160,9 +160,8 @@ pub struct AllocMap {
 pub fn try_alloc(block: &ribit_ssa::Block) -> Result<AllocMap, RegisterSpill> {
     let mut allocator = RegisterAllocator::new();
 
-    let start = match allocator.allocate_args(&block.instructions) {
-        Some(idx) => idx,
-        None => return Ok(allocator.finish()),
+    let Some(start) = allocator.allocate_args(&block.instructions) else {
+        return Ok(allocator.finish());
     };
 
     // todo: find an efficient way of pre-checking lifetimes to avoid unneeded work on spills.
@@ -341,7 +340,7 @@ mod test {
                 ---------
                 12 => [zax, zcx]
             "#]],
-        )
+        );
     }
 
     #[test]
@@ -461,7 +460,7 @@ mod test {
                 %46 => zax
                 %47 => zax
             "#]],
-        )
+        );
     }
 
     #[test]

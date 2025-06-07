@@ -20,9 +20,7 @@ fn assert_instructions(input: &str, expected: expect_test::Expect) {
         eprintln!("error: {error}");
     }
 
-    if !result.errors.is_empty() {
-        panic!("failing due to previous error(s)");
-    }
+    assert!(result.errors.is_empty(), "failing due to previous error(s)");
 
     expected.assert_eq(&print_instructions(&result.instructions));
 }
@@ -144,7 +142,7 @@ fn imem() {
             LHU x0, 000(x0)
             LW x0, 000(x0)
         "#]],
-    )
+    );
 }
 
 #[test]
@@ -162,7 +160,7 @@ fn s_32() {
             SW x0, 000(x0)
             SW x1, 000(x2)
         "#]],
-    )
+    );
 }
 
 #[test]
@@ -178,7 +176,7 @@ fn b_32() {
             BNE x0, 0020(x0)
             BLT x0, 0020(x0)
         "#]],
-    )
+    );
 }
 
 #[test]
@@ -192,7 +190,7 @@ fn u_32() {
             AUIPC x1, deafd
             LUI x1, dfaed
         "#]],
-    )
+    );
 }
 
 #[test]
@@ -206,7 +204,7 @@ fn j_32() {
             JAL x1, 0000d
             JAL x1, fffff
         "#]],
-    )
+    );
 }
 
 #[test]
@@ -220,5 +218,5 @@ fn sys_32() {
             ECALL
             EBREAK
         "#]],
-    )
+    );
 }

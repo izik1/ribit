@@ -19,6 +19,7 @@ pub struct X86_64 {
 }
 
 fn print_block(buffer: &[u8], block: &Block) {
+    use core::fmt::Write;
     let buffer = &buffer[block.offset..][..block.length];
     let byte_str = {
         const SEPARATOR: &str = ", ";
@@ -32,13 +33,13 @@ fn print_block(buffer: &[u8], block: &Block) {
         let mut bytes = buffer.iter();
 
         if let Some(byte) = bytes.next() {
-            byte_str.push_str(&format!("{byte:02x}"));
+            write!(byte_str, "{byte:02x}").unwrap();
         }
 
         for byte in bytes {
             byte_str.push_str(SEPARATOR);
 
-            byte_str.push_str(&format!("{byte:02x}"));
+            write!(byte_str, "{byte:02x}").unwrap();
         }
 
         byte_str

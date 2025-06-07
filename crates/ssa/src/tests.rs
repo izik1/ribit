@@ -4,7 +4,7 @@ use crate::opt::PassManager;
 use crate::opt::pass_manager::InplacePass;
 use crate::{Block, lower};
 
-pub const MEM_SIZE: u32 = 0x1000000;
+pub const MEM_SIZE: u32 = 0x100_0000;
 
 pub(crate) fn assemble_block_with_context(mut context: lower::Context, block: &str) -> Block {
     let output = ribit_asm::tokenize(block, true);
@@ -12,9 +12,7 @@ pub(crate) fn assemble_block_with_context(mut context: lower::Context, block: &s
         eprintln!("error: {error}");
     }
 
-    if !output.errors.is_empty() {
-        panic!("failing due to previous error(s)");
-    }
+    assert!(output.errors.is_empty(), "failing due to previous error(s)");
 
     let mut instructions = output.instructions;
 
@@ -33,14 +31,14 @@ pub(crate) fn assemble_block(block: &str) -> Block {
 
 #[track_caller]
 pub(crate) fn expect_block(block: &str, expect: Expect) {
-    expect_block_with_opts(PassManager::unoptimized(), block, expect)
+    expect_block_with_opts(PassManager::unoptimized(), block, expect);
 }
 
 #[track_caller]
 pub(crate) fn expect_block_with_opts(pm: PassManager, block: &str, expect: Expect) {
     let mut block = assemble_block(block);
     pm.run(&mut block);
-    expect.assert_eq(&block.display_instructions().to_string())
+    expect.assert_eq(&block.display_instructions().to_string());
 }
 
 pub fn max_fn() -> Block {

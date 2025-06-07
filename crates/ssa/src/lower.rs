@@ -195,7 +195,17 @@ impl Context {
     }
 
     pub fn write_register(&mut self, reg: register::RiscV, val: AnySource) {
-        self.registers[reg.get() as usize] = Some(val);
+        let stored = &mut self.registers[reg.get() as usize];
+
+        // don't write a value that's already there.
+        // this can happen due to non cannonical NOPs (aka, certain HINTs),
+        // or due to writing the same value twice, doesn't really matter how it happens.
+        // not sure how _common_ it is, unfortunately.
+        if stored.as_ref() == Some(&val) {
+            return;
+        }
+
+        *stored = Some(val);
         self.registers_written |= 1 << reg.get();
     }
 
@@ -323,6 +333,7 @@ impl Context {
     }
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, len: u32) {
     match instruction {
         instruction::Instruction::J(_)
@@ -453,6 +464,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
 }
 
 #[must_use]
+#[allow(clippy::needless_pass_by_value)]
 pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u32) -> Block {
     let len = AnySource::Const(Constant::i32(len));
 

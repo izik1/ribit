@@ -69,7 +69,7 @@ pub fn sub(
                 (false, false) => {
                     builder.stream.mov_reg_reg(Reg32(dest), Reg32(lhs))?;
                 }
-            };
+            }
 
             return builder.stream.sub_reg_reg(Reg32(dest), Reg32(rhs));
         }

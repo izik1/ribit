@@ -30,16 +30,16 @@ fn cbi(
     rd_rs1_prime: Option<register::RiscV>,
 ) -> Result<u16, EncodeError> {
     let quad = quad as u16;
-    let func3 = (func3 as u16) << 13;
+    let func3 = u16::from(func3) << 13;
     let func2 = (func2 as u16) << 10;
 
     let imm6 = imm6 & 0b11_1111;
     let imm = ((imm6 & 0b01_1111) << 2) | ((imm6 & 0b10_0000) << 7);
 
-    let rd_rs1 = encode_short_reg(rd_rs1_prime)? as u16;
+    let rd_rs1 = u16::from(encode_short_reg(rd_rs1_prime)?);
     let rd_rs1 = rd_rs1 << 7;
 
-    return Ok(func3 | func2 | imm | rd_rs1 | quad);
+    Ok(func3 | func2 | imm | rd_rs1 | quad)
 }
 
 #[inline]
@@ -67,13 +67,13 @@ fn ca(
     rs2_prime: Option<register::RiscV>,
 ) -> Result<u16, EncodeError> {
     let quad = quad as u16;
-    let func6 = (func6 as u16) << 10;
-    let func2 = (func2 as u16) << 5;
+    let func6 = u16::from(func6) << 10;
+    let func2 = u16::from(func2) << 5;
 
-    let rd_rs1 = encode_short_reg(rd_rs1_prime)? as u16;
+    let rd_rs1 = u16::from(encode_short_reg(rd_rs1_prime)?);
     let rd_rs1 = rd_rs1 << 7;
 
-    let rs2 = encode_short_reg(rs2_prime)? as u16;
+    let rs2 = u16::from(encode_short_reg(rs2_prime)?);
     let rs2 = rs2 << 2;
 
     Ok(func6 | rd_rs1 | func2 | rs2 | quad)
@@ -107,14 +107,14 @@ pub fn instruction(instruction: &Instruction) -> Result<u16, EncodeError> {
                     None => 0b1000,
                 };
 
-                return Ok(cr(Quadrant::C2, func4, *rd, *rs2));
+                Ok(cr(Quadrant::C2, func4, *rd, *rs2))
             }
             opcode::R::SUB => {
                 if *rd != *rs1 {
                     return Err(EncodeError::Incompressable);
                 }
 
-                return ca(Quadrant::C1, 0b100011, 0b00, *rd, *rs2);
+                ca(Quadrant::C1, 0b10_0011, 0b00, *rd, *rs2)
             }
 
             opcode::R::XOR => {
@@ -122,21 +122,21 @@ pub fn instruction(instruction: &Instruction) -> Result<u16, EncodeError> {
                     return Err(EncodeError::Incompressable);
                 }
 
-                return ca(Quadrant::C1, 0b100011, 0b01, *rd, *rs2);
+                ca(Quadrant::C1, 0b10_0011, 0b01, *rd, *rs2)
             }
             opcode::R::OR => {
                 if *rd != *rs1 {
                     return Err(EncodeError::Incompressable);
                 }
 
-                return ca(Quadrant::C1, 0b100011, 0b10, *rd, *rs2);
+                ca(Quadrant::C1, 0b10_0011, 0b10, *rd, *rs2)
             }
             opcode::R::AND => {
                 if *rd != *rs1 {
                     return Err(EncodeError::Incompressable);
                 }
 
-                return ca(Quadrant::C1, 0b100011, 0b11, *rd, *rs2);
+                ca(Quadrant::C1, 0b10_0011, 0b11, *rd, *rs2)
             }
             opcode::R::SLL
             | opcode::R::SCond(_)
@@ -149,7 +149,7 @@ pub fn instruction(instruction: &Instruction) -> Result<u16, EncodeError> {
             | opcode::R::DIV
             | opcode::R::DIVU
             | opcode::R::REM
-            | opcode::R::REMU => return Err(EncodeError::Incompressable),
+            | opcode::R::REMU => Err(EncodeError::Incompressable),
         },
 
         Instruction::S(instruction::S { imm, rs1, rs2, width }) => {
@@ -205,7 +205,7 @@ pub fn instruction(instruction: &Instruction) -> Result<u16, EncodeError> {
                 | ((imm & 0b0000_0000_0110) << 2)
                 | ((imm & 0b0000_0010_0000) >> 3);
 
-            return Ok(func3 | rs1 | imm | 0b01);
+            Ok(func3 | rs1 | imm | 0b01)
         }
         Instruction::U(instruction::U { imm, rd, opcode }) => {
             match opcode {
@@ -263,6 +263,8 @@ pub fn instruction(instruction: &Instruction) -> Result<u16, EncodeError> {
         Instruction::I(instruction::I { imm, rs1, rd, opcode }) => {
             match opcode {
                 opcode::I::ADDI => {
+                    // func3=0,quad=0
+                    const ADDI4SPN: u16 = 0b0000_0000_0000_0000;
                     // addi is all kinds of special, it's the cannoical nop (twice over), and has other special unstructions besides.
 
                     // first thing's first, let's turn cannonical nop into "not a problem"
@@ -304,7 +306,7 @@ pub fn instruction(instruction: &Instruction) -> Result<u16, EncodeError> {
                         };
 
                         let (func3, imm6) = match rs1 {
-                            Some(register::RiscV::X2) if imm & 0xf == 0 && *imm != 0 => {
+                            Some(register::RiscV::X2) if imm.trailing_zeros() >= 4 && *imm != 0 => {
                                 (ADDI16SP, imm6_b()?)
                             }
                             Some(_) => (ADDI, imm6_a()?),
@@ -335,11 +337,11 @@ pub fn instruction(instruction: &Instruction) -> Result<u16, EncodeError> {
 
                     let imm = imm << 5;
 
-                    return Ok(imm | ((rd as u16) << 2) | 0b0000_0000_0000_0000);
+                    Ok(imm | (u16::from(rd) << 2) | ADDI4SPN)
                 }
                 opcode::I::ANDI => {
                     let imm6 = signed_truncate::<6>(*imm)?;
-                    return cbi(Quadrant::C1, 0b100, Quadrant::C2, imm6, *rd);
+                    cbi(Quadrant::C1, 0b100, Quadrant::C2, imm6, *rd)
                 }
                 opcode::I::SLLI => {
                     let imm = imm & 0b1_1111;
@@ -348,27 +350,27 @@ pub fn instruction(instruction: &Instruction) -> Result<u16, EncodeError> {
                         return Err(EncodeError::Incompressable);
                     }
 
-                    return Ok(ci(Quadrant::C2, 0b000, imm << 2, *rd));
+                    Ok(ci(Quadrant::C2, 0b000, imm << 2, *rd))
                 }
                 opcode::I::SRLI => {
                     if rs1 != rd {
                         return Err(EncodeError::Incompressable);
                     }
 
-                    return cbi(Quadrant::C1, 0b100, Quadrant::C0, imm & 0b1_1111, *rd);
+                    cbi(Quadrant::C1, 0b100, Quadrant::C0, imm & 0b1_1111, *rd)
                 }
                 opcode::I::SRAI => {
                     if rs1 != rd {
                         return Err(EncodeError::Incompressable);
                     }
 
-                    return cbi(Quadrant::C1, 0b100, Quadrant::C1, imm & 0b1_1111, *rd);
+                    cbi(Quadrant::C1, 0b100, Quadrant::C1, imm & 0b1_1111, *rd)
                 }
 
                 opcode::I::SICond(_) | opcode::I::XORI | opcode::I::ORI => {
-                    return Err(EncodeError::Incompressable);
+                    Err(EncodeError::Incompressable)
                 }
-            };
+            }
         }
         Instruction::IJump(instruction::IJump { imm, rs1, rd, opcode }) => {
             let opcode::IJump::JALR = opcode;
@@ -387,7 +389,7 @@ pub fn instruction(instruction: &Instruction) -> Result<u16, EncodeError> {
                 Some(_) => return Err(EncodeError::Incompressable),
             };
 
-            return Ok(cr(Quadrant::C2, func4, *rs1, None));
+            Ok(cr(Quadrant::C2, func4, *rs1, None))
         }
         Instruction::IMem(instruction::IMem { imm, rs1, rd, opcode }) => {
             const OPCODE: u16 = 0b0100_0000_0000_0000;

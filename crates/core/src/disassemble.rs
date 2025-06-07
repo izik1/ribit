@@ -41,7 +41,7 @@ impl<'a> FmtInstruction<'a> {
     }
 }
 
-impl<'a> fmt::Display for FmtInstruction<'a> {
+impl fmt::Display for FmtInstruction<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // todo: instructions actually get different names and parameters when they're compressed sometimes.
         match self.width {
@@ -111,7 +111,7 @@ impl<'a> fmt::Display for FmtInstruction<'a> {
 
             &Instruction::J(instruction::J { imm, rd, opcode }) => {
                 let rd = WrapRegister(rd);
-                write!(f, "{opcode} {rd}, {:05x}", (imm as i32 >> 1) & 0xfffff)
+                write!(f, "{opcode} {rd}, {:05x}", (imm.cast_signed() >> 1) & 0xfffff)
             }
 
             Instruction::Sys(instruction::Sys { opcode }) => opcode.fmt(f),

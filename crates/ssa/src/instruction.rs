@@ -89,30 +89,30 @@ impl Instruction {
             Self::Arg { .. } | Self::ReadStack { .. } | Self::Fence => {}
             Self::ReadReg { base, .. } => {
                 if let Source::Ref(it) = base {
-                    visit(*it)
+                    visit(*it);
                 }
             }
             Self::WriteReg { base, src, .. } | Self::ReadMem { base, src, .. } => {
                 if let Source::Ref(it) = base {
-                    visit(*it)
+                    visit(*it);
                 }
 
                 if let AnySource::Ref(src) = src {
-                    visit(src.id)
+                    visit(src.id);
                 }
             }
 
             Self::WriteMem { addr, src, base, .. } => {
                 if let Source::Ref(it) = addr {
-                    visit(*it)
+                    visit(*it);
                 }
 
                 if let AnySource::Ref(it) = src {
-                    visit(it.id)
+                    visit(it.id);
                 }
 
                 if let Source::Ref(it) = base {
-                    visit(*it)
+                    visit(*it);
                 }
             }
 
@@ -130,18 +130,18 @@ impl Instruction {
                 visit(reference.id);
 
                 if let AnySource::Ref(it) = source {
-                    visit(it.id)
+                    visit(it.id);
                 }
             }
 
             Self::Select(it) => {
                 visit(it.cond.id);
                 if let AnySource::Ref(it) = it.if_true {
-                    visit(it.id)
+                    visit(it.id);
                 }
 
                 if let AnySource::Ref(it) = it.if_false {
-                    visit(it.id)
+                    visit(it.id);
                 }
             }
 

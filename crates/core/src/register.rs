@@ -24,16 +24,6 @@ impl RiscV {
         }
     }
 
-    // internal function because `Option::unwrap` isn't const stable.
-    #[track_caller]
-    const fn with_u8_panicking(v: u8) -> Self {
-        // just inline `Option::unwrap` for now.
-        match Self::with_u8(v) {
-            Some(it) => it,
-            None => panic!("called `Option::unwrap()` on a `None` value"),
-        }
-    }
-
     /// # Safety
     /// Requires [`inner`] to be 1..=31
     #[inline(always)]
@@ -51,35 +41,35 @@ impl RiscV {
         self.0.get()
     }
 
-    pub const X1: Self = Self::with_u8_panicking(1);
-    pub const X2: Self = Self::with_u8_panicking(2);
-    pub const X3: Self = Self::with_u8_panicking(3);
-    pub const X4: Self = Self::with_u8_panicking(4);
-    pub const X5: Self = Self::with_u8_panicking(5);
-    pub const X6: Self = Self::with_u8_panicking(6);
-    pub const X7: Self = Self::with_u8_panicking(7);
-    pub const X8: Self = Self::with_u8_panicking(8);
-    pub const X9: Self = Self::with_u8_panicking(9);
-    pub const X10: Self = Self::with_u8_panicking(10);
-    pub const X11: Self = Self::with_u8_panicking(11);
-    pub const X12: Self = Self::with_u8_panicking(12);
-    pub const X13: Self = Self::with_u8_panicking(13);
-    pub const X14: Self = Self::with_u8_panicking(14);
-    pub const X15: Self = Self::with_u8_panicking(15);
-    pub const X16: Self = Self::with_u8_panicking(16);
-    pub const X17: Self = Self::with_u8_panicking(17);
-    pub const X18: Self = Self::with_u8_panicking(18);
-    pub const X19: Self = Self::with_u8_panicking(19);
-    pub const X20: Self = Self::with_u8_panicking(20);
-    pub const X21: Self = Self::with_u8_panicking(21);
-    pub const X22: Self = Self::with_u8_panicking(22);
-    pub const X23: Self = Self::with_u8_panicking(23);
-    pub const X24: Self = Self::with_u8_panicking(24);
-    pub const X25: Self = Self::with_u8_panicking(25);
-    pub const X26: Self = Self::with_u8_panicking(26);
-    pub const X27: Self = Self::with_u8_panicking(27);
-    pub const X28: Self = Self::with_u8_panicking(28);
-    pub const X29: Self = Self::with_u8_panicking(29);
-    pub const X30: Self = Self::with_u8_panicking(30);
-    pub const X31: Self = Self::with_u8_panicking(31);
+    pub const X1: Self = Self::with_u8(1).unwrap();
+    pub const X2: Self = Self::with_u8(2).unwrap();
+    pub const X3: Self = Self::with_u8(3).unwrap();
+    pub const X4: Self = Self::with_u8(4).unwrap();
+    pub const X5: Self = Self::with_u8(5).unwrap();
+    pub const X6: Self = Self::with_u8(6).unwrap();
+    pub const X7: Self = Self::with_u8(7).unwrap();
+    pub const X8: Self = Self::with_u8(8).unwrap();
+    pub const X9: Self = Self::with_u8(9).unwrap();
+    pub const X10: Self = Self::with_u8(10).unwrap();
+    pub const X11: Self = Self::with_u8(11).unwrap();
+    pub const X12: Self = Self::with_u8(12).unwrap();
+    pub const X13: Self = Self::with_u8(13).unwrap();
+    pub const X14: Self = Self::with_u8(14).unwrap();
+    pub const X15: Self = Self::with_u8(15).unwrap();
+    pub const X16: Self = Self::with_u8(16).unwrap();
+    pub const X17: Self = Self::with_u8(17).unwrap();
+    pub const X18: Self = Self::with_u8(18).unwrap();
+    pub const X19: Self = Self::with_u8(19).unwrap();
+    pub const X20: Self = Self::with_u8(20).unwrap();
+    pub const X21: Self = Self::with_u8(21).unwrap();
+    pub const X22: Self = Self::with_u8(22).unwrap();
+    pub const X23: Self = Self::with_u8(23).unwrap();
+    pub const X24: Self = Self::with_u8(24).unwrap();
+    pub const X25: Self = Self::with_u8(25).unwrap();
+    pub const X26: Self = Self::with_u8(26).unwrap();
+    pub const X27: Self = Self::with_u8(27).unwrap();
+    pub const X28: Self = Self::with_u8(28).unwrap();
+    pub const X29: Self = Self::with_u8(29).unwrap();
+    pub const X30: Self = Self::with_u8(30).unwrap();
+    pub const X31: Self = Self::with_u8(31).unwrap();
 }

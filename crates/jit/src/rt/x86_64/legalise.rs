@@ -56,7 +56,7 @@ pub fn count_clobbers_for_terminal(
             // this terminator "needs" at least two registers- unless addr and cond are both `val`,
             // in which case, just one- one of which must be Zax.
 
-            let register_count = addr.reference().is_some() as usize;
+            let register_count = usize::from(addr.reference().is_some());
 
             let zax_used = addr.reference().is_some_and(|r| allocs[&r.id] == Register::Zax);
 

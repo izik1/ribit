@@ -179,7 +179,7 @@ pub fn set_bool_conditional(
         CmpValue::CmpReg(src1, src2) => {
             builder.stream.cmp_reg_reg(Reg32(src1), Reg32(src2))?;
         }
-    };
+    }
 
     if !xor {
         // todo: add clobbler to be more efficent (ability to xor)

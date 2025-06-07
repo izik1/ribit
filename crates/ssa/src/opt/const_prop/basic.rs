@@ -56,9 +56,7 @@ fn run_instruction(
                 }
             };
 
-            let res = eval::commutative_binop(lhs, rhs, *op);
-
-            Some((*dest, res))
+            Some((*dest, eval::commutative_binop(lhs, rhs, *op)))
         }
 
         Instruction::Sub { dest, src1, src2 } => {
@@ -103,9 +101,7 @@ fn run_instruction(
                 Err(it) => it,
             };
 
-            let res = eval::shift(lhs, rhs, *op);
-
-            Some((*dest, res))
+            Some((*dest, eval::shift(lhs, rhs, *op)))
         }
 
         Instruction::Cmp { dest, args } => {

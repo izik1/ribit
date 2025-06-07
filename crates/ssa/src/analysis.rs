@@ -190,14 +190,8 @@ impl<'a, 'b> ShowLifetimes<'a, 'b> {
     }
 }
 
-fn log10(mut v: usize) -> usize {
-    let mut result = 0;
-    while v >= 10 {
-        v /= 10;
-        result += 1;
-    }
-
-    result
+fn log10(v: usize) -> usize {
+    v.checked_ilog10().unwrap_or(0) as usize
 }
 
 fn show_lifetime(f: &mut fmt::Formatter, lifetime: &Lifetime, idx: usize) -> fmt::Result {

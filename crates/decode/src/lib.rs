@@ -203,7 +203,7 @@ mod test {
     fn decode_ebreak() {
         let instruction = crate::instruction(0b0000_0000_0001_0000_0000_0000_0111_0011).unwrap();
         if let Instruction::Sys(instruction) = instruction {
-            assert_eq!(instruction.opcode, opcode::RSys::EBREAK)
+            assert_eq!(instruction.opcode, opcode::RSys::EBREAK);
         } else {
             panic!("Instruction type wasn't RType!")
         }

@@ -22,9 +22,10 @@ pub struct BlockBuilder<'a, 'b: 'a> {
 
 impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
     pub(super) fn start(stream: Assembler<'a, 'b>) -> Self {
-        if !is_x86_feature_detected!("bmi2") {
-            panic!("Make the crate author support code gen on x86 without bmi2");
-        }
+        assert!(
+            is_x86_feature_detected!("bmi2"),
+            "Make the crate author support codegen on x86 without bmi2"
+        );
 
         Self { stream }
     }

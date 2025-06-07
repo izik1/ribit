@@ -42,7 +42,7 @@ fn signed_truncate<const BITS: u8>(imm: u16) -> Result<u16, EncodeError> {
     // basically for the bits we truncate out they must all be the same value (all 0s or 1s).
 
     // build a mask of zeros at the MSB end of `16 - BITS` bits by turning a full mask into "full mask except MSB end".
-    let mask = u16::MAX.wrapping_shr(u16::BITS - BITS as u32);
+    let mask = u16::MAX.wrapping_shr(u16::BITS - u32::from(BITS));
 
     if imm & !mask == 0 || imm & !mask == !mask {
         Ok(imm & mask)
@@ -62,7 +62,7 @@ fn signed_truncate_32<const BITS: u8>(imm: u32) -> Result<u32, EncodeError> {
     // basically for the bits we truncate out they must all be the same value (all 0s or 1s).
 
     // build a mask of zeros at the MSB end of `32 - BITS` bits by turning a full mask into "full mask except MSB end".
-    let mask = u32::MAX.wrapping_shr(u32::BITS - BITS as u32);
+    let mask = u32::MAX.wrapping_shr(u32::BITS - u32::from(BITS));
 
     if imm & !mask == 0 || imm & !mask == !mask {
         Ok(imm & mask)
@@ -72,10 +72,10 @@ fn signed_truncate_32<const BITS: u8>(imm: u32) -> Result<u32, EncodeError> {
 }
 
 pub fn i_32(regs: u32, opcode: u8, func3: u8, imm: u16) -> Result<u32, EncodeError> {
-    let opcode = opcode as u32;
-    let func3 = (func3 as u32) << 12;
+    let opcode = u32::from(opcode);
+    let func3 = u32::from(func3) << 12;
 
-    let imm = (signed_truncate::<12>(imm)? as u32) << 20;
+    let imm = u32::from(signed_truncate::<12>(imm)?) << 20;
 
     Ok(regs | opcode | func3 | imm)
 }
@@ -108,9 +108,9 @@ pub fn instruction(instruction: &Instruction) -> Result<u32, EncodeError> {
                 opcode::R::REMU => (0b011_0011, 0b111, 0b000_0001),
             };
 
-            let opcode = opcode as u32;
-            let func3 = (func3 as u32) << 12;
-            let func7 = (func7 as u32) << 25;
+            let opcode = u32::from(opcode);
+            let func3 = u32::from(func3) << 12;
+            let func7 = u32::from(func7) << 25;
 
             Ok(regs | opcode | func3 | func7)
         }
@@ -171,8 +171,8 @@ pub fn instruction(instruction: &Instruction) -> Result<u32, EncodeError> {
         }
 
         Instruction::S(instruction::S { imm, rs1, rs2, width }) => {
-            let regs = encode_rs(*rs1, *rs2);
             const OPCODE: u8 = 0b010_0011;
+            let regs = encode_rs(*rs1, *rs2);
 
             let func3: u8 = match width {
                 Width::Byte => 0b000,
@@ -182,16 +182,16 @@ pub fn instruction(instruction: &Instruction) -> Result<u32, EncodeError> {
 
             let imm = signed_truncate::<12>(*imm)?;
 
-            let imm = imm as u32;
+            let imm = u32::from(imm);
             let imm = ((imm & !0b1_1111) << 20) | ((imm & 0b1_1111) << 7);
-            let func3 = (func3 as u32) << 12;
+            let func3 = u32::from(func3) << 12;
 
-            Ok(imm | regs | func3 | OPCODE as u32)
+            Ok(imm | regs | func3 | u32::from(OPCODE))
         }
 
         Instruction::B(instruction::B { rs1, rs2, imm, cmp_mode }) => {
-            let regs = encode_rs(*rs1, *rs2);
             const OPCODE: u8 = 0b110_0011;
+            let regs = encode_rs(*rs1, *rs2);
 
             let func3: u8 = match cmp_mode {
                 opcode::Cmp::Eq => 0b000,
@@ -202,16 +202,16 @@ pub fn instruction(instruction: &Instruction) -> Result<u32, EncodeError> {
                 opcode::Cmp::Geu => 0b111,
             };
 
-            let imm = *imm as u32;
+            let imm = u32::from(*imm);
 
             let imm = ((imm & 0b0001_0000_0000_0000) << 19)
                 | ((imm & 0b0000_0111_1110_0000) << 20)
                 | ((imm & 0b0000_1000_0000_0000) >> 4)
                 | ((imm & 0b0000_0000_0001_1110) << 7);
 
-            let func3 = (func3 as u32) << 12;
+            let func3 = u32::from(func3) << 12;
 
-            Ok(imm | regs | func3 | OPCODE as u32)
+            Ok(imm | regs | func3 | u32::from(OPCODE))
         }
 
         Instruction::U(instruction::U { imm, rd, opcode }) => {
@@ -226,7 +226,7 @@ pub fn instruction(instruction: &Instruction) -> Result<u32, EncodeError> {
                 return Err(EncodeError::InvalidInstruction);
             }
 
-            Ok(imm | regs | (opcode as u32))
+            Ok(imm | regs | u32::from(opcode))
         }
 
         Instruction::J(instruction::J { imm, rd, opcode }) => {
@@ -242,7 +242,7 @@ pub fn instruction(instruction: &Instruction) -> Result<u32, EncodeError> {
                 | ((imm & 0b0000_0000_0000_1000_0000_0000) << 9)
                 | (imm & 0b0000_1111_1111_0000_0000_0000);
 
-            Ok(imm | regs | (opcode as u32))
+            Ok(imm | regs | u32::from(opcode))
         }
 
         Instruction::Sys(sys) => match sys.opcode {

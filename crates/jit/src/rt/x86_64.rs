@@ -44,7 +44,7 @@ mod test {
     use crate::AMD64Runtime;
 
     fn init() -> ([u32; 32], Vec<u8>) {
-        let mut regs = [0xaaaaaaaa; 32];
+        let mut regs = [0xaaaa_aaaa; 32];
         regs[0] = 0;
         let memory = vec![0xbb; crate::MEMORY_SIZE as usize];
 
@@ -80,7 +80,7 @@ mod test {
             match idx {
                 0 => assert_eq!(reg, 0, "reg-num: {idx}"),
                 4 => assert_eq!(reg, 4, "reg-num: {idx}"),
-                _ => assert_eq!(reg, 0xaaaaaaaa, "reg-num: {idx}"),
+                _ => assert_eq!(reg, 0xaaaa_aaaa, "reg-num: {idx}"),
             }
         }
     }
@@ -118,7 +118,7 @@ mod test {
                 0 => assert_eq!(reg, 0, "reg-num={idx}"),
                 1 => assert_eq!(reg, 1024, "reg-num={idx}"),
                 4 => assert_eq!(reg, 52, "reg-num={idx}"),
-                _ => assert_eq!(reg, 0xaaaaaaaa, "reg-num={idx}"),
+                _ => assert_eq!(reg, 0xaaaa_aaaa, "reg-num={idx}"),
             }
         }
     }
@@ -146,7 +146,7 @@ mod test {
         for (idx, reg) in regs.iter().copied().enumerate() {
             match idx {
                 0 => assert_eq!(reg, 0),
-                _ => assert_eq!(reg, 0xaaaaaaaa),
+                _ => assert_eq!(reg, 0xaaaa_aaaa),
             }
         }
     }

@@ -7,6 +7,7 @@
 )]
 #![warn(clippy::must_use_candidate, clippy::clone_on_copy)]
 
+use std::collections::BTreeMap;
 use std::fmt;
 
 use instruction::CmpArgs;
@@ -228,7 +229,7 @@ impl fmt::Display for ShiftOp {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum Arg {
     Register = 0,
@@ -340,6 +341,136 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
             Terminator::Ret { addr, .. } => {
                 update_typed_reference(addr, old, new);
             }
+        }
+    }
+}
+
+#[track_caller]
+pub fn assert_well_formed(graph: &Block) {
+    macro_rules! assert_ref {
+        ($ids:ident [ $reference:expr ]) => {
+            assert_eq!($ids.get(&$reference.id), Some(&$reference.ty));
+        };
+
+        ($when:expr => $ids:ident [ $reference:ident ]) => {
+            if let AnySource::Ref($reference) = $when {
+                assert_ref!($ids[$reference]);
+            }
+        };
+    }
+
+    macro_rules! assert_ref_typed {
+        ($ids:ident [ $reference:expr ]) => {
+            assert_eq!($ids.get(&$reference.id), Some(&$reference.ty()));
+        };
+
+        ($when:expr => $ids:ident [ $reference:ident ]) => {
+            if let Some($reference) = $when {
+                assert_ref_typed!($ids[$reference]);
+            }
+        };
+    }
+
+    let mut args = BTreeMap::new();
+    let mut ids = BTreeMap::new();
+
+    for (idx, instruction) in graph.instructions.iter().enumerate() {
+        if let Instruction::Arg { dest, src } = instruction {
+            assert_eq!(args.len(), idx, "arg ({dest} = {src:?}) must be at start of block");
+
+            assert_eq!(args.insert(*src, *dest), None, "Args must not be duplicated");
+        }
+
+        match instruction.id() {
+            Some(id) => {
+                assert_eq!(ids.insert(id, instruction.ty()), None, "Ids must not be re-used");
+                instruction.visit_arg_ids(|arg| {
+                    // no self referencing.
+                    assert_ne!(id, arg);
+                });
+            }
+            None => assert_eq!(instruction.ty(), Type::Unit),
+        }
+
+        match instruction {
+            Instruction::Arg { .. } => {}
+            Instruction::ReadStack { .. } => {}
+
+            Instruction::WriteStack { dest: _, src } => {
+                assert_ref!(ids[src]);
+            }
+            Instruction::ReadReg { dest: _, base, src: _ } => {
+                assert!(
+                    args.contains_key(&Arg::Register),
+                    "RV register reads require the existence of a register arg"
+                );
+
+                // todo: find chain of custody for `base` until it reaches the correct arg, in theory this means it should never be a constant, but...
+
+                assert_ref_typed!(base.reference() => ids[base]);
+            }
+            Instruction::WriteReg { dest: _, base, src } => {
+                assert!(
+                    args.contains_key(&Arg::Register),
+                    "RV register writes require the existence of a register arg"
+                );
+
+                // todo: see about comment for `Instruction::ReadReg`
+                assert_ref_typed!(base.reference() => ids[base]);
+
+                assert_ref!(src => ids[src]);
+            }
+            Instruction::ReadMem { dest: _, src, base, width: _, sign_extend: _ } => {
+                assert!(
+                    args.contains_key(&Arg::Memory),
+                    "memory reads require the existence of a memory arg"
+                );
+
+                assert_ref_typed!(base.reference() => ids[base]);
+
+                assert_ref!(src => ids[src]);
+            }
+            Instruction::WriteMem { addr, src, base, width: _ } => {
+                assert!(
+                    args.contains_key(&Arg::Memory),
+                    "memory writes require the existence of a memory arg"
+                );
+
+                assert_ref_typed!(addr.reference() => ids[addr]);
+
+                assert_ref_typed!(base.reference() => ids[base]);
+
+                assert_ref!(src => ids[src]);
+            }
+
+            Instruction::ShiftOp { dest: _, src, op: _ } => {
+                assert_ref!(src.lhs() => ids[lhs]);
+                assert_ref!(src.rhs() => ids[rhs]);
+            }
+            Instruction::Cmp { dest: _, args: CmpArgs { src1: reference, src2: src, kind: _ } }
+            | Instruction::CommutativeBinOp { dest: _, src1: reference, src2: src, op: _ }
+            | Instruction::Sub { dest: _, src1: src, src2: reference } => {
+                assert_ref!(ids[reference]);
+                assert_ref!(src => ids[src]);
+
+                assert_eq!(src.ty(), reference.ty);
+            }
+            Instruction::Select(instruction::Select { dest: _, cond, if_true, if_false }) => {
+                assert_ref_typed!(ids[cond]);
+
+                assert_ref!(if_true => ids[if_true]);
+                assert_ref!(if_false => ids[if_false]);
+            }
+            Instruction::ExtInt(instruction::ExtInt { dest: _, width: _, src, signed: _ }) => {
+                assert_ref!(ids[src]);
+            }
+            Instruction::Fence => {}
+        }
+    }
+
+    match graph.terminator {
+        Terminator::Ret { addr, code: _ } => {
+            assert_ref_typed!(addr.reference() => ids[addr]);
         }
     }
 }

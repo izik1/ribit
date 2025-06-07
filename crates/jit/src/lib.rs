@@ -68,7 +68,7 @@ fn get_val(konst: Constant) -> u32 {
             i.unsigned()
         }
         // fixme: should we panic here?
-        Constant::Bool(i) => i as u32,
+        Constant::Bool(i) => u32::from(i),
     }
 }
 
@@ -195,9 +195,7 @@ mod test {
             eprintln!("error: {error}");
         }
 
-        if !output.errors.is_empty() {
-            panic!("failing due to previous error(s)");
-        }
+        assert!(output.errors.is_empty(), "failing due to previous error(s)");
 
         let mut instructions = output.instructions;
 

@@ -17,7 +17,7 @@ pub mod opcode;
 pub mod register;
 
 // note: RISC-V would have these be: B, H(W), W
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Ord, PartialOrd)]
 pub enum Width {
     Byte,
     Word,
@@ -26,17 +26,17 @@ pub enum Width {
 
 impl fmt::Display for Width {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Byte => f.write_str("byte"),
-            Self::Word => f.write_str("word"),
-            Self::DWord => f.write_str("dword"),
-        }
+        f.write_str(match self {
+            Width::Byte => "byte",
+            Width::Word => "word",
+            Width::DWord => "dword",
+        })
     }
 }
 
 pub struct DisplayDeferSlice<'a, T: fmt::Display>(pub &'a [T]);
 
-impl<'a, T: fmt::Display> fmt::Display for DisplayDeferSlice<'a, T> {
+impl<T: fmt::Display> fmt::Display for DisplayDeferSlice<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         DisplayDeferIter(self.0).fmt(f)
     }
