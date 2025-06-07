@@ -393,8 +393,7 @@ pub fn assert_well_formed(graph: &Block) {
         }
 
         match instruction {
-            Instruction::Arg { .. } => {}
-            Instruction::ReadStack { .. } => {}
+            Instruction::Arg { .. } | Instruction::ReadStack { .. } | Instruction::Fence => {}
 
             Instruction::WriteStack { dest: _, src } => {
                 assert_ref!(ids[src]);
@@ -464,7 +463,6 @@ pub fn assert_well_formed(graph: &Block) {
             Instruction::ExtInt(instruction::ExtInt { dest: _, width: _, src, signed: _ }) => {
                 assert_ref!(ids[src]);
             }
-            Instruction::Fence => {}
         }
     }
 

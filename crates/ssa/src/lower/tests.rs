@@ -17,12 +17,14 @@ fn jalr_link_eq_src() {
         ",
     );
 
-    expect![[r#"
-        %2 = args[0]
-        %3 = args[1]
-        x(%2)17 = 00010138
-        ret 0, 00010148"#]]
-    .assert_eq(&block.display_instructions().to_string());
+    expect_block(
+        block,
+        expect![[r#"
+            %2 = args[0]
+            %3 = args[1]
+            x(%2)17 = 00010138
+            ret 0, 00010148"#]],
+    );
 }
 
 #[test]
@@ -41,15 +43,17 @@ fn jalr_bit() {
         4,
     );
 
-    expect![[r#"
-        %2 = args[0]
-        %3 = args[1]
-        %4 = x(%2)1
-        %5 = add %4, 000007ff
-        %6 = and %5, fffffffe
-        x(%2)4 = 00000034
-        ret 0, %6"#]]
-    .assert_eq(&block.display_instructions().to_string());
+    expect_block(
+        block,
+        expect![[r#"
+            %2 = args[0]
+            %3 = args[1]
+            %4 = x(%2)1
+            %5 = add %4, 000007ff
+            %6 = and %5, fffffffe
+            x(%2)4 = 00000034
+            ret 0, %6"#]],
+    );
 }
 
 #[test]
@@ -232,11 +236,13 @@ fn empty() {
 
     let block = ctx.ret();
 
-    expect![[r#"
-        %2 = args[0]
-        %3 = args[1]
-        ret 0, fefefefe"#]]
-    .assert_eq(&block.display_instructions().to_string());
+    expect_block(
+        block,
+        expect![[r#"
+            %2 = args[0]
+            %3 = args[1]
+            ret 0, fefefefe"#]],
+    );
 }
 
 #[test]
@@ -248,13 +254,15 @@ fn reads_register() {
     ctx.read_register(register::RiscV::X1);
     let block = ctx.ret();
 
-    expect![[r#"
-        %2 = args[0]
-        %3 = args[1]
-        %4 = x(%2)1
-        %5 = x(%2)2
-        ret 0, 00000000"#]]
-    .assert_eq(&block.display_instructions().to_string());
+    expect_block(
+        block,
+        expect![[r#"
+            %2 = args[0]
+            %3 = args[1]
+            %4 = x(%2)1
+            %5 = x(%2)2
+            ret 0, 00000000"#]],
+    );
 }
 
 #[test]
@@ -264,10 +272,12 @@ fn writes_register() {
     ctx.write_register(register::RiscV::X2, AnySource::Const(Constant::i32(0)));
     let block = ctx.ret();
 
-    expect![[r#"
-        %2 = args[0]
-        %3 = args[1]
-        x(%2)2 = 00000000
-        ret 0, 00000000"#]]
-    .assert_eq(&block.display_instructions().to_string());
+    expect_block(
+        block,
+        expect![[r#"
+            %2 = args[0]
+            %3 = args[1]
+            x(%2)2 = 00000000
+            ret 0, 00000000"#]],
+    );
 }

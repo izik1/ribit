@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod test;
+mod tests;
 
 use ribit_core::{ReturnCode, Width, instruction, opcode, register};
 

@@ -6,6 +6,26 @@ use crate::{Block, lower};
 
 pub const MEM_SIZE: u32 = 0x100_0000;
 
+pub trait IntoBlock {
+    #[track_caller]
+    fn into_block(self) -> Block;
+}
+
+impl IntoBlock for Block {
+    #[track_caller]
+    fn into_block(self) -> Block {
+        self
+    }
+}
+
+impl IntoBlock for &'_ str {
+    #[track_caller]
+    fn into_block(self) -> Block {
+        assemble_block(self)
+    }
+}
+
+#[track_caller]
 pub(crate) fn assemble_block_with_context(mut context: lower::Context, block: &str) -> Block {
     let output = ribit_asm::tokenize(block, true);
     for error in &output.errors {
@@ -25,18 +45,19 @@ pub(crate) fn assemble_block_with_context(mut context: lower::Context, block: &s
     lower::terminal(context, last.instruction, last.len)
 }
 
+#[track_caller]
 pub(crate) fn assemble_block(block: &str) -> Block {
     assemble_block_with_context(lower::Context::new(1024, MEM_SIZE), block)
 }
 
 #[track_caller]
-pub(crate) fn expect_block(block: &str, expect: Expect) {
+pub(crate) fn expect_block<B: IntoBlock>(block: B, expect: Expect) {
     expect_block_with_opts(PassManager::unoptimized(), block, expect);
 }
 
 #[track_caller]
-pub(crate) fn expect_block_with_opts(pm: PassManager, block: &str, expect: Expect) {
-    let mut block = assemble_block(block);
+pub(crate) fn expect_block_with_opts<B: IntoBlock>(pm: PassManager, block: B, expect: Expect) {
+    let mut block = block.into_block();
     pm.run(&mut block);
     expect.assert_eq(&block.display_instructions().to_string());
 }

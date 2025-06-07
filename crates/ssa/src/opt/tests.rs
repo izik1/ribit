@@ -1,7 +1,7 @@
 use expect_test::expect;
 
 use super::PassManager;
-use super::pass_manager::{InplacePass, Pass};
+use super::pass_manager::Pass;
 use crate::tests::{expect_block_with_opts, max_fn, min_fn};
 
 #[test]
@@ -64,49 +64,48 @@ fn mem_read_write_all_opts() {
 
 #[test]
 fn max() {
-    let mut block = max_fn();
-
-    PassManager::optimized().run(&mut block);
-
-    expect![[r#"
-        %2 = args[0]
-        %4 = x(%2)10
-        %5 = x(%2)11
-        %6 = add %4, %5
-        %7 = srl %6, 0000001f
-        x(%2)12 = %7
-        %8 = and %6, %7
-        x(%2)11 = %8
-        %9 = add %4, %8
-        x(%2)10 = %9
-        %10 = x(%2)1
-        %11 = and %10, fffffffe
-        ret 0, %11"#]]
-    .assert_eq(&block.display_instructions().to_string());
+    expect_block_with_opts(
+        PassManager::optimized(),
+        max_fn(),
+        expect![[r#"
+            %2 = args[0]
+            %4 = x(%2)10
+            %5 = x(%2)11
+            %6 = add %4, %5
+            %7 = srl %6, 0000001f
+            x(%2)12 = %7
+            %8 = and %6, %7
+            x(%2)11 = %8
+            %9 = add %4, %8
+            x(%2)10 = %9
+            %10 = x(%2)1
+            %11 = and %10, fffffffe
+            ret 0, %11"#]],
+    );
 }
 
 #[test]
 fn min() {
-    let mut block = min_fn();
-
-    PassManager::optimized().run(&mut block);
-
-    expect![[r#"
-        %2 = args[0]
-        %4 = x(%2)10
-        %5 = x(%2)11
-        %6 = cmp ult %4, %5
-        %7 = zext dword %6
-        %8 = sub 00000000, %7
-        x(%2)12 = %8
-        %9 = xor %4, %5
-        %10 = and %9, %8
-        %11 = xor %10, %5
-        x(%2)10 = %11
-        %12 = x(%2)1
-        %13 = and %12, fffffffe
-        ret 0, %13"#]]
-    .assert_eq(&block.display_instructions().to_string());
+    expect_block_with_opts(
+        PassManager::optimized(),
+        min_fn(),
+        //
+        expect![[r#"
+            %2 = args[0]
+            %4 = x(%2)10
+            %5 = x(%2)11
+            %6 = cmp ult %4, %5
+            %7 = zext dword %6
+            %8 = sub 00000000, %7
+            x(%2)12 = %8
+            %9 = xor %4, %5
+            %10 = and %9, %8
+            %11 = xor %10, %5
+            x(%2)10 = %11
+            %12 = x(%2)1
+            %13 = and %12, fffffffe
+            ret 0, %13"#]],
+    );
 }
 
 #[test]
