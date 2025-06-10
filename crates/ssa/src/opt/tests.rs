@@ -186,3 +186,52 @@ fn jal_basic_die() {
             ret 0, 00001400"#]],
     );
 }
+
+#[test]
+fn load_update_store_known_offset() {
+    expect_block_with_opts(
+        PassManager::optimized(),
+        r"
+        auipc x10, 0
+        lw x11, -4(x10)
+        xori x11, x11, -1
+        sw x11, -4(x10)
+        ebreak
+        ",
+        expect![[r#"
+            %2 = args[0]
+            %3 = args[1]
+            %4 = signed dword m(%3)000003fc
+            %5 = xor %4, ffffffff
+            x(%2)11 = %5
+            m(%3)000003fc = dword %5
+            x(%2)10 = 00000400
+            ret 1, 00000414"#]],
+    );
+}
+
+#[test]
+fn load_update_store_unknown_offset() {
+    expect_block_with_opts(
+        PassManager::optimized(),
+        r"
+        lw x11, -4(x10)
+        xori x11, x11, -1
+        sw x11, -4(x10)
+        ebreak
+        ",
+        expect![[r#"
+            %2 = args[0]
+            %3 = args[1]
+            %4 = x(%2)10
+            %5 = add %4, fffffffc
+            %6 = and %5, 00ffffff
+            %7 = signed dword m(%3)%6
+            %8 = xor %7, ffffffff
+            x(%2)11 = %8
+            %9 = add %4, fffffffc
+            %10 = and %9, 00ffffff
+            m(%3)%10 = dword %8
+            ret 1, 00000410"#]],
+    );
+}
