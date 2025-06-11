@@ -10,9 +10,9 @@ fn jal_basic_const_prop() {
         PassManager::with_passes(vec![Pass::ConstProp]),
         "jal x4, 2048",
         expect![[r#"
-            %2 = args[0]
-            %3 = args[1]
-            x(%2)4 = 00000404
+            %0 = args[0]
+            %1 = args[1]
+            x(%0)4 = 00000404
             ret 0, 00001400"#]],
     );
 }
@@ -28,11 +28,11 @@ fn register_writeback_multiple_stores() {
         ebreak
         "#,
         expect![[r#"
-            %2 = args[0]
-            %3 = args[1]
-            %4 = x(%2)26
-            x(%2)21 = %4
-            x(%2)20 = %4
+            %0 = args[0]
+            %1 = args[1]
+            %2 = x(%0)26
+            x(%0)21 = %2
+            x(%0)20 = %2
             ret 1, 00000410"#]],
     );
 }
@@ -48,16 +48,16 @@ fn mem_read_write_all_opts() {
             ebreak
         "#,
         expect![[r#"
-            %2 = args[0]
-            %3 = args[1]
-            %4 = x(%2)1
-            %5 = and %4, 00ffffff
-            %6 = signed dword m(%3)%5
-            %7 = add %6, 00000064
-            x(%2)2 = %7
-            %8 = add %4, 00000032
-            %9 = and %8, 00ffffff
-            m(%3)%9 = dword %7
+            %0 = args[0]
+            %1 = args[1]
+            %2 = x(%0)1
+            %3 = and %2, 00ffffff
+            %4 = signed dword m(%1)%3
+            %5 = add %4, 00000064
+            x(%0)2 = %5
+            %6 = add %2, 00000032
+            %7 = and %6, 00ffffff
+            m(%1)%7 = dword %5
             ret 1, 00000410"#]],
     );
 }
@@ -68,19 +68,19 @@ fn max() {
         PassManager::optimized(),
         max_fn(),
         expect![[r#"
-            %2 = args[0]
-            %4 = x(%2)10
-            %5 = x(%2)11
-            %6 = add %4, %5
-            %7 = srl %6, 0000001f
-            x(%2)12 = %7
-            %8 = and %6, %7
-            x(%2)11 = %8
-            %9 = add %4, %8
-            x(%2)10 = %9
-            %10 = x(%2)1
-            %11 = and %10, fffffffe
-            ret 0, %11"#]],
+            %0 = args[0]
+            %2 = x(%0)10
+            %3 = x(%0)11
+            %4 = add %2, %3
+            %5 = srl %4, 0000001f
+            x(%0)12 = %5
+            %6 = and %4, %5
+            x(%0)11 = %6
+            %7 = add %2, %6
+            x(%0)10 = %7
+            %8 = x(%0)1
+            %9 = and %8, fffffffe
+            ret 0, %9"#]],
     );
 }
 
@@ -91,20 +91,20 @@ fn min() {
         min_fn(),
         //
         expect![[r#"
-            %2 = args[0]
-            %4 = x(%2)10
-            %5 = x(%2)11
-            %6 = cmp ult %4, %5
-            %7 = zext dword %6
-            %8 = sub 00000000, %7
-            x(%2)12 = %8
-            %9 = xor %4, %5
-            %10 = and %9, %8
-            %11 = xor %10, %5
-            x(%2)10 = %11
-            %12 = x(%2)1
-            %13 = and %12, fffffffe
-            ret 0, %13"#]],
+            %0 = args[0]
+            %2 = x(%0)10
+            %3 = x(%0)11
+            %4 = cmp ult %2, %3
+            %5 = zext dword %4
+            %6 = sub 00000000, %5
+            x(%0)12 = %6
+            %7 = xor %2, %3
+            %8 = and %7, %6
+            %9 = xor %8, %3
+            x(%0)10 = %9
+            %10 = x(%0)1
+            %11 = and %10, fffffffe
+            ret 0, %11"#]],
     );
 }
 
@@ -121,16 +121,16 @@ fn max_opt_bf_bb_1() {
             jalr x1, 182(x6)
         "#,
         expect![[r#"
-            %2 = args[0]
-            %3 = args[1]
-            %4 = x(%2)11
-            %5 = and %4, 00ffffff
-            %6 = x(%2)2
-            m(%3)%5 = byte %6
-            %7 = x(%2)12
-            x(%2)2 = %7
-            x(%2)1 = 00000410
-            x(%2)6 = 00000408
+            %0 = args[0]
+            %1 = args[1]
+            %2 = x(%0)11
+            %3 = and %2, 00ffffff
+            %4 = x(%0)2
+            m(%1)%3 = byte %4
+            %5 = x(%0)12
+            x(%0)2 = %5
+            x(%0)1 = 00000410
+            x(%0)6 = 00000408
             ret 0, 000004be"#]],
     );
 }
@@ -145,10 +145,10 @@ fn max_opt_ori_ori() {
             ebreak
         "#,
         expect![[r#"
-            %2 = args[0]
-            %4 = x(%2)10
-            %6 = or %4, 00000009
-            x(%2)10 = %6
+            %0 = args[0]
+            %2 = x(%0)10
+            %4 = or %2, 00000009
+            x(%0)10 = %4
             ret 1, 0000040c"#]],
     );
 }
@@ -167,10 +167,10 @@ fn max_opt_many_addis() {
             ebreak
         "#,
         expect![[r#"
-            %2 = args[0]
-            %4 = x(%2)10
-            %10 = add %4, 0000000e
-            x(%2)10 = %10
+            %0 = args[0]
+            %2 = x(%0)10
+            %8 = add %2, 0000000e
+            x(%0)10 = %8
             ret 1, 0000041c"#]],
     );
 }
@@ -181,8 +181,8 @@ fn jal_basic_die() {
         PassManager::with_passes(vec![Pass::ConstProp, Pass::DeadInstructionElimination]),
         "jal x4, 2048",
         expect![[r#"
-            %2 = args[0]
-            x(%2)4 = 00000404
+            %0 = args[0]
+            x(%0)4 = 00000404
             ret 0, 00001400"#]],
     );
 }
@@ -199,13 +199,13 @@ fn load_update_store_known_offset() {
         ebreak
         ",
         expect![[r#"
-            %2 = args[0]
-            %3 = args[1]
-            %4 = signed dword m(%3)000003fc
-            %5 = xor %4, ffffffff
-            x(%2)11 = %5
-            m(%3)000003fc = dword %5
-            x(%2)10 = 00000400
+            %0 = args[0]
+            %1 = args[1]
+            %2 = signed dword m(%1)000003fc
+            %3 = xor %2, ffffffff
+            x(%0)11 = %3
+            m(%1)000003fc = dword %3
+            x(%0)10 = 00000400
             ret 1, 00000414"#]],
     );
 }
@@ -230,17 +230,17 @@ fn load_update_store_unknown_offset() {
         // stores don't have IDs so LVN wouldn't apply to them, but, if they did, there's one more:
         // stores with a fence in the way may not be replaced.
         expect![[r#"
-            %2 = args[0]
-            %3 = args[1]
-            %4 = x(%2)10
-            %5 = add %4, fffffffc
-            %6 = and %5, 00ffffff
-            %7 = signed dword m(%3)%6
-            %8 = xor %7, ffffffff
-            x(%2)11 = %8
-            %9 = add %4, fffffffc
-            %10 = and %9, 00ffffff
-            m(%3)%10 = dword %8
+            %0 = args[0]
+            %1 = args[1]
+            %2 = x(%0)10
+            %3 = add %2, fffffffc
+            %4 = and %3, 00ffffff
+            %5 = signed dword m(%1)%4
+            %6 = xor %5, ffffffff
+            x(%0)11 = %6
+            %7 = add %2, fffffffc
+            %8 = and %7, 00ffffff
+            m(%1)%8 = dword %6
             ret 1, 00000410"#]],
     );
 }

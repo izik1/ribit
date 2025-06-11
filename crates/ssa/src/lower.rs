@@ -64,7 +64,7 @@ fn try_associate(
 impl Context {
     #[must_use]
     pub fn new(start_pc: u32, memory_size: u32) -> Self {
-        const REG_ID: Id = Id(2);
+        const REG_ID: Id = Id(0);
         const MEM_ID: Id = Id(REG_ID.0 + 1);
 
         assert!(memory_size.is_power_of_two());
