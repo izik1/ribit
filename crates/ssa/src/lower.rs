@@ -371,7 +371,9 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
             }
         }
 
-        instruction::Instruction::I(instruction::I { opcode, imm, rs1, rd }) => {
+        // ignore nops to save the need to eliminate them.
+        instruction::Instruction::I(instruction::I { rd: None, .. }) => {}
+        instruction::Instruction::I(instruction::I { opcode, imm, rs1, rd: Some(rd) }) => {
             let imm = imm as i16 as u32;
             let src = ctx.load_register(rs1);
             let imm = AnySource::Const(Constant::i32(imm));
@@ -390,16 +392,29 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
                 }
             };
 
-            if let Some(rd) = rd {
-                ctx.write_register(rd, res);
-            }
+            ctx.write_register(rd, res);
         }
 
-        instruction::Instruction::R(instruction::R { rs1, rs2, rd, opcode }) => {
+        instruction::Instruction::R(instruction::R {
+            opcode:
+                opcode::R::MUL
+                | opcode::R::MULH
+                | opcode::R::MULHSU
+                | opcode::R::MULHU
+                | opcode::R::DIV
+                | opcode::R::DIVU
+                | opcode::R::REM
+                | opcode::R::REMU,
+            ..
+        }) => {
+            todo!("M-extension instructions have no JIT support")
+        }
+        // same as with I-type, ignore nops to avoid needing to get rid of them.
+        instruction::Instruction::R(instruction::R { rd: None, .. }) => {}
+        instruction::Instruction::R(instruction::R { rs1, rs2, rd: Some(rd), opcode }) => {
             let src1 = ctx.load_register(rs1);
             let src2 = ctx.load_register(rs2);
 
-            #[allow(clippy::match_same_arms)]
             let res = match opcode {
                 opcode::R::ADD => ctx.add(src1, src2),
                 opcode::R::SUB => ctx.sub(src1, src2),
@@ -413,19 +428,17 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
                 opcode::R::SRA => ctx.sra(src1, src2),
                 opcode::R::OR => ctx.or(src1, src2),
                 opcode::R::AND => ctx.and(src1, src2),
-                opcode::R::MUL => todo!(),
-                opcode::R::MULH => todo!(),
-                opcode::R::MULHSU => todo!(),
-                opcode::R::MULHU => todo!(),
-                opcode::R::DIV => todo!(),
-                opcode::R::DIVU => todo!(),
-                opcode::R::REM => todo!(),
-                opcode::R::REMU => todo!(),
+                opcode::R::MUL
+                | opcode::R::MULH
+                | opcode::R::MULHSU
+                | opcode::R::MULHU
+                | opcode::R::DIV
+                | opcode::R::DIVU
+                | opcode::R::REM
+                | opcode::R::REMU => unreachable!(),
             };
 
-            if let Some(rd) = rd {
-                ctx.write_register(rd, res);
-            }
+            ctx.write_register(rd, res);
         }
         instruction::Instruction::S(instruction::S { width, rs1, rs2, imm }) => {
             let imm = imm as i16 as u32;

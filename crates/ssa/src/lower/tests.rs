@@ -162,8 +162,6 @@ fn addi_no_dest() {
         expect![[r#"
             %0 = args[0]
             %1 = args[1]
-            %2 = x(%0)1
-            %3 = add %2, 00000032
             ret 1, 00000408"#]],
     );
 }
@@ -178,9 +176,6 @@ fn add_no_dest() {
         expect![[r#"
             %0 = args[0]
             %1 = args[1]
-            %2 = x(%0)1
-            %3 = x(%0)2
-            %4 = add %2, %3
             ret 1, 00000408"#]],
     );
 }
@@ -334,7 +329,7 @@ fn reads_register() {
 fn writes_register() {
     let mut ctx = super::Context::new(0, MEM_SIZE);
 
-    ctx.write_register(register::RiscV::X2, AnySource::Const(Constant::i32(0)));
+    ctx.write_register(register::RiscV::X2, AnySource::Const(Constant::i32(0x1f2e_3d4c)));
     let block = ctx.ret();
 
     expect_block(
@@ -342,7 +337,7 @@ fn writes_register() {
         expect![[r#"
             %0 = args[0]
             %1 = args[1]
-            x(%0)2 = 00000000
+            x(%0)2 = 1f2e3d4c
             ret 0, 00000000"#]],
     );
 }
