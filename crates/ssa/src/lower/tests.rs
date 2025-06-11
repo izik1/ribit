@@ -169,6 +169,71 @@ fn addi_no_dest() {
 }
 
 #[test]
+fn add_no_dest() {
+    expect_block(
+        r"
+        add x0, x1, x2
+        ebreak
+        ",
+        expect![[r#"
+            %0 = args[0]
+            %1 = args[1]
+            %2 = x(%0)1
+            %3 = x(%0)2
+            %4 = add %2, %3
+            ret 1, 00000408"#]],
+    );
+}
+
+#[test]
+fn add_mv() {
+    expect_block(
+        r"
+        add x10, x0, x11
+        ebreak
+        ",
+        expect![[r#"
+            %0 = args[0]
+            %1 = args[1]
+            %2 = x(%0)11
+            x(%0)10 = %2
+            ret 1, 00000408"#]],
+    );
+}
+
+#[test]
+fn store_no_reg_write() {
+    expect_block(
+        r#"
+            sw x2, 64(x0)
+            ebreak
+        "#,
+        expect![[r#"
+            %0 = args[0]
+            %1 = args[1]
+            %2 = x(%0)2
+            m(%1)00000040 = dword %2
+            ret 1, 00000408"#]],
+    );
+}
+
+#[test]
+fn load_no_reg_read() {
+    expect_block(
+        r#"
+            lw x2, 64(x0)
+            ebreak
+        "#,
+        expect![[r#"
+            %0 = args[0]
+            %1 = args[1]
+            %2 = signed dword m(%1)00000040
+            x(%0)2 = %2
+            ret 1, 00000408"#]],
+    );
+}
+
+#[test]
 fn mem_read_write() {
     expect_block(
         r#"
