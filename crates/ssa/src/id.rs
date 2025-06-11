@@ -6,17 +6,17 @@ pub struct IdAllocator {
 
 impl IdAllocator {
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self::with_start(Id(0))
     }
 
     #[must_use]
-    pub fn with_start(start: Id) -> Self {
+    pub const fn with_start(start: Id) -> Self {
         Self { next_id: start }
     }
 
     #[must_use = "ignoring the return of this function will leak an ID slot and is almost never what you want"]
-    pub fn allocate(&mut self) -> Id {
+    pub const fn allocate(&mut self) -> Id {
         let id_num = self.next_id.0;
 
         let new_id = id_num.checked_add(1).expect("ID overflow");

@@ -13,8 +13,8 @@ pub struct Context {
     id_allocator: IdAllocator,
     pub pc: Source<ty::I32>,
     registers: [Option<AnySource>; 32],
-    register_arg: Option<Source<ty::I32>>,
-    memory_arg: Option<Source<ty::I32>>,
+    register_arg: Source<ty::I32>,
+    memory_arg: Source<ty::I32>,
     registers_written: u32,
     instructions: Vec<Instruction>,
     memory_size: u32,
@@ -64,26 +64,24 @@ fn try_associate(
 impl Context {
     #[must_use]
     pub fn new(start_pc: u32, memory_size: u32) -> Self {
+        const REG_ID: Id = Id(2);
+        const MEM_ID: Id = Id(REG_ID.0 + 1);
+
         assert!(memory_size.is_power_of_two());
 
-        let mut self_ = Self {
-            id_allocator: IdAllocator::with_start(Id(2)),
+        Self {
+            id_allocator: const { IdAllocator::with_start(Id(MEM_ID.0 + 1)) },
             pc: Source::Const(start_pc),
             registers: [None; 32],
-            register_arg: None,
-            memory_arg: None,
+            register_arg: Source::Ref(REG_ID),
+            memory_arg: Source::Ref(MEM_ID),
             registers_written: 0x0000_0000,
-            instructions: vec![],
+            instructions: Vec::from([
+                Instruction::Arg { dest: REG_ID, src: Arg::Register },
+                Instruction::Arg { dest: MEM_ID, src: Arg::Memory },
+            ]),
             memory_size,
-        };
-
-        self_.register_arg = Some(self_.arg(Arg::Register));
-        self_.memory_arg = Some(self_.arg(Arg::Memory));
-        self_
-    }
-
-    fn arg(&mut self, arg: Arg) -> Source<ty::I32> {
-        self.typed_instruction(|id| Instruction::Arg { dest: id, src: arg })
+        }
     }
 
     pub fn add_pc(&mut self, src: AnySource) -> Source<ty::I32> {
@@ -167,11 +165,7 @@ impl Context {
     pub fn read_register(&mut self, reg: register::RiscV) -> AnySource {
         self.registers[reg.get() as usize].unwrap_or_else(|| {
             let id = self.id_allocator.allocate();
-            let instr = Instruction::ReadReg {
-                dest: id,
-                base: self.register_arg.expect("Register arg wasn't initialized?"),
-                src: reg,
-            };
+            let instr = Instruction::ReadReg { dest: id, base: self.register_arg, src: reg };
 
             let ty = instr.ty();
 
@@ -190,7 +184,7 @@ impl Context {
     }
 
     pub fn read_memory(&mut self, src: AnySource, width: Width, sign_extend: bool) -> AnySource {
-        let base = self.memory_arg.expect("Memory arg wasn't initialized?");
+        let base = self.memory_arg;
         self.instruction(|dest| Instruction::ReadMem { dest, src, base, width, sign_extend })
     }
 
@@ -212,7 +206,7 @@ impl Context {
     pub fn write_memory(&mut self, addr: Source<ty::I32>, val: AnySource, width: Width) {
         self.instructions.push(Instruction::WriteMem {
             addr,
-            base: self.memory_arg.expect("Memory arg wasn't initialized?"),
+            base: self.memory_arg,
             src: val,
             width,
         });
@@ -308,7 +302,7 @@ impl Context {
             {
                 self.instructions.push(Instruction::WriteReg {
                     dest,
-                    base: self.register_arg.expect("Register arg wasn't initialized?"),
+                    base: self.register_arg,
                     src,
                 });
             }
