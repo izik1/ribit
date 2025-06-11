@@ -220,6 +220,15 @@ fn load_update_store_unknown_offset() {
         sw x11, -4(x10)
         ebreak
         ",
+        // note the redundant address calculation between the load/store.
+        // ideally this is solved via some kind of value numbering, which is easier said than done.
+        // hazards LVN needs to worry about:
+        // `fence` (IORW<->IORW barriers), "todo: more fine grained fences", but also "todo: actually care about fences"
+        // IDs destination IDs (two instructions won't `==` if their ID is different... but that pass is trying to explicitly figure when it's just the ID that's different)
+        // multiple replacements (see: this very block, `%10 == %6`, but just doing a single sweep/replace isn't enough to figure that out without clever tricks)
+        // memory, register, and stack loads may look equal because they alias, but if there's an intervening write (in all cases), or fence (memory, csr), they most likely _aren't_.
+        // stores don't have IDs so LVN wouldn't apply to them, but, if they did, there's one more:
+        // stores with a fence in the way may not be replaced.
         expect![[r#"
             %2 = args[0]
             %3 = args[1]
