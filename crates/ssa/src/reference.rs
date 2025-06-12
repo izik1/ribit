@@ -1,13 +1,21 @@
 use std::fmt;
+use std::hash::Hash;
 use std::marker::PhantomData;
 
 use crate::ty::ConstTy;
 use crate::{Id, Type};
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Hash)]
 pub struct Reference {
     pub ty: Type,
     pub id: Id,
+}
+
+impl Reference {
+    #[must_use]
+    pub const fn new(ty: Type, id: Id) -> Self {
+        Self { ty, id }
+    }
 }
 
 impl fmt::Display for Reference {
@@ -33,6 +41,12 @@ impl<T> PartialEq for Ref<T> {
     }
 }
 
+impl<T> Hash for Ref<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
 impl<T> Clone for Ref<T> {
     fn clone(&self) -> Self {
         *self
@@ -50,6 +64,11 @@ impl<T: ConstTy> Ref<T> {
     #[must_use]
     pub const fn ty(self) -> Type {
         T::TY
+    }
+
+    #[must_use]
+    pub const fn to_source(self) -> crate::Source<T> {
+        crate::Source::Ref(self.id)
     }
 }
 

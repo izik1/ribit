@@ -54,7 +54,7 @@ impl StackIndex {
 
 // bitpacked: [(signed/unsigned):2, (lt/gt):1, (eq/no):0]
 #[repr(u8)]
-#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
 pub enum Inequality {
     Ult = 0b000,
     Ule = 0b001,
@@ -120,7 +120,7 @@ impl Inequality {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub enum CmpKind {
     Eq,
     Ne,
@@ -179,7 +179,7 @@ impl From<opcode::Cmp> for CmpKind {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub enum CommutativeBinOp {
     And,
     Add,
@@ -212,7 +212,7 @@ impl fmt::Display for CommutativeBinOp {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub enum ShiftOp {
     Sll,
     Srl,
@@ -229,7 +229,7 @@ impl fmt::Display for ShiftOp {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
 #[repr(u8)]
 pub enum Arg {
     Register = 0,

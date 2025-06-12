@@ -18,6 +18,7 @@ where
 pub enum Pass {
     Inplace(Box<dyn InplacePass>),
     ConstProp,
+    LocalValueNumbering,
     DeadInstructionElimination,
     RegisterWritebackShrinking,
 }
@@ -27,6 +28,7 @@ impl fmt::Debug for Pass {
         let data = match self {
             Self::Inplace(_) => return f.debug_tuple("Inplace").finish_non_exhaustive(),
             Self::ConstProp => "ConstProp",
+            Self::LocalValueNumbering => "LocalValueNumbering",
             Self::DeadInstructionElimination => "DeadInstructionElimination",
             Self::RegisterWritebackShrinking => "RegisterWritebackShrinking",
         };
@@ -56,7 +58,7 @@ impl PassManager {
     pub fn optimized() -> Self {
         Self {
             passes: vec![
-                Pass::ConstProp,
+                Pass::LocalValueNumbering,
                 Pass::DeadInstructionElimination,
                 Pass::RegisterWritebackShrinking,
             ],
@@ -70,6 +72,7 @@ impl InplacePass for PassManager {
             match pass {
                 Pass::Inplace(p) => p.run(block),
                 Pass::ConstProp => super::fold_and_prop_consts(block),
+                Pass::LocalValueNumbering => super::local_value_numbering(block),
                 Pass::DeadInstructionElimination => super::dead_instruction_elimination(block),
                 Pass::RegisterWritebackShrinking => super::register_writeback_shrinking(block),
             }

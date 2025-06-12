@@ -266,7 +266,7 @@ impl fmt::Display for Instruction {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub struct CmpArgs {
     pub src1: Reference,
     pub src2: AnySource,

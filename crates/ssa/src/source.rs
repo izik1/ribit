@@ -7,7 +7,7 @@ use crate::{Constant, Id, Type};
 /// Like source, but for specific types.
 ///
 /// Such as `Int` or `bool`.
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Hash)]
 pub enum Source<T: ConstTy> {
     /// A constant of type `T`
     Const(T::Const),
@@ -86,7 +86,7 @@ where
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Hash)]
 pub enum AnySource {
     Const(Constant),
     Ref(Reference),
@@ -136,7 +136,7 @@ impl fmt::Display for AnySource {
 }
 
 /// A pair of constants/references that specifically *can't* be `const,const`
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum SourcePair {
     RefRef(Reference, Reference),
     RefConst(Reference, Constant),

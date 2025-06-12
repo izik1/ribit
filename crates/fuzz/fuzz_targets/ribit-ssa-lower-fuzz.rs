@@ -108,6 +108,7 @@ impl Passes {
                 0x01 => passes.push(Pass::ConstProp),
                 0x02 => passes.push(Pass::DeadInstructionElimination),
                 0x03 => passes.push(Pass::RegisterWritebackShrinking),
+                0x04 => passes.push(Pass::LocalValueNumbering),
                 _ => {}
             }
         }
@@ -421,7 +422,7 @@ fn mutator(data: &mut [u8], size: usize, max_size: usize, seed: u32) -> usize {
         // set the passes to exactly `PassManager::optimized`'s passes
         2 | 3 => {
             passes.0 = vec![
-                Pass::ConstProp,
+                Pass::LocalValueNumbering,
                 Pass::DeadInstructionElimination,
                 Pass::RegisterWritebackShrinking,
             ];
@@ -466,6 +467,7 @@ fn mutator(data: &mut [u8], size: usize, max_size: usize, seed: u32) -> usize {
                 Pass::ConstProp => 0x01,
                 Pass::DeadInstructionElimination => 0x02,
                 Pass::RegisterWritebackShrinking => 0x03,
+                Pass::LocalValueNumbering => 0x04,
             };
 
             start.copy_from_slice(&value.to_be_bytes());

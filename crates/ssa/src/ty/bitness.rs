@@ -5,7 +5,7 @@ use std::num::NonZeroU8;
 use ribit_core::Width;
 
 // todo: arbitrary bitness
-#[derive(PartialEq, Eq, Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone, Hash)]
 pub struct Bitness(Width);
 
 impl Bitness {

@@ -1,6 +1,6 @@
 use core::num::NonZeroU8;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct RiscV(NonZeroU8);
 
 // all of these functions are super trivial and should *always* be inlined.

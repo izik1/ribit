@@ -6,7 +6,7 @@ pub use bitness::Bitness;
 
 use crate::icmp::PartialICmp;
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Hash)]
 pub enum Type {
     Int(Bitness),
     /// Unit type, `()` in Rust, `void` in C
@@ -58,7 +58,7 @@ impl ConstTy for Bool {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct I32;
 
 impl ConstTy for I32 {
@@ -77,7 +77,7 @@ impl ConstTy for I32 {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Hash)]
 pub enum Constant {
     Int(Int),
     Bool(bool),
@@ -147,7 +147,7 @@ impl fmt::Display for Constant {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Hash)]
 pub struct Int(pub Bitness, pub u32);
 
 impl Int {
@@ -221,8 +221,31 @@ impl PartialICmp for Int {
     }
 }
 
+#[macro_export]
+macro_rules! assert_types_eq {
+    ($left:expr, $right:expr $(,)?) => {
+        match (&$left, &$right) {
+            (left_val, right_val) => {
+                if *left_val != *right_val {
+                    $crate::ty::mismatch(*left_val, *right_val)
+                }
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! debug_assert_types_eq {
+    ($left:expr, $right:expr $(,)?) => {
+        if cfg!(debug_assertions) {
+            $crate::assert_types_eq!($left, $right);
+        }
+    };
+}
+
 #[inline(never)]
 #[cold]
+#[track_caller]
 pub fn mismatch(ty1: Type, ty2: Type) -> ! {
     assert_ne!(ty1, ty2, "BUG: Fake type mismatch!");
     panic!("mismatched types: ({ty1} != {ty2})")

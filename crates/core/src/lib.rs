@@ -17,7 +17,7 @@ pub mod opcode;
 pub mod register;
 
 // note: RISC-V would have these be: B, H(W), W
-#[derive(Debug, PartialEq, Eq, Copy, Clone, Ord, PartialOrd)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Ord, PartialOrd, Hash)]
 pub enum Width {
     Byte,
     Word,

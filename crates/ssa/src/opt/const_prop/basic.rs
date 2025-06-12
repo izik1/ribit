@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+use std::hash::BuildHasher;
+
+use fnv::FnvHashMap;
 
 use super::{lookup, typed_lookup};
 use crate::instruction::CmpArgs;
@@ -7,8 +10,8 @@ use crate::{
     instruction,
 };
 
-fn run_instruction(
-    consts: &HashMap<Id, Constant>,
+fn run_instruction<S: BuildHasher>(
+    consts: &HashMap<Id, Constant, S>,
     instruction: &mut Instruction,
 ) -> Option<(Id, Constant)> {
     match instruction {
@@ -126,12 +129,18 @@ fn run_instruction(
     }
 }
 
-fn ext_int(consts: &HashMap<Id, Constant>, it: &mut instruction::ExtInt) -> Option<(Id, Constant)> {
+fn ext_int<S: BuildHasher>(
+    consts: &HashMap<Id, Constant, S>,
+    it: &mut instruction::ExtInt,
+) -> Option<(Id, Constant)> {
     let src = lookup(consts, AnySource::Ref(it.src)).constant()?;
     Some((it.dest, Constant::Int(eval::extend_int(it.width, src, it.signed))))
 }
 
-fn select(consts: &HashMap<Id, Constant>, it: &mut instruction::Select) -> Option<(Id, Constant)> {
+fn select<S: BuildHasher>(
+    consts: &HashMap<Id, Constant, S>,
+    it: &mut instruction::Select,
+) -> Option<(Id, Constant)> {
     it.if_true = lookup(consts, it.if_true);
     it.if_false = lookup(consts, it.if_false);
 
@@ -146,7 +155,7 @@ fn select(consts: &HashMap<Id, Constant>, it: &mut instruction::Select) -> Optio
 }
 
 pub fn run(block: &mut Block) {
-    let mut consts = HashMap::new();
+    let mut consts = FnvHashMap::default();
     for instruction in &mut block.instructions {
         if let Some((dest, val)) = run_instruction(&consts, instruction) {
             consts.insert(dest, val);
