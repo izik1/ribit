@@ -267,7 +267,7 @@ pub fn alloc(block: &mut ribit_ssa::Block) -> AllocMap {
 mod test {
     use expect_test::{Expect, expect};
     use ribit_ssa::opt::PassManager;
-    use ribit_ssa::opt::pass_manager::InplacePass;
+    use ribit_ssa::opt::pass_manager::{InplacePass, Pass};
     use ribit_ssa::{Block, analysis};
 
     use crate::test::{assemble_block, max_fn};
@@ -466,7 +466,10 @@ mod test {
     #[test]
     fn alloc_reload() {
         expect_optimized_block(
-            PassManager::optimized(),
+            PassManager::with_passes(Vec::from([
+                Pass::DeadInstructionElimination,
+                Pass::RegisterWritebackShrinking,
+            ])),
             assemble_block(
                 r#"
                 add x3, x2, x1

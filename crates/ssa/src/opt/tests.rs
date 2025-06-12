@@ -244,3 +244,56 @@ fn load_update_store_unknown_offset() {
             ret 1, 00000410"#]],
     );
 }
+
+#[test]
+fn many_register_loads() {
+    expect_block_with_opts(
+        PassManager::optimized(),
+        r#"
+            add x3, x2, x1
+            add x6, x5, x4
+            add x9, x8, x7
+            add x12, x11, x10
+            add x15, x14, x13
+            add x16, x2, x1
+            add x17, x5, x4
+            add x18, x8, x7
+            add x19, x11, x10
+            add x20, x14, x13
+            ebreak
+        "#,
+        expect![[r#"
+            %0 = args[0]
+            %2 = x(%0)2
+            %3 = x(%0)1
+            %4 = add %2, %3
+            x(%0)3 = %4
+            %5 = x(%0)5
+            %6 = x(%0)4
+            %7 = add %5, %6
+            x(%0)6 = %7
+            %8 = x(%0)8
+            %9 = x(%0)7
+            %10 = add %8, %9
+            x(%0)9 = %10
+            %11 = x(%0)11
+            %12 = x(%0)10
+            %13 = add %11, %12
+            x(%0)12 = %13
+            %14 = x(%0)14
+            %15 = x(%0)13
+            %16 = add %14, %15
+            x(%0)15 = %16
+            %17 = add %2, %3
+            x(%0)16 = %17
+            %18 = add %5, %6
+            x(%0)17 = %18
+            %19 = add %8, %9
+            x(%0)18 = %19
+            %20 = add %11, %12
+            x(%0)19 = %20
+            %21 = add %14, %15
+            x(%0)20 = %21
+            ret 1, 0000042c"#]],
+    )
+}
