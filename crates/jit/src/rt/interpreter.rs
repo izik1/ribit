@@ -115,10 +115,10 @@ impl Block {
                     evaluated.insert(dest, Constant::Bool(res));
                 }
 
-                &ribit_ssa::Instruction::CommutativeBinOp { dest, src1, src2, op } => {
-                    let src1 = evaluated[&src1.id];
-                    let src2 = lookup_source(&evaluated, src2);
-                    let output = eval::commutative_binop(src1, src2, op);
+                &ribit_ssa::Instruction::CommutativeBinOp { dest, args } => {
+                    let src1 = evaluated[&args.src1.id];
+                    let src2 = lookup_source(&evaluated, args.src2);
+                    let output = eval::commutative_binop(src1, src2, args.op);
                     evaluated.insert(dest, output);
                 }
 

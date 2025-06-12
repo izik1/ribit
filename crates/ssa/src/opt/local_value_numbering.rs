@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use ribit_core::Width;
 
-use crate::instruction::{self, CmpArgs};
+use crate::instruction::{self, BinaryArgs, CmpArgs};
 use crate::reference::{Ref, Reference};
 use crate::ty::ConstTy;
 use crate::{
@@ -191,9 +191,7 @@ fn run_instruction(context: &Context, instruction: &mut Instruction) -> Option<A
                     let dest = *dest;
                     *instruction = Instruction::CommutativeBinOp {
                         dest,
-                        src1,
-                        src2,
-                        op: CommutativeBinOp::Add,
+                        args: BinaryArgs { src1, src2, op: CommutativeBinOp::Add },
                     };
 
                     return Some(Action::AddEquivalence {
@@ -231,7 +229,7 @@ fn run_instruction(context: &Context, instruction: &mut Instruction) -> Option<A
                 Err(value) => Some(Action::constify(*dest, ty::Constant::Bool(value))),
             }
         }
-        Instruction::CommutativeBinOp { dest, src1, src2, op } => {
+        Instruction::CommutativeBinOp { dest, args: BinaryArgs { src1, src2, op } } => {
             let lhs = context.lookup(AnySource::Ref(*src1));
             let rhs = context.lookup(*src2);
 

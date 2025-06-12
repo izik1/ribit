@@ -4,7 +4,7 @@ use std::hash::BuildHasher;
 use fnv::FnvHashMap;
 
 use super::{lookup, typed_lookup};
-use crate::instruction::CmpArgs;
+use crate::instruction::{BinaryArgs, CmpArgs};
 use crate::{
     AnySource, Block, CommutativeBinOp, Constant, Id, Instruction, SourcePair, Terminator, eval,
     instruction,
@@ -40,7 +40,7 @@ fn run_instruction<S: BuildHasher>(
             None
         }
 
-        Instruction::CommutativeBinOp { dest, src1, src2, op } => {
+        Instruction::CommutativeBinOp { dest, args: BinaryArgs { src1, src2, op } } => {
             *src2 = lookup(consts, *src2);
 
             let lhs = lookup(consts, AnySource::Ref(*src1)).constant()?;
@@ -80,9 +80,11 @@ fn run_instruction<S: BuildHasher>(
                     let src2 = eval::neg(src2);
                     *instruction = Instruction::CommutativeBinOp {
                         dest: *dest,
-                        src1,
-                        src2: AnySource::Const(src2),
-                        op: CommutativeBinOp::Add,
+                        args: BinaryArgs {
+                            src1,
+                            src2: AnySource::Const(src2),
+                            op: CommutativeBinOp::Add,
+                        },
                     };
 
                     None

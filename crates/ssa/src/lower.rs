@@ -4,7 +4,7 @@ mod tests;
 use ribit_core::{ReturnCode, Width, instruction, opcode, register};
 
 use super::{AnySource, CmpKind, Id, Instruction, ShiftOp};
-use crate::instruction::{CmpArgs, ExtInt, Select};
+use crate::instruction::{BinaryArgs, CmpArgs, ExtInt, Select};
 use crate::reference::Reference;
 use crate::ty::{self, ConstTy, Constant};
 use crate::{Arg, Block, CommutativeBinOp, IdAllocator, Ref, Source, SourcePair, Terminator, eval};
@@ -45,20 +45,18 @@ fn try_associate(
 
     let instr = instructions.iter().rfind(|it| it.id() == Some(src1.id)).unwrap();
     let inner = match instr {
-        Instruction::CommutativeBinOp { dest: _, src1, src2, op: inner_op } if *inner_op == op => {
-            (src1, src2)
-        }
+        Instruction::CommutativeBinOp { dest: _, args } if args.op == op => (args.src1, args.src2),
         _ => return (src1, src2),
     };
 
     let src2 = match inner.1 {
-        AnySource::Const(inner_src2) => eval::commutative_binop(*inner_src2, src2, op),
+        AnySource::Const(inner_src2) => eval::commutative_binop(inner_src2, src2, op),
         _ => return (src1, src2),
     };
 
     let src1 = inner.0;
 
-    (*src1, src2)
+    (src1, src2)
 }
 
 impl Context {
@@ -140,7 +138,10 @@ impl Context {
             return it;
         }
 
-        self.instruction(|dest| Instruction::CommutativeBinOp { dest, src1, src2, op })
+        self.instruction(|dest| Instruction::CommutativeBinOp {
+            dest,
+            args: BinaryArgs { src1, src2, op },
+        })
     }
 
     pub fn shift(&mut self, op: ShiftOp, src1: AnySource, src2: AnySource) -> AnySource {

@@ -36,6 +36,8 @@ pub use instruction::Instruction;
 pub use source::{AnySource, Source, SourcePair};
 pub use ty::{Bitness, Constant, Type};
 
+use crate::instruction::BinaryArgs;
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, PartialOrd, Ord)]
 pub struct StackIndex(pub u8);
 
@@ -286,7 +288,10 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
                 }
             },
 
-            Instruction::CommutativeBinOp { dest: _, src1: reference, src2: source, .. }
+            Instruction::CommutativeBinOp {
+                dest: _,
+                args: BinaryArgs { src1: reference, src2: source, op: _ },
+            }
             | Instruction::Sub { dest: _, src1: source, src2: reference }
             | Instruction::Cmp {
                 dest: _,
@@ -447,7 +452,10 @@ pub fn assert_well_formed(graph: &Block) {
                 assert_ref!(src.rhs() => ids[rhs]);
             }
             Instruction::Cmp { dest: _, args: CmpArgs { src1: reference, src2: src, kind: _ } }
-            | Instruction::CommutativeBinOp { dest: _, src1: reference, src2: src, op: _ }
+            | Instruction::CommutativeBinOp {
+                dest: _,
+                args: BinaryArgs { src1: reference, src2: src, op: _ },
+            }
             | Instruction::Sub { dest: _, src1: src, src2: reference } => {
                 assert_ref!(ids[reference]);
                 assert_ref!(src => ids[src]);

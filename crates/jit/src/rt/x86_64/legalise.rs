@@ -69,18 +69,18 @@ pub fn count_clobbers_for_terminal(
 pub fn legalise(block: &mut Block, allocs: &HashMap<Id, Register>) {
     for instruction in &mut block.instructions {
         match instruction {
-            Instruction::CommutativeBinOp { dest, src1, src2, op: _ } => {
-                let src2 = match src2 {
+            Instruction::CommutativeBinOp { dest, args } => {
+                let src2 = match &mut args.src2 {
                     AnySource::Const(_) => continue,
                     AnySource::Ref(r) => r,
                 };
 
-                let src_reg_1 = allocs.get(&src1.id);
+                let src_reg_1 = allocs.get(&args.src1.id);
                 let src_reg_2 = allocs.get(&src2.id);
                 let dest_reg = allocs.get(dest);
 
                 if src_reg_1 != dest_reg && src_reg_2 == dest_reg {
-                    mem::swap(src1, src2);
+                    mem::swap(&mut args.src1, src2);
                 }
             }
 

@@ -73,9 +73,7 @@ pub enum Instruction {
     },
     CommutativeBinOp {
         dest: Id,
-        src1: Reference,
-        src2: AnySource,
-        op: CommutativeBinOp,
+        args: CommutativeBinArgs,
     },
     // todo: box this
     Select(Select),
@@ -124,7 +122,10 @@ impl Instruction {
                 SourcePair::RefConst(it, _) | SourcePair::ConstRef(_, it) => visit(it.id),
             },
 
-            Self::CommutativeBinOp { src1: reference, src2: source, .. }
+            Self::CommutativeBinOp {
+                dest: _,
+                args: BinaryArgs { src1: reference, src2: source, op: _ },
+            }
             | Self::Sub { src1: source, src2: reference, .. }
             | Self::Cmp { dest: _, args: CmpArgs { src1: reference, src2: source, kind: _ } } => {
                 visit(reference.id);
@@ -170,7 +171,10 @@ impl Instruction {
 
                 ty
             }
-            Self::CommutativeBinOp { dest: _, src1: reference, src2: source, op: _ }
+            Self::CommutativeBinOp {
+                dest: _,
+                args: BinaryArgs { src1: reference, src2: source, op: _ },
+            }
             | Self::Sub { dest: _, src1: source, src2: reference } => {
                 let ty = reference.ty;
 
@@ -245,7 +249,7 @@ impl fmt::Display for Instruction {
 
             Self::Arg { dest, src } => write!(f, "{dest} = args[{}]", *src as u8),
 
-            Self::CommutativeBinOp { dest, src1, src2, op } => {
+            Self::CommutativeBinOp { dest, args: BinaryArgs { src1, src2, op } } => {
                 write!(f, "{dest} = {op} {src1}, {src2}")
             }
 
@@ -265,6 +269,15 @@ impl fmt::Display for Instruction {
         }
     }
 }
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub struct BinaryArgs<T> {
+    pub src1: Reference,
+    pub src2: AnySource,
+    pub op: T,
+}
+
+pub type CommutativeBinArgs = BinaryArgs<CommutativeBinOp>;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub struct CmpArgs {
