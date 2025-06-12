@@ -158,7 +158,7 @@ impl<'a, 'b: 'a> BlockBuilder<'a, 'b> {
                     let src2 = crate::Source::from_ssa_src(args.src2, allocs)
                         .expect("src2 not allocated!?");
 
-                    cmp::set_bool_conditional(self, dest, src1, src2, args.kind)
+                    cmp::set_bool_conditional(self, dest, src1, src2, args.op)
                 }
 
                 // todo(perf): split into `dest = if cond { if_true } else { <undefined> }; dest = if !cond { if_false } else { dest }

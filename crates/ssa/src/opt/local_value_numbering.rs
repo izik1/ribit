@@ -214,7 +214,7 @@ fn run_instruction(context: &Context, instruction: &mut Instruction) -> Option<A
             let new = CmpArgs::new(
                 context.lookup(AnySource::Ref(args.src1)),
                 context.lookup(args.src2),
-                args.kind,
+                args.op,
             );
 
             match new {

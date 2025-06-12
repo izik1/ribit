@@ -295,7 +295,7 @@ pub fn update_references(graph: &mut Block, start_from: usize, old: Id, new: Id)
             | Instruction::Sub { dest: _, src1: source, src2: reference }
             | Instruction::Cmp {
                 dest: _,
-                args: CmpArgs { src1: reference, src2: source, kind: _ },
+                args: CmpArgs { src1: reference, src2: source, op: _ },
             } => {
                 if reference.id == old {
                     reference.id = new;
@@ -451,7 +451,7 @@ pub fn assert_well_formed(graph: &Block) {
                 assert_ref!(src.lhs() => ids[lhs]);
                 assert_ref!(src.rhs() => ids[rhs]);
             }
-            Instruction::Cmp { dest: _, args: CmpArgs { src1: reference, src2: src, kind: _ } }
+            Instruction::Cmp { dest: _, args: CmpArgs { src1: reference, src2: src, op: _ } }
             | Instruction::CommutativeBinOp {
                 dest: _,
                 args: BinaryArgs { src1: reference, src2: src, op: _ },

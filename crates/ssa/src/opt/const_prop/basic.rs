@@ -117,7 +117,7 @@ fn run_instruction<S: BuildHasher>(
             let lhs = lookup(consts, AnySource::Ref(args.src1));
             let rhs = lookup(consts, args.src2);
 
-            match CmpArgs::new(lhs, rhs, args.kind) {
+            match CmpArgs::new(lhs, rhs, args.op) {
                 Ok(it) => {
                     *args = it;
                     None

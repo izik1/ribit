@@ -110,7 +110,7 @@ impl Block {
                 &ribit_ssa::Instruction::Cmp { dest, args } => {
                     let src1 = evaluated[&args.src1.id];
                     let src2 = lookup_source(&evaluated, args.src2);
-                    let res = eval::icmp(src1, src2, args.kind);
+                    let res = eval::icmp(src1, src2, args.op);
 
                     evaluated.insert(dest, Constant::Bool(res));
                 }

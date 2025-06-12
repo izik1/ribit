@@ -127,7 +127,7 @@ impl Instruction {
                 args: BinaryArgs { src1: reference, src2: source, op: _ },
             }
             | Self::Sub { src1: source, src2: reference, .. }
-            | Self::Cmp { dest: _, args: CmpArgs { src1: reference, src2: source, kind: _ } } => {
+            | Self::Cmp { dest: _, args: CmpArgs { src1: reference, src2: source, op: _ } } => {
                 visit(reference.id);
 
                 if let AnySource::Ref(it) = source {
@@ -186,7 +186,7 @@ impl Instruction {
                 ty
             }
 
-            Self::Cmp { dest: _, args: CmpArgs { src1, src2, kind: _ } } => {
+            Self::Cmp { dest: _, args: CmpArgs { src1, src2, op: _ } } => {
                 assert_eq!(src1.ty, src2.ty());
 
                 Type::Boolean
@@ -259,8 +259,8 @@ impl fmt::Display for Instruction {
 
             Self::Sub { dest, src1, src2 } => write!(f, "{dest} = sub {src1}, {src2}"),
 
-            Self::Cmp { dest, args: CmpArgs { src1, src2, kind } } => {
-                write!(f, "{dest} = cmp {kind} {src1}, {src2}")
+            Self::Cmp { dest, args: CmpArgs { src1, src2, op } } => {
+                write!(f, "{dest} = cmp {op} {src1}, {src2}")
             }
 
             Self::Select(it) => it.fmt(f),
@@ -270,7 +270,7 @@ impl fmt::Display for Instruction {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub struct BinaryArgs<T> {
     pub src1: Reference,
     pub src2: AnySource,
@@ -278,24 +278,18 @@ pub struct BinaryArgs<T> {
 }
 
 pub type CommutativeBinArgs = BinaryArgs<CommutativeBinOp>;
-
-#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
-pub struct CmpArgs {
-    pub src1: Reference,
-    pub src2: AnySource,
-    pub kind: CmpKind,
-}
+pub type CmpArgs = BinaryArgs<CmpKind>;
 
 impl CmpArgs {
-    pub fn new(src1: AnySource, src2: AnySource, kind: CmpKind) -> Result<Self, bool> {
+    pub fn new(src1: AnySource, src2: AnySource, op: CmpKind) -> Result<Self, bool> {
         let (src1, src2, kind) = match (src1, src2) {
             (AnySource::Const(src1), AnySource::Const(src2)) => {
-                return Err(eval::icmp(src1, src2, kind));
+                return Err(eval::icmp(src1, src2, op));
             }
-            (src1 @ AnySource::Const(_), AnySource::Ref(src2)) => (src2, src1, kind.swap()),
-            (AnySource::Ref(src1), src2) => (src1, src2, kind),
+            (src1 @ AnySource::Const(_), AnySource::Ref(src2)) => (src2, src1, op.swap()),
+            (AnySource::Ref(src1), src2) => (src1, src2, op),
         };
 
-        Ok(Self { src1, src2, kind })
+        Ok(Self { src1, src2, op: kind })
     }
 }
