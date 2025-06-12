@@ -9,9 +9,8 @@ use crate::{
     SourcePair, debug_assert_types_eq, eval, ty,
 };
 
-
 #[cfg(test)]
-mod tests ;
+mod tests;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub(crate) struct Select {
@@ -329,6 +328,12 @@ pub fn run(block: &mut Block) {
             }
 
             None => {}
+        }
+    }
+
+    match &mut block.terminator {
+        crate::Terminator::Ret { addr, code: _ } => {
+            *addr = context.typed_lookup(*addr);
         }
     }
 }
