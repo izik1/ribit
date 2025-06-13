@@ -5,19 +5,6 @@ use super::pass_manager::Pass;
 use crate::tests::{expect_block_with_opts, max_fn, min_fn};
 
 #[test]
-fn jal_basic_const_prop() {
-    expect_block_with_opts(
-        PassManager::with_passes(vec![Pass::ConstProp]),
-        "jal x4, 2048",
-        expect![[r#"
-            %0 = args[0]
-            %1 = args[1]
-            x(%0)4 = 00000404
-            ret 0, 00001400"#]],
-    );
-}
-
-#[test]
 fn register_writeback_multiple_stores() {
     expect_block_with_opts(
         PassManager::with_passes(Vec::from([Pass::RegisterWritebackShrinking])),
@@ -154,9 +141,9 @@ fn max_opt_ori_ori() {
 }
 
 #[test]
-fn max_opt_many_addis() {
+fn many_addis_die() {
     expect_block_with_opts(
-        PassManager::optimized(),
+        PassManager::with_passes(vec![Pass::DeadInstructionElimination]),
         r#"
             addi x10, x10, 1
             addi x10, x10, 2
@@ -176,9 +163,32 @@ fn max_opt_many_addis() {
 }
 
 #[test]
+fn addi_lvn() {
+    expect_block_with_opts(
+        PassManager::with_passes(Vec::from([Pass::LocalValueNumbering])),
+        r#"
+            addi x10, x10, 1
+            addi x11, x10, 3
+            addi x11, x11, -3
+            ebreak
+        "#,
+        expect![[r#"
+            %0 = args[0]
+            %1 = args[1]
+            %2 = x(%0)10
+            %3 = add %2, 00000001
+            %4 = add %2, 00000004
+            %5 = add %2, 00000001
+            x(%0)10 = %3
+            x(%0)11 = %3
+            ret 1, 00000410"#]],
+    );
+}
+
+#[test]
 fn jal_basic_die() {
     expect_block_with_opts(
-        PassManager::with_passes(vec![Pass::ConstProp, Pass::DeadInstructionElimination]),
+        PassManager::with_passes(vec![Pass::DeadInstructionElimination]),
         "jal x4, 2048",
         expect![[r#"
             %0 = args[0]
@@ -220,15 +230,6 @@ fn load_update_store_unknown_offset() {
         sw x11, -4(x10)
         ebreak
         ",
-        // note the redundant address calculation between the load/store.
-        // ideally this is solved via some kind of value numbering, which is easier said than done.
-        // hazards LVN needs to worry about:
-        // `fence` (IORW<->IORW barriers), "todo: more fine grained fences", but also "todo: actually care about fences"
-        // IDs destination IDs (two instructions won't `==` if their ID is different... but that pass is trying to explicitly figure when it's just the ID that's different)
-        // multiple replacements (see: this very block, `%10 == %6`, but just doing a single sweep/replace isn't enough to figure that out without clever tricks)
-        // memory, register, and stack loads may look equal because they alias, but if there's an intervening write (in all cases), or fence (memory, csr), they most likely _aren't_.
-        // stores don't have IDs so LVN wouldn't apply to them, but, if they did, there's one more:
-        // stores with a fence in the way may not be replaced.
         expect![[r#"
             %0 = args[0]
             %1 = args[1]

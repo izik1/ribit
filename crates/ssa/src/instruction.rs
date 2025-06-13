@@ -337,8 +337,15 @@ impl CmpArgs {
             (AnySource::Const(src1), AnySource::Const(src2)) => {
                 return Err(eval::icmp(src1, src2, op));
             }
+
             (src1 @ AnySource::Const(_), AnySource::Ref(src2)) => (src2, src1, op.swap()),
-            (AnySource::Ref(src1), src2) => (src1, src2, op),
+
+            (AnySource::Ref(src1), AnySource::Ref(src2)) if src1.id <= src2.id => {
+                (src1, AnySource::Ref(src2), op)
+            }
+            (src1 @ AnySource::Ref(_), AnySource::Ref(src2)) => (src2, src1, op.swap()),
+
+            (AnySource::Ref(src1), src2 @ AnySource::Const(_)) => (src1, src2, op),
         };
 
         Ok(Self { src1, src2, op: kind })

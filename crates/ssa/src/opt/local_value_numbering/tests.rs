@@ -86,7 +86,6 @@ fn add_sll_equivalent() {
     );
 }
 
-// this is currently a negative test, but the only thing stopping this from working is the pass not being smart enough.
 #[test]
 fn cmp_equivalent_eq() {
     expect_block_with_opts(
@@ -116,18 +115,15 @@ fn cmp_equivalent_eq() {
             %2 = x(%0)10
             %3 = x(%0)11
             %4 = cmp eq %2, %3
-            %5 = cmp eq %3, %2
             %6 = x(%0)12
             %7 = x(%0)13
             %8 = select %4, %6, %7
-            %9 = select %5, %6, %7
             x(%0)10 = %8
-            x(%0)11 = %9
+            x(%0)11 = %8
             ret 0, 00000400"#]],
     );
 }
 
-// this is currently a negative test, but the only thing stopping this from working is the pass not being smart enough.
 #[test]
 fn cmp_equivalent_inequality_same() {
     expect_block_with_opts(
@@ -168,7 +164,6 @@ fn cmp_equivalent_inequality_same() {
     );
 }
 
-// this is currently a negative test, but the only thing stopping this from working is the pass not being smart enough.
 #[test]
 fn cmp_equivalent_inequality_mirrored() {
     expect_block_with_opts(
@@ -197,11 +192,9 @@ fn cmp_equivalent_inequality_mirrored() {
             %2 = x(%0)10
             %3 = x(%0)11
             %4 = cmp ult %2, %3
-            %5 = cmp ugt %3, %2
             %6 = select %4, %2, %3
-            %7 = select %5, %2, %3
             x(%0)10 = %6
-            x(%0)11 = %7
+            x(%0)11 = %6
             ret 0, 00000400"#]],
     );
 }
@@ -240,7 +233,7 @@ fn cmp_non_equivalent_eq() {
             %3 = x(%0)11
             %4 = cmp eq %2, %3
             %5 = x(%0)12
-            %6 = cmp eq %5, %2
+            %6 = cmp eq %2, %5
             %7 = x(%0)13
             %8 = select %4, %5, %7
             %9 = select %6, %5, %7
@@ -278,7 +271,7 @@ fn cmp_non_equivalent_inequality_same() {
             %2 = x(%0)10
             %3 = x(%0)11
             %4 = cmp ult %2, %3
-            %5 = cmp ult %3, %2
+            %5 = cmp ugt %2, %3
             %6 = select %4, %2, %3
             %7 = select %5, %2, %3
             x(%0)10 = %6
