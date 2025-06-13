@@ -4,8 +4,8 @@ use ribit_core::{Width, register};
 
 use crate::reference::Reference;
 use crate::{
-    AnySource, Arg, CmpKind, CommutativeBinOp, Id, ShiftOp, Source, SourcePair, StackIndex, Type,
-    eval, ty,
+    AnySource, Arg, CmpKind, CommutativeBinOp, Constant, Id, ShiftOp, Source, SourcePair,
+    StackIndex, Type, eval, ty,
 };
 
 mod ext_int;
@@ -278,6 +278,57 @@ pub struct BinaryArgs<T> {
 }
 
 pub type CommutativeBinArgs = BinaryArgs<CommutativeBinOp>;
+
+impl CommutativeBinArgs {
+    pub fn new(op: CommutativeBinOp, src1: AnySource, src2: AnySource) -> Result<Self, AnySource> {
+        /// Reassociate by doing... nothing.
+        #[inline(always)]
+        fn reassociate_id(_: CommutativeBinOp, r: Reference, c: Constant) -> (Reference, Constant) {
+            (r, c)
+        }
+
+        Self::new_assoc(op, src1, src2, reassociate_id)
+    }
+
+    pub fn new_assoc<F>(
+        op: CommutativeBinOp,
+        src1: AnySource,
+        src2: AnySource,
+        reassociate: F,
+    ) -> Result<Self, AnySource>
+    where
+        F: FnOnce(CommutativeBinOp, Reference, Constant) -> (Reference, Constant),
+    {
+        assert_eq!(src1.ty(), src2.ty());
+
+        let (src1, src2) = match (src1, src2) {
+            (AnySource::Const(src1), AnySource::Const(src2)) => {
+                return Err(AnySource::Const(eval::commutative_binop(src1, src2, op)));
+            }
+            (AnySource::Const(c), AnySource::Ref(r)) | (AnySource::Ref(r), AnySource::Const(c)) => {
+                let (r, c) = reassociate(op, r, c);
+                (r, AnySource::Const(c))
+            }
+            (AnySource::Ref(src1), AnySource::Ref(src2)) if src1.id <= src2.id => {
+                (src1, AnySource::Ref(src2))
+            }
+            (src1 @ AnySource::Ref(_), AnySource::Ref(src2)) => (src2, src1),
+        };
+
+        let args = BinaryArgs { src1, src2, op };
+
+        let res = eval::commutative_absorb(args)
+            .map(AnySource::Const)
+            .or_else(|| eval::commutative_identity(args).map(AnySource::Ref));
+
+        if let Some(it) = res {
+            return Err(it);
+        }
+
+        Ok(Self { src1, src2, op })
+    }
+}
+
 pub type CmpArgs = BinaryArgs<CmpKind>;
 
 impl CmpArgs {

@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use ribit_core::Width;
 
-use crate::instruction::{self, BinaryArgs, CmpArgs};
+use crate::instruction::{self, BinaryArgs, CmpArgs, CommutativeBinArgs};
 use crate::reference::{Ref, Reference};
 use crate::ty::ConstTy;
 use crate::{
@@ -34,7 +34,7 @@ pub(crate) enum EquivalenceInstruction {
     Sub { src1: AnySource, src2: Reference },
     Cmp { args: CmpArgs },
     // if src1 and src2 are both references, the lower IDed one must go first (just to pick one so that the equivalence relation works)
-    CommutativeBinOp { src1: Reference, src2: AnySource, op: CommutativeBinOp },
+    CommutativeBinOp { args: CommutativeBinArgs },
     // todo: box this
     Select(Select),
     ExtInt(ExtInt),
@@ -188,20 +188,13 @@ fn run_instruction(context: &Context, instruction: &mut Instruction) -> Option<A
                 (AnySource::Ref(src1), AnySource::Const(src2)) => {
                     let src2 = AnySource::Const(eval::neg(src2));
 
-                    let dest = *dest;
-                    *instruction = Instruction::CommutativeBinOp {
-                        dest,
-                        args: BinaryArgs { src1, src2, op: CommutativeBinOp::Add },
-                    };
+                    let mut args = BinaryArgs { src1, src2, op: CommutativeBinOp::Add };
 
-                    return Some(Action::AddEquivalence {
-                        equivalence: EquivalenceInstruction::CommutativeBinOp {
-                            src1,
-                            src2,
-                            op: CommutativeBinOp::Add,
-                        },
-                        value_number: reference(dest),
-                    });
+                    let action = commutative_binop(context, reference(*dest), &mut args);
+
+                    *instruction = Instruction::CommutativeBinOp { dest: *dest, args };
+
+                    return action;
                 }
             };
 
@@ -229,38 +222,8 @@ fn run_instruction(context: &Context, instruction: &mut Instruction) -> Option<A
                 Err(value) => Some(Action::constify(*dest, ty::Constant::Bool(value))),
             }
         }
-        Instruction::CommutativeBinOp { dest, args: BinaryArgs { src1, src2, op } } => {
-            let lhs = context.lookup(AnySource::Ref(*src1));
-            let rhs = context.lookup(*src2);
-
-            (*src1, *src2) = match (lhs, rhs) {
-                (AnySource::Const(src1), AnySource::Const(src2)) => {
-                    return Some(Action::constify(*dest, eval::commutative_binop(src1, src2, *op)));
-                }
-                (AnySource::Ref(src1), src2 @ AnySource::Const(_))
-                | (src2 @ AnySource::Const(_), AnySource::Ref(src1)) => (src1, src2),
-                (AnySource::Ref(src1), AnySource::Ref(src2)) if src1.id <= src2.id => {
-                    (src1, AnySource::Ref(src2))
-                }
-                (src1 @ AnySource::Ref(_), AnySource::Ref(src2)) => (src2, src1),
-            };
-
-            let res = eval::commutative_absorb(*src1, *src2, *op)
-                .map(AnySource::Const)
-                .or_else(|| eval::commutative_identity(*src1, *src2, *op).map(AnySource::Ref));
-
-            if let Some(res) = res {
-                return Some(Action::Map { old: *dest, new: res });
-            }
-
-            Some(Action::AddEquivalence {
-                equivalence: EquivalenceInstruction::CommutativeBinOp {
-                    src1: *src1,
-                    src2: *src2,
-                    op: *op,
-                },
-                value_number: reference(*dest),
-            })
+        Instruction::CommutativeBinOp { dest, args } => {
+            commutative_binop(context, reference(*dest), args)
         }
         Instruction::Select(instruction::Select { dest, cond, if_true, if_false }) => {
             *if_true = context.lookup(*if_true);
@@ -308,6 +271,28 @@ fn run_instruction(context: &Context, instruction: &mut Instruction) -> Option<A
         }
         Instruction::Fence => None,
     }
+}
+
+fn commutative_binop(
+    context: &Context,
+    dest: Reference,
+    args: &mut CommutativeBinArgs,
+) -> Option<Action> {
+    let new_args = CommutativeBinArgs::new(
+        args.op,
+        context.lookup(AnySource::Ref(args.src1)),
+        context.lookup(args.src2),
+    );
+
+    *args = match new_args {
+        Ok(args) => args,
+        Err(res) => return Some(Action::Map { old: dest.id, new: res }),
+    };
+
+    Some(Action::AddEquivalence {
+        equivalence: EquivalenceInstruction::CommutativeBinOp { args: *args },
+        value_number: dest,
+    })
 }
 
 pub fn run(block: &mut Block) {

@@ -4,7 +4,7 @@ mod tests;
 use ribit_core::{ReturnCode, Width, instruction, opcode, register};
 
 use super::{AnySource, CmpKind, Id, Instruction, ShiftOp};
-use crate::instruction::{BinaryArgs, CmpArgs, ExtInt, Select};
+use crate::instruction::{CmpArgs, CommutativeBinArgs, ExtInt, Select};
 use crate::reference::Reference;
 use crate::ty::{self, ConstTy, Constant};
 use crate::{Arg, Block, CommutativeBinOp, IdAllocator, Ref, Source, SourcePair, Terminator, eval};
@@ -117,31 +117,14 @@ impl Context {
         src1: AnySource,
         src2: AnySource,
     ) -> AnySource {
-        assert_eq!(src1.ty(), src2.ty());
+        let args = CommutativeBinArgs::new_assoc(op, src1, src2, |op, r, c| {
+            try_associate(&self.instructions, op, r, c)
+        });
 
-        let (src1, src2) = match (src1, src2) {
-            (AnySource::Const(src1), AnySource::Const(src2)) => {
-                return AnySource::Const(eval::commutative_binop(src1, src2, op));
-            }
-            (AnySource::Const(c), AnySource::Ref(r)) | (AnySource::Ref(r), AnySource::Const(c)) => {
-                let (r, c) = try_associate(&self.instructions, op, r, c);
-                (r, AnySource::Const(c))
-            }
-            (AnySource::Ref(src1), src2 @ AnySource::Ref(_)) => (src1, src2),
-        };
-
-        let res = eval::commutative_absorb(src1, src2, op)
-            .map(AnySource::Const)
-            .or_else(|| eval::commutative_identity(src1, src2, op).map(AnySource::Ref));
-
-        if let Some(it) = res {
-            return it;
+        match args {
+            Ok(args) => self.instruction(|dest| Instruction::CommutativeBinOp { dest, args }),
+            Err(res) => res,
         }
-
-        self.instruction(|dest| Instruction::CommutativeBinOp {
-            dest,
-            args: BinaryArgs { src1, src2, op },
-        })
     }
 
     pub fn shift(&mut self, op: ShiftOp, src1: AnySource, src2: AnySource) -> AnySource {

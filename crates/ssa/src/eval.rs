@@ -1,16 +1,14 @@
 use core::fmt;
 
 use crate::icmp::PartialICmp;
+use crate::instruction::CommutativeBinArgs;
 use crate::reference::Reference;
 use crate::ty::{self, Constant, Int};
 use crate::{AnySource, Bitness, CmpKind, CommutativeBinOp, ShiftOp};
 
 #[must_use]
-pub fn commutative_identity(
-    lhs: Reference,
-    rhs: AnySource,
-    op: CommutativeBinOp,
-) -> Option<Reference> {
+pub fn commutative_identity(args: CommutativeBinArgs) -> Option<Reference> {
+    let CommutativeBinArgs { src1: lhs, src2: rhs, op } = args;
     assert_eq!(lhs.ty, rhs.ty());
 
     match (rhs, op) {
@@ -37,11 +35,8 @@ pub fn commutative_identity(
 }
 
 #[must_use]
-pub fn commutative_absorb(
-    lhs: Reference,
-    rhs: AnySource,
-    op: CommutativeBinOp,
-) -> Option<Constant> {
+pub fn commutative_absorb(args: CommutativeBinArgs) -> Option<Constant> {
+    let CommutativeBinArgs { src1: lhs, src2: rhs, op } = args;
     let c = match (rhs, op) {
         (AnySource::Const(Constant::Int(i)), CommutativeBinOp::And) if i.unsigned() == 0 => {
             Constant::Int(i)

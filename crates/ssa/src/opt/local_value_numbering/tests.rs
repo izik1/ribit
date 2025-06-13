@@ -182,7 +182,7 @@ fn cmp_equivalent_inequality_mirrored() {
             let cmp_a =
                 context.cmp(reg_a, reg_b, crate::CmpKind::Inequality(crate::Inequality::Ult));
             let cmp_b =
-                context.cmp(reg_b, reg_a, crate::CmpKind::Inequality(crate::Inequality::Uge));
+                context.cmp(reg_b, reg_a, crate::CmpKind::Inequality(crate::Inequality::Ugt));
 
             let out_a = context.select(cmp_a, reg_a, reg_b);
             let out_b = context.select(cmp_b, reg_a, reg_b);
@@ -197,7 +197,7 @@ fn cmp_equivalent_inequality_mirrored() {
             %2 = x(%0)10
             %3 = x(%0)11
             %4 = cmp ult %2, %3
-            %5 = cmp uge %3, %2
+            %5 = cmp ugt %3, %2
             %6 = select %4, %2, %3
             %7 = select %5, %2, %3
             x(%0)10 = %6
@@ -300,7 +300,7 @@ fn cmp_non_equivalent_inequality_mirrored() {
             let cmp_a =
                 context.cmp(reg_a, reg_b, crate::CmpKind::Inequality(crate::Inequality::Ult));
             let cmp_b =
-                context.cmp(reg_b, reg_a, crate::CmpKind::Inequality(crate::Inequality::Ult));
+                context.cmp(reg_a, reg_b, crate::CmpKind::Inequality(crate::Inequality::Ugt));
 
             let out_a = context.select(cmp_a, reg_a, reg_b);
             let out_b = context.select(cmp_b, reg_a, reg_b);
@@ -315,7 +315,7 @@ fn cmp_non_equivalent_inequality_mirrored() {
             %2 = x(%0)10
             %3 = x(%0)11
             %4 = cmp ult %2, %3
-            %5 = cmp ult %3, %2
+            %5 = cmp ugt %2, %3
             %6 = select %4, %2, %3
             %7 = select %5, %2, %3
             x(%0)10 = %6
