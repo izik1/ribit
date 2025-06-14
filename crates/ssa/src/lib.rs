@@ -146,6 +146,15 @@ impl CmpKind {
     }
 
     #[must_use]
+    pub const fn include_eq(self) -> bool {
+        match self {
+            CmpKind::Eq => true,
+            CmpKind::Ne => false,
+            CmpKind::Inequality(it) => it.include_eq(),
+        }
+    }
+
+    #[must_use]
     pub fn swap(self) -> Self {
         match self {
             // equality is symmetric.

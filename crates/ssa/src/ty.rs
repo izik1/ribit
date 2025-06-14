@@ -84,6 +84,48 @@ pub enum Constant {
 }
 
 impl Constant {
+    #[inline(always)]
+    #[must_use]
+    pub const fn umin(ty: Type) -> Self {
+        match ty {
+            Type::Int(bitness) => Self::Int(Int::umin(bitness)),
+            Type::Boolean => Self::Bool(false),
+            Type::Unit => panic!("invalid type for constant: Unit"),
+        }
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub const fn umax(ty: Type) -> Self {
+        match ty {
+            Type::Int(bitness) => Self::Int(Int::umax(bitness)),
+            Type::Boolean => Self::Bool(true),
+            Type::Unit => panic!("invalid type for constant: Unit"),
+        }
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub const fn smin(ty: Type) -> Self {
+        match ty {
+            Type::Int(bitness) => Self::Int(Int::smin(bitness)),
+            Type::Boolean => Self::Bool(true),
+            Type::Unit => panic!("invalid type for constant: Unit"),
+        }
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub const fn smax(ty: Type) -> Self {
+        match ty {
+            Type::Int(bitness) => Self::Int(Int::smax(bitness)),
+            Type::Boolean => Self::Bool(false),
+            Type::Unit => panic!("invalid type for constant: Unit"),
+        }
+    }
+
+    
+
     #[must_use]
     pub const fn i32(v: u32) -> Self {
         Self::Int(Int::i32(v))
@@ -100,6 +142,7 @@ impl Constant {
     }
 
     #[must_use]
+    #[inline(always)]
     pub const fn ty(self) -> Type {
         match self {
             Constant::Int(it) => it.ty(),
@@ -151,6 +194,36 @@ impl fmt::Display for Constant {
 pub struct Int(pub Bitness, pub u32);
 
 impl Int {
+    #[inline(always)]
+    #[must_use]
+    pub const fn zero(bitness: Bitness) -> Self {
+        Self(bitness, 0)
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub const fn umin(bitness: Bitness) -> Self {
+        Self::zero(bitness)
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub const fn umax(bitness: Bitness) -> Self {
+        Self(bitness, bitness.mask())
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub const fn smin(bitness: Bitness) -> Self {
+        Self(bitness, i32::MIN.cast_unsigned() & bitness.mask())
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub const fn smax(bitness: Bitness) -> Self {
+        Self(bitness, i32::MAX.cast_unsigned() & bitness.mask())
+    }
+
     #[must_use]
     pub const fn i32(v: u32) -> Self {
         Self(Bitness::B32, v)
@@ -167,6 +240,7 @@ impl Int {
     }
 
     #[must_use]
+    #[inline(always)]
     pub const fn ty(self) -> Type {
         Type::Int(self.0)
     }

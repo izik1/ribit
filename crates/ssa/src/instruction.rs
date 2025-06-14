@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::fmt;
 
 use ribit_core::{Width, register};
@@ -333,21 +334,28 @@ pub type CmpArgs = BinaryArgs<CmpKind>;
 
 impl CmpArgs {
     pub fn new(src1: AnySource, src2: AnySource, op: CmpKind) -> Result<Self, bool> {
-        let (src1, src2, kind) = match (src1, src2) {
+        let (src1, src2, op) = match (src1, src2) {
             (AnySource::Const(src1), AnySource::Const(src2)) => {
                 return Err(eval::icmp(src1, src2, op));
             }
 
             (src1 @ AnySource::Const(_), AnySource::Ref(src2)) => (src2, src1, op.swap()),
 
-            (AnySource::Ref(src1), AnySource::Ref(src2)) if src1.id <= src2.id => {
-                (src1, AnySource::Ref(src2), op)
-            }
-            (src1 @ AnySource::Ref(_), AnySource::Ref(src2)) => (src2, src1, op.swap()),
+            (AnySource::Ref(src1), AnySource::Ref(src2)) => match src1.id.cmp(&src2.id) {
+                Ordering::Less => (src1, AnySource::Ref(src2), op),
+                Ordering::Equal => return Err(op.include_eq()),
+                Ordering::Greater => (src2, AnySource::Ref(src1), op.swap()),
+            },
 
             (AnySource::Ref(src1), src2 @ AnySource::Const(_)) => (src1, src2, op),
         };
 
-        Ok(Self { src1, src2, op: kind })
+        if let AnySource::Const(src2) = src2
+            && let Some(res) = eval::icmp_constant(src2, op)
+        {
+            return Err(res);
+        }
+
+        Ok(Self { src1, src2, op })
     }
 }

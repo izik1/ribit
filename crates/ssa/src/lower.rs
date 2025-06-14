@@ -234,6 +234,8 @@ impl Context {
     }
 
     pub fn cmp(&mut self, src1: AnySource, src2: AnySource, kind: CmpKind) -> Source<ty::Bool> {
+        assert_eq!(src1.ty(), src2.ty());
+
         match CmpArgs::new(src1, src2, kind) {
             Ok(args) => self.typed_instruction(|dest| Instruction::Cmp { dest, args }),
             Err(c) => Source::Const(c),

@@ -50,24 +50,41 @@ struct Context {
 
 impl Context {
     #[must_use]
-    fn lookup(&self, src: AnySource) -> AnySource {
-        match src {
-            src @ AnySource::Const(_) => src,
-            AnySource::Ref(it) => match self.value_map.get(&it.id).copied() {
-                Some(value) => value,
-                None => panic!(),
-            },
+    #[inline(always)]
+    fn lookup_id(&self, id: Id) -> AnySource {
+        match self.value_map.get(&id).copied() {
+            Some(value) => value,
+            None => panic!(),
         }
     }
 
     #[must_use]
+    #[inline(always)]
+    fn lookup_ref(&self, src: Reference) -> AnySource {
+        self.lookup_id(src.id)
+    }
+
+    #[must_use]
+    #[inline(always)]
+    fn lookup(&self, src: AnySource) -> AnySource {
+        match src {
+            src @ AnySource::Const(_) => src,
+            AnySource::Ref(it) => self.lookup_ref(it),
+        }
+    }
+
+    #[must_use]
+    #[inline(always)]
+    fn typed_lookup_ref<T: ConstTy>(&self, src: Ref<T>) -> Source<T> {
+        self.lookup_id(src.id).downcast().unwrap()
+    }
+
+    #[must_use]
+    #[inline(always)]
     fn typed_lookup<T: ConstTy>(&self, src: Source<T>) -> Source<T> {
         match src {
             src @ Source::Const(_) => src,
-            Source::Ref(it) => match self.value_map.get(&it).copied() {
-                Some(c) => c.downcast().unwrap(),
-                None => panic!(),
-            },
+            Source::Ref(id) => self.typed_lookup_ref(Ref::<T>::new(id)),
         }
     }
 
@@ -93,14 +110,17 @@ enum Action {
 }
 
 impl Action {
+    #[must_use]
     const fn identity(value: Reference) -> Self {
         Self::replace(value.id, value)
     }
 
+    #[must_use]
     const fn replace(old: Id, new: Reference) -> Self {
         Self::Map { old, new: AnySource::Ref(new) }
     }
 
+    #[must_use]
     const fn constify(old: Id, new: Constant) -> Self {
         Self::Map { old, new: AnySource::Const(new) }
     }
@@ -122,7 +142,7 @@ fn run_instruction(context: &Context, instruction: &mut Instruction) -> Option<A
             // in practice this instruction will almost certainly never be seen by this pass, because stack reads/writes get inserted by regalloc.
             // still a good idea to fix it though.
             *src = context
-                .lookup(AnySource::Ref(*src))
+                .lookup_ref(*src)
                 .reference()
                 .expect("fixme: handle src no longer being a reference");
 
@@ -155,7 +175,7 @@ fn run_instruction(context: &Context, instruction: &mut Instruction) -> Option<A
 
             None
         }
-        Instruction::ShiftOp { dest, src, op } => {
+        &mut Instruction::ShiftOp { dest, ref mut src, op } => {
             let lhs = context.lookup(src.lhs());
             let rhs = context.lookup(src.rhs());
 
@@ -164,20 +184,20 @@ fn run_instruction(context: &Context, instruction: &mut Instruction) -> Option<A
                     *src = new;
 
                     Some(Action::AddEquivalence {
-                        equivalence: EquivalenceInstruction::ShiftOp { src: *src, op: *op },
-                        value_number: reference(*dest),
+                        equivalence: EquivalenceInstruction::ShiftOp { src: *src, op },
+                        value_number: reference(dest),
                     })
                 }
-                Err((lhs, rhs)) => Some(Action::constify(*dest, eval::shift(lhs, rhs, *op))),
+                Err((lhs, rhs)) => Some(Action::constify(dest, eval::shift(lhs, rhs, op))),
             }
         }
-        Instruction::Sub { dest, src1, src2 } => {
+        &mut Instruction::Sub { dest, ref mut src1, ref mut src2 } => {
             let lhs = context.lookup(*src1);
-            let rhs = context.lookup(AnySource::Ref(*src2));
+            let rhs = context.lookup_ref(*src2);
 
             match (lhs, rhs) {
                 (AnySource::Const(lhs), AnySource::Const(rhs)) => {
-                    return Some(Action::constify(*dest, eval::sub(lhs, rhs)));
+                    return Some(Action::constify(dest, eval::sub(lhs, rhs)));
                 }
 
                 (lhs, AnySource::Ref(rhs)) => {
@@ -190,25 +210,22 @@ fn run_instruction(context: &Context, instruction: &mut Instruction) -> Option<A
 
                     let mut args = BinaryArgs { src1, src2, op: CommutativeBinOp::Add };
 
-                    let action = commutative_binop(context, reference(*dest), &mut args);
+                    let action = commutative_binop(context, reference(dest), &mut args);
 
-                    *instruction = Instruction::CommutativeBinOp { dest: *dest, args };
+                    *instruction = Instruction::CommutativeBinOp { dest, args };
 
-                    return action;
+                    return Some(action);
                 }
-            };
+            }
 
             Some(Action::AddEquivalence {
                 equivalence: EquivalenceInstruction::Sub { src1: *src1, src2: *src2 },
-                value_number: reference(*dest),
+                value_number: reference(dest),
             })
         }
-        Instruction::Cmp { dest, args } => {
-            let new = CmpArgs::new(
-                context.lookup(AnySource::Ref(args.src1)),
-                context.lookup(args.src2),
-                args.op,
-            );
+        &mut Instruction::Cmp { dest, ref mut args } => {
+            let new =
+                CmpArgs::new(context.lookup_ref(args.src1), context.lookup(args.src2), args.op);
 
             match new {
                 Ok(new) => {
@@ -216,20 +233,20 @@ fn run_instruction(context: &Context, instruction: &mut Instruction) -> Option<A
 
                     Some(Action::AddEquivalence {
                         equivalence: EquivalenceInstruction::Cmp { args: new },
-                        value_number: reference(*dest),
+                        value_number: reference(dest),
                     })
                 }
-                Err(value) => Some(Action::constify(*dest, ty::Constant::Bool(value))),
+                Err(value) => Some(Action::constify(dest, Constant::Bool(value))),
             }
         }
-        Instruction::CommutativeBinOp { dest, args } => {
-            commutative_binop(context, reference(*dest), args)
+        &mut Instruction::CommutativeBinOp { dest, ref mut args } => {
+            Some(commutative_binop(context, reference(dest), args))
         }
         Instruction::Select(instruction::Select { dest, cond, if_true, if_false }) => {
             *if_true = context.lookup(*if_true);
             *if_false = context.lookup(*if_false);
 
-            let replacement = match context.typed_lookup(cond.to_source()) {
+            let replacement = match context.typed_lookup_ref(*cond) {
                 Source::Const(true) => *if_true,
                 Source::Const(false) => *if_false,
                 Source::Ref(id) => {
@@ -249,35 +266,27 @@ fn run_instruction(context: &Context, instruction: &mut Instruction) -> Option<A
             Some(Action::Map { old: *dest, new: replacement })
         }
 
-        Instruction::ExtInt(instruction::ExtInt { dest, width, src, signed }) => {
-            *src = match context.lookup(AnySource::Ref(*src)) {
+        &mut Instruction::ExtInt(instruction::ExtInt { dest, width, ref mut src, signed }) => {
+            *src = match context.lookup_ref(*src) {
                 AnySource::Const(src) => {
                     return Some(Action::constify(
-                        *dest,
-                        Constant::Int(eval::extend_int(*width, src, *signed)),
+                        dest,
+                        Constant::Int(eval::extend_int(width, src, signed)),
                     ));
                 }
                 AnySource::Ref(src) => src,
             };
 
             Some(Action::AddEquivalence {
-                equivalence: EquivalenceInstruction::ExtInt(ExtInt {
-                    width: *width,
-                    src: *src,
-                    signed: *signed,
-                }),
-                value_number: reference(*dest),
+                equivalence: EquivalenceInstruction::ExtInt(ExtInt { width, src: *src, signed }),
+                value_number: reference(dest),
             })
         }
         Instruction::Fence => None,
     }
 }
 
-fn commutative_binop(
-    context: &Context,
-    dest: Reference,
-    args: &mut CommutativeBinArgs,
-) -> Option<Action> {
+fn commutative_binop(context: &Context, dest: Reference, args: &mut CommutativeBinArgs) -> Action {
     let new_args = CommutativeBinArgs::new(
         args.op,
         context.lookup(AnySource::Ref(args.src1)),
@@ -286,13 +295,13 @@ fn commutative_binop(
 
     *args = match new_args {
         Ok(args) => args,
-        Err(res) => return Some(Action::Map { old: dest.id, new: res }),
+        Err(res) => return Action::Map { old: dest.id, new: res },
     };
 
-    Some(Action::AddEquivalence {
+    Action::AddEquivalence {
         equivalence: EquivalenceInstruction::CommutativeBinOp { args: *args },
         value_number: dest,
-    })
+    }
 }
 
 pub fn run(block: &mut Block) {

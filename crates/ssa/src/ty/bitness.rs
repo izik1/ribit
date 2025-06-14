@@ -29,17 +29,24 @@ impl Bitness {
     }
 
     #[must_use]
-    pub fn to_width(self) -> Width {
+    pub const fn to_width(self) -> Width {
         self.0
     }
 
     #[must_use]
-    pub fn to_bits(self) -> u8 {
+    pub const fn to_bits(self) -> u8 {
         match self.0 {
             Width::Byte => 8,
             Width::Word => 16,
             Width::DWord => 32,
         }
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub const fn mask(self) -> u32 {
+        // can't do `(1 << bits) - 1` because of underflows.
+        if self.to_bits() >= 32 { u32::MAX } else { (1 << (self.to_bits() as u32)) - 1 }
     }
 }
 

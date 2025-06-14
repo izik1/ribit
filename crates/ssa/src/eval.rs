@@ -12,19 +12,12 @@ pub fn commutative_identity(args: CommutativeBinArgs) -> Option<Reference> {
     assert_eq!(lhs.ty, rhs.ty());
 
     match (rhs, op) {
-        (AnySource::Const(Constant::Int(i)), CommutativeBinOp::And) if i.signed() == -1 => {
-            Some(lhs)
-        }
-
-        (AnySource::Const(Constant::Bool(true)), CommutativeBinOp::And) => Some(lhs),
-        (AnySource::Const(Constant::Bool(false)), CommutativeBinOp::Xor | CommutativeBinOp::Or) => {
-            Some(lhs)
-        }
+        (AnySource::Const(c), CommutativeBinOp::And) if c == Constant::umax(c.ty()) => Some(lhs),
 
         (
-            AnySource::Const(Constant::Int(i)),
+            AnySource::Const(c),
             CommutativeBinOp::Xor | CommutativeBinOp::Add | CommutativeBinOp::Or,
-        ) if i.unsigned() == 0 => Some(lhs),
+        ) if c == Constant::umin(c.ty()) => Some(lhs),
 
         (AnySource::Ref(rhs), CommutativeBinOp::And | CommutativeBinOp::Or) if lhs.id == rhs.id => {
             Some(lhs)
@@ -38,22 +31,14 @@ pub fn commutative_identity(args: CommutativeBinArgs) -> Option<Reference> {
 pub fn commutative_absorb(args: CommutativeBinArgs) -> Option<Constant> {
     let CommutativeBinArgs { src1: lhs, src2: rhs, op } = args;
     let c = match (rhs, op) {
-        (AnySource::Const(Constant::Int(i)), CommutativeBinOp::And) if i.unsigned() == 0 => {
-            Constant::Int(i)
+        (AnySource::Const(c), CommutativeBinOp::And) if c == Constant::umin(c.ty()) => {
+            Constant::umin(c.ty())
+        }
+        (AnySource::Const(c), CommutativeBinOp::Or) if c == Constant::umax(c.ty()) => {
+            Constant::umax(c.ty())
         }
 
-        (AnySource::Const(Constant::Int(i)), CommutativeBinOp::Or) if i.signed() == -1 => {
-            Constant::Int(i)
-        }
-
-        (AnySource::Const(Constant::Bool(false)), CommutativeBinOp::And) => Constant::Bool(false),
-        (AnySource::Const(Constant::Bool(true)), CommutativeBinOp::Or) => Constant::Bool(true),
-
-        (AnySource::Ref(rhs), CommutativeBinOp::Xor) if lhs.id == rhs.id => match lhs.ty {
-            crate::Type::Int(b) => Constant::Int(Int(b, 0)),
-            crate::Type::Unit => panic!(),
-            crate::Type::Boolean => Constant::Bool(false),
-        },
+        (AnySource::Ref(rhs), CommutativeBinOp::Xor) if lhs.id == rhs.id => Constant::umin(lhs.ty),
 
         _ => return None,
     };
@@ -68,12 +53,7 @@ pub(crate) fn neg(v: Constant) -> Constant {
             // `-SIGNED_MIN` -> `-SIGNED_MIN` -> `+SIGNED_MIN as unsigned`, which is perfect,
             // it matches with what you'd expect for `0i8 - 128i8 -> 0 + (-128i8) -> 0 + 128u8`, likewise for bigger integers.
             // this will only actually trigger for 32 bit integers because those are the biggest we can store.
-            let val = it.signed().wrapping_neg().cast_unsigned();
-
-            // can't do `(1 << bits) - 1` because of underflows.
-            let mask = if it.bits() >= 32 { u32::MAX } else { (1 << u32::from(it.bits())) - 1 };
-
-            Constant::Int(Int(it.0, val & mask))
+            Constant::Int(Int(it.0, it.signed().wrapping_neg().cast_unsigned() & it.0.mask()))
         }
         Constant::Bool(_) => panic!("attempted to negate boolean"),
     }
@@ -81,14 +61,9 @@ pub(crate) fn neg(v: Constant) -> Constant {
 
 #[must_use]
 pub fn sub(lhs: Constant, rhs: Constant) -> Constant {
-    struct Op;
-    impl fmt::Display for Op {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            f.write_str("sub")
-        }
-    }
+    let (lhs, rhs) = int_consts(lhs, rhs, "sub");
 
-    u32_op_consts(|lhs, rhs, Op| lhs.wrapping_sub(rhs), lhs, rhs, Op)
+    Constant::Int(Int(lhs.0, lhs.unsigned().wrapping_sub(rhs.unsigned()) & lhs.0.mask()))
 }
 
 #[must_use]
@@ -96,52 +71,77 @@ pub fn icmp(lhs: Constant, rhs: Constant, kind: CmpKind) -> bool {
     lhs.partial_cmp_with(&rhs, kind).unwrap_or_else(|| ty::mismatch(lhs.ty(), rhs.ty()))
 }
 
+pub(crate) fn icmp_constant(src2: Constant, op: CmpKind) -> Option<bool> {
+    let inequality = match op {
+        // equal and not equal could be comparing to anything.
+        CmpKind::Eq | CmpKind::Ne => return None,
+        CmpKind::Inequality(inequality) => inequality,
+    };
+
+    // what does return a static value?
+    let (other, res) = match inequality {
+        // x u<  0    -> false
+        crate::Inequality::Ult => (Constant::umin(src2.ty()), false),
+        // x u<= umax -> true
+        crate::Inequality::Ule => (Constant::umax(src2.ty()), true),
+        // x u>  umax -> false
+        crate::Inequality::Ugt => (Constant::umax(src2.ty()), false),
+        // x u>= 0    -> true
+        crate::Inequality::Uge => (Constant::umin(src2.ty()), true),
+        // x s<  smin -> false
+        crate::Inequality::Slt => (Constant::smin(src2.ty()), false),
+        // x s<= smax -> true
+        crate::Inequality::Sle => (Constant::smax(src2.ty()), true),
+        // x s>  smax -> false
+        crate::Inequality::Sgt => (Constant::smax(src2.ty()), false),
+        // x s>= smin -> true
+        crate::Inequality::Sge => (Constant::smin(src2.ty()), true),
+    };
+
+    (src2 == other).then_some(res)
+}
+
 // todo: "just work with arbitrary constants of compatable types"
 #[must_use]
-pub fn shift(src1: Constant, src2: Constant, op: ShiftOp) -> Constant {
-    u32_op_consts(shift_u32, src1, src2, op)
+pub fn shift(lhs: Constant, rhs: Constant, op: ShiftOp) -> Constant {
+    let (lhs, rhs) = int_consts(lhs, rhs, op);
+
+    let rhs = rhs.unsigned() & u32::from(lhs.0.to_bits() - 1);
+
+    let value = match op {
+        ShiftOp::Sll => lhs.unsigned() << rhs,
+        ShiftOp::Srl => lhs.unsigned() >> rhs,
+        ShiftOp::Sra => (lhs.signed() >> rhs).cast_unsigned(),
+    };
+
+    Constant::Int(Int(lhs.0, value & lhs.0.mask()))
 }
 
 #[must_use]
-fn shift_u32(src1: u32, src2: u32, op: ShiftOp) -> u32 {
-    match op {
-        ShiftOp::Sll => src1 << (src2 & 0x1f),
-        ShiftOp::Srl => src1 >> (src2 & 0x1f),
-        ShiftOp::Sra => ((src1 as i32) >> (src2 & 0x1f)) as u32,
-    }
-}
-
-#[must_use]
-fn u32_op_consts<O, F>(f: F, src1: Constant, src2: Constant, op: O) -> Constant
+#[track_caller]
+fn int_consts<O>(lhs: Constant, rhs: Constant, op: O) -> (Int, Int)
 where
-    F: FnOnce(u32, u32, O) -> u32,
     O: fmt::Display,
 {
-    match (src1, src2) {
-        (Constant::Int(Int(Bitness::B32, lhs)), Constant::Int(Int(Bitness::B32, rhs))) => {
-            Constant::i32(f(lhs, rhs, op))
-        }
-
-        (lhs, rhs) => {
-            panic!("unsupported operation `{op}` between types: ({},{})", lhs.ty(), rhs.ty())
-        }
+    match (lhs, rhs) {
+        (Constant::Int(lhs), Constant::Int(rhs)) if lhs.ty() == rhs.ty() => (lhs, rhs),
+        _ => panic!("unsupported operation `{op}` between types: ({},{})", lhs.ty(), rhs.ty()),
     }
 }
 
 // todo: "just work with arbitrary constants of compatable types"
 #[must_use]
-pub fn commutative_binop(src1: Constant, src2: Constant, op: CommutativeBinOp) -> Constant {
-    u32_op_consts(commutative_binop_u32, src1, src2, op)
-}
+pub fn commutative_binop(lhs: Constant, rhs: Constant, op: CommutativeBinOp) -> Constant {
+    let (lhs, rhs) = int_consts(lhs, rhs, op);
 
-#[must_use]
-fn commutative_binop_u32(src1: u32, src2: u32, op: CommutativeBinOp) -> u32 {
-    match op {
-        CommutativeBinOp::And => src1 & src2,
-        CommutativeBinOp::Add => src1.wrapping_add(src2),
-        CommutativeBinOp::Or => src1 | src2,
-        CommutativeBinOp::Xor => src1 ^ src2,
-    }
+    let val = match op {
+        CommutativeBinOp::And => lhs.1 & rhs.1,
+        CommutativeBinOp::Add => lhs.1.wrapping_add(rhs.1),
+        CommutativeBinOp::Or => lhs.1 | rhs.1,
+        CommutativeBinOp::Xor => lhs.1 ^ rhs.1,
+    };
+
+    Constant::Int(Int(lhs.0, val & lhs.0.mask()))
 }
 
 #[must_use]
@@ -173,8 +173,8 @@ mod test {
 
     #[test]
     fn sra_1() {
-        let res = super::shift_u32(0x8_0000 << 12, 0x8, ShiftOp::Sra);
-        assert_eq!(0xff80_0000, res);
+        let res = super::shift(Constant::i32(0x8_0000 << 12), Constant::i32(0x8), ShiftOp::Sra);
+        assert_eq!(Constant::i32(0xff80_0000), res);
     }
 
     #[test]
