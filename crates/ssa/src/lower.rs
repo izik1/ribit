@@ -9,14 +9,40 @@ use crate::reference::Reference;
 use crate::ty::{self, ConstTy, Constant};
 use crate::{Arg, Block, CommutativeBinOp, IdAllocator, Ref, Source, SourcePair, Terminator, eval};
 
-pub struct Context {
+struct CoreContext {
     id_allocator: IdAllocator,
+    instructions: Vec<Instruction>,
+}
+
+impl CoreContext {
+    fn instruction<F: FnOnce(Id) -> Instruction>(&mut self, f: F) -> AnySource {
+        let id = self.id_allocator.allocate();
+
+        let instr = f(id);
+        let ty = instr.ty();
+
+        self.instructions.push(instr);
+        AnySource::Ref(Reference { ty, id })
+    }
+
+    fn typed_instruction<T: ConstTy, F: FnOnce(Id) -> Instruction>(&mut self, f: F) -> Source<T> {
+        let id = self.id_allocator.allocate();
+
+        let instr = f(id);
+        assert_eq!(instr.ty(), T::TY);
+
+        self.instructions.push(instr);
+        Source::Ref(id)
+    }
+}
+
+pub struct Context {
+    core: CoreContext,
     pub pc: Source<ty::I32>,
     registers: [Option<AnySource>; 32],
     register_arg: Source<ty::I32>,
     memory_arg: Source<ty::I32>,
     registers_written: u32,
-    instructions: Vec<Instruction>,
     memory_size: u32,
 }
 
@@ -62,22 +88,22 @@ fn try_associate(
 impl Context {
     #[must_use]
     pub fn new(start_pc: u32, memory_size: u32) -> Self {
-        const REG_ID: Id = Id(0);
-        const MEM_ID: Id = Id(REG_ID.0 + 1);
-
         assert!(memory_size.is_power_of_two());
 
+        let mut core = CoreContext { id_allocator: IdAllocator::new(), instructions: Vec::new() };
+
+        let register_arg =
+            core.typed_instruction(|dest| Instruction::Arg { dest, src: Arg::Register });
+
+        let memory_arg = core.typed_instruction(|dest| Instruction::Arg { dest, src: Arg::Memory });
+
         Self {
-            id_allocator: const { IdAllocator::with_start(Id(MEM_ID.0 + 1)) },
+            core,
             pc: Source::Const(start_pc),
             registers: [None; 32],
-            register_arg: Source::Ref(REG_ID),
-            memory_arg: Source::Ref(MEM_ID),
+            register_arg,
+            memory_arg,
             registers_written: 0x0000_0000,
-            instructions: Vec::from([
-                Instruction::Arg { dest: REG_ID, src: Arg::Register },
-                Instruction::Arg { dest: MEM_ID, src: Arg::Memory },
-            ]),
             memory_size,
         }
     }
@@ -91,26 +117,6 @@ impl Context {
         self.pc = src;
     }
 
-    fn instruction<F: FnOnce(Id) -> Instruction>(&mut self, f: F) -> AnySource {
-        let id = self.id_allocator.allocate();
-
-        let instr = f(id);
-        let ty = instr.ty();
-
-        self.instructions.push(instr);
-        AnySource::Ref(Reference { ty, id })
-    }
-
-    fn typed_instruction<T: ConstTy, F: FnOnce(Id) -> Instruction>(&mut self, f: F) -> Source<T> {
-        let id = self.id_allocator.allocate();
-
-        let instr = f(id);
-        assert_eq!(instr.ty(), T::TY);
-
-        self.instructions.push(instr);
-        Source::Ref(id)
-    }
-
     pub fn commutative_binop(
         &mut self,
         op: CommutativeBinOp,
@@ -118,11 +124,11 @@ impl Context {
         src2: AnySource,
     ) -> AnySource {
         let args = CommutativeBinArgs::new_assoc(op, src1, src2, |op, r, c| {
-            try_associate(&self.instructions, op, r, c)
+            try_associate(&self.core.instructions, op, r, c)
         });
 
         match args {
-            Ok(args) => self.instruction(|dest| Instruction::CommutativeBinOp { dest, args }),
+            Ok(args) => self.core.instruction(|dest| Instruction::CommutativeBinOp { dest, args }),
             Err(res) => res,
         }
     }
@@ -139,7 +145,7 @@ impl Context {
         // doesn't work for sra without knowing the MSB, but it does work for sll, srl.
 
         let consts: (Constant, Constant) = match SourcePair::try_from((src1, src2)) {
-            Ok(src) => return self.instruction(|dest| Instruction::ShiftOp { dest, src, op }),
+            Ok(src) => return self.core.instruction(|dest| Instruction::ShiftOp { dest, src, op }),
             Err(consts) => consts,
         };
 
@@ -147,19 +153,9 @@ impl Context {
     }
 
     pub fn read_register(&mut self, reg: register::RiscV) -> AnySource {
-        self.registers[reg.get() as usize].unwrap_or_else(|| {
-            let id = self.id_allocator.allocate();
-            let instr = Instruction::ReadReg { dest: id, base: self.register_arg, src: reg };
-
-            let ty = instr.ty();
-
-            self.instructions.push(instr);
-
-            let r = AnySource::Ref(Reference { ty, id });
-
-            self.registers[reg.get() as usize] = Some(r);
-
-            r
+        *self.registers[reg.get() as usize].get_or_insert_with(|| {
+            let base = self.register_arg;
+            self.core.instruction(|dest| Instruction::ReadReg { dest, base, src: reg })
         })
     }
 
@@ -169,7 +165,7 @@ impl Context {
 
     pub fn read_memory(&mut self, src: AnySource, width: Width, sign_extend: bool) -> AnySource {
         let base = self.memory_arg;
-        self.instruction(|dest| Instruction::ReadMem { dest, src, base, width, sign_extend })
+        self.core.instruction(|dest| Instruction::ReadMem { dest, src, base, width, sign_extend })
     }
 
     pub fn write_register(&mut self, reg: register::RiscV, val: AnySource) {
@@ -188,12 +184,8 @@ impl Context {
     }
 
     pub fn write_memory(&mut self, addr: Source<ty::I32>, val: AnySource, width: Width) {
-        self.instructions.push(Instruction::WriteMem {
-            addr,
-            base: self.memory_arg,
-            src: val,
-            width,
-        });
+        let base = self.memory_arg;
+        self.core.instructions.push(Instruction::WriteMem { addr, base, src: val, width });
     }
 
     pub fn or(&mut self, src1: AnySource, src2: AnySource) -> AnySource {
@@ -230,14 +222,14 @@ impl Context {
             AnySource::Ref(src2) => src2,
         };
 
-        self.instruction(|dest| Instruction::Sub { dest, src1, src2 })
+        self.core.instruction(|dest| Instruction::Sub { dest, src1, src2 })
     }
 
     pub fn cmp(&mut self, src1: AnySource, src2: AnySource, kind: CmpKind) -> Source<ty::Bool> {
         assert_eq!(src1.ty(), src2.ty());
 
         match CmpArgs::new(src1, src2, kind) {
-            Ok(args) => self.typed_instruction(|dest| Instruction::Cmp { dest, args }),
+            Ok(args) => self.core.typed_instruction(|dest| Instruction::Cmp { dest, args }),
             Err(c) => Source::Const(c),
         }
     }
@@ -247,9 +239,9 @@ impl Context {
             AnySource::Const(src) => {
                 AnySource::Const(Constant::Int(eval::extend_int(width, src, signed)))
             }
-            AnySource::Ref(src) => {
-                self.instruction(|dest| Instruction::ExtInt(ExtInt { dest, width, src, signed }))
-            }
+            AnySource::Ref(src) => self
+                .core
+                .instruction(|dest| Instruction::ExtInt(ExtInt { dest, width, src, signed })),
         }
     }
 
@@ -262,7 +254,7 @@ impl Context {
         match cond {
             Source::Const(false) => if_false,
             Source::Const(true) => if_true,
-            Source::Ref(id) => self.instruction(|dest| {
+            Source::Ref(id) => self.core.instruction(|dest| {
                 Instruction::Select(Select { dest, if_true, if_false, cond: Ref::new(id) })
             }),
         }
@@ -275,7 +267,7 @@ impl Context {
     }
 
     pub fn fence(&mut self) {
-        self.instructions.push(Instruction::Fence);
+        self.core.instructions.push(Instruction::Fence);
     }
 
     #[must_use]
@@ -286,7 +278,7 @@ impl Context {
             if let Some(src) = *src
                 && (self.registers_written >> dest.get()) & 1 == 1
             {
-                self.instructions.push(Instruction::WriteReg {
+                self.core.instructions.push(Instruction::WriteReg {
                     dest,
                     base: self.register_arg,
                     src,
@@ -295,8 +287,8 @@ impl Context {
         }
 
         Block {
-            allocator: self.id_allocator,
-            instructions: self.instructions,
+            allocator: self.core.id_allocator,
+            instructions: self.core.instructions,
             terminator: Terminator::Ret { addr, code },
         }
     }
