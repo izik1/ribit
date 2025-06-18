@@ -53,7 +53,7 @@ pub(crate) fn neg(v: Constant) -> Constant {
             // `-SIGNED_MIN` -> `-SIGNED_MIN` -> `+SIGNED_MIN as unsigned`, which is perfect,
             // it matches with what you'd expect for `0i8 - 128i8 -> 0 + (-128i8) -> 0 + 128u8`, likewise for bigger integers.
             // this will only actually trigger for 32 bit integers because those are the biggest we can store.
-            Constant::Int(Int(it.0, it.signed().wrapping_neg().cast_unsigned() & it.0.mask()))
+            Constant::Int(Int::truncate(it.0, it.signed().wrapping_neg().cast_unsigned()))
         }
         Constant::Bool(_) => panic!("attempted to negate boolean"),
     }
@@ -63,7 +63,7 @@ pub(crate) fn neg(v: Constant) -> Constant {
 pub fn sub(lhs: Constant, rhs: Constant) -> Constant {
     let (lhs, rhs) = int_consts(lhs, rhs, "sub");
 
-    Constant::Int(Int(lhs.0, lhs.unsigned().wrapping_sub(rhs.unsigned()) & lhs.0.mask()))
+    Constant::Int(Int::truncate(lhs.0, lhs.unsigned().wrapping_sub(rhs.unsigned())))
 }
 
 #[must_use]
@@ -72,6 +72,8 @@ pub fn icmp(lhs: Constant, rhs: Constant, kind: CmpKind) -> bool {
 }
 
 pub(crate) fn icmp_constant(src2: Constant, op: CmpKind) -> Option<bool> {
+    use crate::Inequality;
+
     let inequality = match op {
         // equal and not equal could be comparing to anything.
         CmpKind::Eq | CmpKind::Ne => return None,
@@ -79,26 +81,25 @@ pub(crate) fn icmp_constant(src2: Constant, op: CmpKind) -> Option<bool> {
     };
 
     // what does return a static value?
-    let (other, res) = match inequality {
+    let other = match inequality {
         // x u<  0    -> false
-        crate::Inequality::Ult => (Constant::umin(src2.ty()), false),
-        // x u<= umax -> true
-        crate::Inequality::Ule => (Constant::umax(src2.ty()), true),
-        // x u>  umax -> false
-        crate::Inequality::Ugt => (Constant::umax(src2.ty()), false),
         // x u>= 0    -> true
-        crate::Inequality::Uge => (Constant::umin(src2.ty()), true),
+        Inequality::Ult | Inequality::Uge => Constant::umin(src2.ty()),
+
+        // x u<= umax -> true
+        // x u>  umax -> false
+        Inequality::Ule | Inequality::Ugt => Constant::umax(src2.ty()),
+
         // x s<  smin -> false
-        crate::Inequality::Slt => (Constant::smin(src2.ty()), false),
-        // x s<= smax -> true
-        crate::Inequality::Sle => (Constant::smax(src2.ty()), true),
-        // x s>  smax -> false
-        crate::Inequality::Sgt => (Constant::smax(src2.ty()), false),
         // x s>= smin -> true
-        crate::Inequality::Sge => (Constant::smin(src2.ty()), true),
+        Inequality::Slt | Inequality::Sge => Constant::smin(src2.ty()),
+
+        // x s<= smax -> true
+        // x s>  smax -> false
+        Inequality::Sle | Inequality::Sgt => Constant::smax(src2.ty()),
     };
 
-    (src2 == other).then_some(res)
+    (src2 == other).then_some(inequality.include_eq())
 }
 
 // todo: "just work with arbitrary constants of compatable types"
@@ -114,7 +115,7 @@ pub fn shift(lhs: Constant, rhs: Constant, op: ShiftOp) -> Constant {
         ShiftOp::Sra => (lhs.signed() >> rhs).cast_unsigned(),
     };
 
-    Constant::Int(Int(lhs.0, value & lhs.0.mask()))
+    Constant::Int(Int::truncate(lhs.0, value))
 }
 
 #[must_use]
@@ -141,7 +142,7 @@ pub fn commutative_binop(lhs: Constant, rhs: Constant, op: CommutativeBinOp) -> 
         CommutativeBinOp::Xor => lhs.1 ^ rhs.1,
     };
 
-    Constant::Int(Int(lhs.0, val & lhs.0.mask()))
+    Constant::Int(Int::truncate(lhs.0, val))
 }
 
 #[must_use]
@@ -163,18 +164,31 @@ pub fn extend_int(width: ribit_core::Width, src: Constant, signed: bool) -> Int 
             }
         }
     };
-    let value = value & (1 << (target_bitness.to_bits() - 1));
-    Int(target_bitness, value)
+
+    Int::truncate(target_bitness, value)
 }
 
 #[cfg(test)]
 mod test {
+    use ribit_core::Width;
+
     use crate::{Constant, ShiftOp};
 
     #[test]
     fn sra_1() {
         let res = super::shift(Constant::i32(0x8_0000 << 12), Constant::i32(0x8), ShiftOp::Sra);
         assert_eq!(Constant::i32(0xff80_0000), res);
+    }
+
+    #[test]
+    fn extend_int_signed_neg1() {
+        let res = super::extend_int(Width::DWord, Constant::i8(0xff), true);
+
+        assert_eq!(res.signed(), -1);
+
+        let res = super::extend_int(Width::DWord, Constant::Bool(true), true);
+
+        assert_eq!(res.signed(), -1)
     }
 
     #[test]

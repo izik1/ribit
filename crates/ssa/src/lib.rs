@@ -7,9 +7,9 @@
 )]
 #![warn(clippy::must_use_candidate, clippy::clone_on_copy)]
 
-use std::collections::BTreeMap;
 use std::fmt;
 
+use fnv::FnvHashMap;
 use instruction::CmpArgs;
 use reference::Ref;
 use ribit_core::{ReturnCode, opcode};
@@ -214,12 +214,12 @@ impl CommutativeBinOp {
 
 impl fmt::Display for CommutativeBinOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::And => f.write_str("and"),
-            Self::Add => f.write_str("add"),
-            Self::Or => f.write_str("or"),
-            Self::Xor => f.write_str("xor"),
-        }
+        f.write_str(match self {
+            Self::And => "and",
+            Self::Add => "add",
+            Self::Or => "or",
+            Self::Xor => "xor",
+        })
     }
 }
 
@@ -232,11 +232,11 @@ pub enum ShiftOp {
 
 impl fmt::Display for ShiftOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Sll => f.write_str("sll"),
-            Self::Srl => f.write_str("srl"),
-            Self::Sra => f.write_str("sra"),
-        }
+        f.write_str(match self {
+            Self::Sll => "sll",
+            Self::Srl => "srl",
+            Self::Sra => "sra",
+        })
     }
 }
 
@@ -385,8 +385,9 @@ pub fn assert_well_formed(graph: &Block) {
         };
     }
 
-    let mut args = BTreeMap::new();
-    let mut ids = BTreeMap::new();
+    let mut args = FnvHashMap::default();
+    let mut ids =
+        FnvHashMap::with_capacity_and_hasher(graph.instructions.len(), Default::default());
 
     for (idx, instruction) in graph.instructions.iter().enumerate() {
         if let Instruction::Arg { dest, src } = instruction {

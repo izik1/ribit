@@ -29,11 +29,6 @@ impl Bitness {
     }
 
     #[must_use]
-    pub const fn to_width(self) -> Width {
-        self.0
-    }
-
-    #[must_use]
     pub const fn to_bits(self) -> u8 {
         match self.0 {
             Width::Byte => 8,

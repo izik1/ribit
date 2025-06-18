@@ -124,8 +124,6 @@ impl Constant {
         }
     }
 
-    
-
     #[must_use]
     pub const fn i32(v: u32) -> Self {
         Self::Int(Int::i32(v))
@@ -215,13 +213,19 @@ impl Int {
     #[inline(always)]
     #[must_use]
     pub const fn smin(bitness: Bitness) -> Self {
-        Self(bitness, i32::MIN.cast_unsigned() & bitness.mask())
+        Self::truncate(bitness, i32::MIN.cast_unsigned())
     }
 
     #[inline(always)]
     #[must_use]
     pub const fn smax(bitness: Bitness) -> Self {
-        Self(bitness, i32::MAX.cast_unsigned() & bitness.mask())
+        Self::truncate(bitness, i32::MAX.cast_unsigned())
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub const fn truncate(bitness: Bitness, value: u32) -> Self {
+        Self(bitness, value & bitness.mask())
     }
 
     #[must_use]
