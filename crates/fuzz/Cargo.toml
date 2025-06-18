@@ -23,14 +23,13 @@ workspace = true
 [[bin]]
 bench = false
 doc = false
-name = "ribit-asm-fuzz"
-path = "fuzz_targets/ribit-asm-fuzz.rs"
+name = "asm-fuzz"
+path = "fuzz_targets/asm-fuzz.rs"
 test = false
-
 
 [[bin]]
 bench = false
 doc = false
-name = "ribit-ssa-lower-fuzz"
-path = "fuzz_targets/ribit-ssa-lower-fuzz.rs"
+name = "ssa-lower-fuzz"
+path = "fuzz_targets/ssa-lower-fuzz.rs"
 test = false

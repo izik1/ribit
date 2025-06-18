@@ -11,9 +11,10 @@ use rand::distr::{Bernoulli, Distribution, StandardUniform};
 use rand::seq::{IndexedMutRandom, SliceRandom};
 use rand::{Rng, SeedableRng};
 use ribit_core::instruction::{self, Instruction};
-use ribit_core::{Width, opcode, register};
+use ribit_core::{ReturnCode, Width, opcode, register};
 use ribit_ssa::opt::PassManager;
 use ribit_ssa::opt::pass_manager::{InplacePass, Pass};
+use ribit_ssa::{AnySource, Block, Constant};
 
 #[must_use]
 const fn sign_extend<const BITS: u8>(value: u16) -> u16 {
@@ -62,8 +63,8 @@ fn parse_strict(mut data: &[u8]) -> Result<Vec<instruction::Info>, ()> {
     Ok(instructions)
 }
 
-fn parse(mut data: &[u8]) -> (Vec<instruction::Info>, instruction::Info) {
-    let mut instructions = Vec::with_capacity(data.len() / 2);
+fn parse(mut data: &[u8]) -> Block {
+    let mut ctx = ribit_ssa::lower::Context::new(1024, 2_u32.pow(20));
 
     while let Some((small, rest)) = data.split_at_checked(2) {
         let info = if small[0] & 0b11 == 0b11 {
@@ -85,14 +86,32 @@ fn parse(mut data: &[u8]) -> (Vec<instruction::Info>, instruction::Info) {
         };
 
         if info.instruction.is_terminator() {
-            return (instructions, info);
+            return ribit_ssa::lower::terminal(ctx, info.instruction, info.len);
         }
 
-        instructions.push(info);
-        //
+        match info.instruction {
+            Instruction::R(instruction::R {
+                rs1: _,
+                rs2: _,
+                rd: _,
+                opcode:
+                    opcode::R::MUL
+                    | opcode::R::MULH
+                    | opcode::R::MULHSU
+                    | opcode::R::MULHU
+                    | opcode::R::DIV
+                    | opcode::R::DIVU
+                    | opcode::R::REM
+                    | opcode::R::REMU,
+            }) => continue,
+            _ => {}
+        }
+
+        ribit_ssa::lower::non_terminal(&mut ctx, info.instruction, info.len);
     }
 
-    (instructions, instruction::Info { instruction: EBREAK, len: 4 })
+    let addr = ctx.add_pc(AnySource::Const(Constant::i32(4)));
+    ctx.ret_with_code(addr, ReturnCode::EBreak)
 }
 
 #[derive(Debug)]
@@ -214,47 +233,13 @@ fuzz_target!(
     },
     |data: FuzzData<'_>| {
     let FuzzData { instructions, passes } = data;
-    let (instructions, term) = parse(instructions);
     let passes = Passes::from_bytes(passes);
-
-    let mut block = black_box(lower(instructions, term));
+    let mut block = black_box(parse(instructions));
 
     PassManager::with_passes(passes.0).run(&mut block);
 
     ribit_ssa::assert_well_formed(&block);
 });
-
-fn lower(instructions: Vec<instruction::Info>, term: instruction::Info) -> ribit_ssa::Block {
-    let mut ctx = ribit_ssa::lower::Context::new(1024, 2_u32.pow(20));
-
-    for instruction::Info { instruction, len } in instructions {
-        assert!(!instruction.is_terminator());
-
-        match instruction {
-            Instruction::R(instruction::R {
-                rs1: _,
-                rs2: _,
-                rd: _,
-                opcode:
-                    opcode::R::MUL
-                    | opcode::R::MULH
-                    | opcode::R::MULHSU
-                    | opcode::R::MULHU
-                    | opcode::R::DIV
-                    | opcode::R::DIVU
-                    | opcode::R::REM
-                    | opcode::R::REMU,
-            }) => continue,
-            _ => {}
-        }
-
-        ribit_ssa::lower::non_terminal(&mut ctx, instruction, len);
-    }
-
-    assert!(term.instruction.is_terminator());
-
-    ribit_ssa::lower::terminal(ctx, term.instruction, term.len)
-}
 
 fn trial_encode(instruction: &Instruction, len: u32) -> Result<(), ()> {
     match len {
