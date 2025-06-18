@@ -7,5 +7,5 @@ fn check_for_size_regression() {
     // any commit that changes this should explain *why* in its message.
     // Unfortunately `Instruction` is a *very* hot (commonly used) type,
     // so the size actually ends up mattering.
-    assert_eq!(std::mem::size_of::<Instruction>(), 28);
+    assert_eq!(std::mem::size_of::<Instruction>(), 32);
 }

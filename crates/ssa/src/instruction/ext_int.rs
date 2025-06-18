@@ -20,7 +20,7 @@ impl ExtInt {
         assert!(matches!(self.src.ty, Type::Int(_) | Type::Boolean));
 
         if let Type::Int(ty) = self.src.ty {
-            assert!(ty >= Bitness::from(self.width));
+            assert!(ty >= Bitness::from_width(self.width));
         }
 
         Type::Int(Bitness::from(self.width))

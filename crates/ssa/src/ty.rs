@@ -252,25 +252,18 @@ impl Int {
     /// Sign extends [`self`](Self) to a [`i32`].
     #[must_use]
     pub const fn signed(self) -> i32 {
-        match self.0 {
-            Bitness::B8 => self.1 as i8 as i32,
-            Bitness::B16 => self.1 as i16 as i32,
-            Bitness::B32 => self.1 as i32,
-        }
+        let bits = u32::BITS - self.bits() as u32;
+        self.1.cast_signed() << bits >> bits
     }
 
     /// Zero extends [`self`](Self) to a [`u32`].
     #[must_use]
     pub const fn unsigned(self) -> u32 {
-        match self.0 {
-            Bitness::B8 => self.1 as u8 as u32,
-            Bitness::B16 => self.1 as u16 as u32,
-            Bitness::B32 => self.1,
-        }
+        self.1 & self.0.mask()
     }
 
     #[must_use]
-    pub fn bits(self) -> u8 {
+    pub const fn bits(self) -> u8 {
         self.0.to_bits()
     }
 }
