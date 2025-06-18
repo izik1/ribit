@@ -153,7 +153,7 @@ fn select<S: BuildHasher>(
         false => it.if_false,
     };
 
-    taken.constant().map(|c| (it.id(), c))
+    taken.constant().map(|c| (it.dest, c))
 }
 
 pub fn run(block: &mut Block) {

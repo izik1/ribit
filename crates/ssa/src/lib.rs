@@ -7,9 +7,10 @@
 )]
 #![warn(clippy::must_use_candidate, clippy::clone_on_copy)]
 
+use std::collections::HashMap;
 use std::fmt;
 
-use fnv::FnvHashMap;
+use fnv::{FnvBuildHasher, FnvHashMap};
 use instruction::CmpArgs;
 use reference::Ref;
 use ribit_core::{ReturnCode, opcode};
@@ -386,8 +387,10 @@ pub fn assert_well_formed(graph: &Block) {
     }
 
     let mut args = FnvHashMap::default();
-    let mut ids =
-        FnvHashMap::with_capacity_and_hasher(graph.instructions.len(), Default::default());
+    let mut ids = HashMap::with_capacity_and_hasher(
+        graph.instructions.len(),
+        const { FnvBuildHasher::new() },
+    );
 
     for (idx, instruction) in graph.instructions.iter().enumerate() {
         if let Instruction::Arg { dest, src } = instruction {

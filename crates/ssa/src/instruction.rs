@@ -212,8 +212,8 @@ impl Instruction {
             | Self::Sub { dest, .. }
             | Self::ShiftOp { dest, .. } => Some(*dest),
 
-            Self::Select(it) => Some(it.id()),
-            Self::ExtInt(it) => Some(it.id()),
+            Self::Select(it) => Some(it.dest),
+            Self::ExtInt(it) => Some(it.dest),
 
             Self::WriteStack { .. }
             | Self::WriteReg { .. }

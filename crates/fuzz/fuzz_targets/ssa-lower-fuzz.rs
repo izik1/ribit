@@ -12,9 +12,9 @@ use rand::seq::{IndexedMutRandom, SliceRandom};
 use rand::{Rng, SeedableRng};
 use ribit_core::instruction::{self, Instruction};
 use ribit_core::{ReturnCode, Width, opcode, register};
+use ribit_ssa::Block;
 use ribit_ssa::opt::PassManager;
 use ribit_ssa::opt::pass_manager::{InplacePass, Pass};
-use ribit_ssa::{AnySource, Block, Constant};
 
 #[must_use]
 const fn sign_extend<const BITS: u8>(value: u16) -> u16 {
@@ -110,7 +110,7 @@ fn parse(mut data: &[u8]) -> Block {
         ribit_ssa::lower::non_terminal(&mut ctx, info.instruction, info.len);
     }
 
-    let addr = ctx.add_pc(AnySource::Const(Constant::i32(4)));
+    let addr = ctx.add_pc_u32(4);
     ctx.ret_with_code(addr, ReturnCode::EBreak)
 }
 

@@ -26,9 +26,4 @@ impl Select {
 
         ty
     }
-
-    #[must_use]
-    pub fn id(&self) -> Id {
-        self.dest
-    }
 }

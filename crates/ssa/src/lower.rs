@@ -4,14 +4,17 @@ mod tests;
 use ribit_core::{ReturnCode, Width, instruction, opcode, register};
 
 use super::{AnySource, CmpKind, Id, Instruction, ShiftOp};
-use crate::instruction::{CmpArgs, CommutativeBinArgs, ExtInt, Select};
+use crate::instruction::{BinaryArgs, CmpArgs, CommutativeBinArgs, ExtInt, Select};
 use crate::reference::Reference;
 use crate::ty::{self, ConstTy, Constant};
 use crate::{Arg, Block, CommutativeBinOp, IdAllocator, Ref, Source, SourcePair, Terminator, eval};
 
+#[derive(Default)]
 struct CoreContext {
     id_allocator: IdAllocator,
     instructions: Vec<Instruction>,
+    // ids are contiguous here because we've done no passes that can get them out of order or put gaps in them... might not be true anywhere else though.
+    id_to_idx: Vec<usize>,
 }
 
 impl CoreContext {
@@ -21,18 +24,13 @@ impl CoreContext {
         let instr = f(id);
         let ty = instr.ty();
 
+        self.id_to_idx.push(self.instructions.len());
         self.instructions.push(instr);
         AnySource::Ref(Reference { ty, id })
     }
 
     fn typed_instruction<T: ConstTy, F: FnOnce(Id) -> Instruction>(&mut self, f: F) -> Source<T> {
-        let id = self.id_allocator.allocate();
-
-        let instr = f(id);
-        assert_eq!(instr.ty(), T::TY);
-
-        self.instructions.push(instr);
-        Source::Ref(id)
+        self.instruction(f).downcast().unwrap()
     }
 }
 
@@ -60,7 +58,7 @@ pub struct Context {
 /// ```
 /// which we can then munch away via identity.
 fn try_associate(
-    instructions: &[Instruction],
+    instruction: Option<&Instruction>,
     op: CommutativeBinOp,
     src1: Reference,
     src2: Constant,
@@ -69,18 +67,14 @@ fn try_associate(
         return (src1, src2);
     }
 
-    let instr = instructions.iter().rfind(|it| it.id() == Some(src1.id)).unwrap();
-    let inner = match instr {
-        Instruction::CommutativeBinOp { dest: _, args } if args.op == op => (args.src1, args.src2),
-        _ => return (src1, src2),
-    };
+    if let Some(&Instruction::CommutativeBinOp { dest: _, args: inner }) = instruction
+        && inner.op == op
+        && let AnySource::Const(inner_src2) = inner.src2
+    {
+        let src2 = eval::commutative_binop(inner_src2, src2, op);
 
-    let src2 = match inner.1 {
-        AnySource::Const(inner_src2) => eval::commutative_binop(inner_src2, src2, op),
-        _ => return (src1, src2),
-    };
-
-    let src1 = inner.0;
+        return (inner.src1, src2);
+    }
 
     (src1, src2)
 }
@@ -90,7 +84,10 @@ impl Context {
     pub fn new(start_pc: u32, memory_size: u32) -> Self {
         assert!(memory_size.is_power_of_two());
 
-        let mut core = CoreContext { id_allocator: IdAllocator::new(), instructions: Vec::new() };
+        let mut core = CoreContext::default();
+
+        core.id_to_idx.reserve(2);
+        core.instructions.reserve(2);
 
         let register_arg =
             core.typed_instruction(|dest| Instruction::Arg { dest, src: Arg::Register });
@@ -108,13 +105,28 @@ impl Context {
         }
     }
 
-    pub fn add_pc(&mut self, src: AnySource) -> Source<ty::I32> {
-        self.pc = self.add(src, self.pc.upcast()).downcast().unwrap();
-        self.pc
-    }
+    pub fn add_pc_u32(&mut self, src: u32) -> Source<ty::I32> {
+        self.pc = match self.pc {
+            // this is the most common case by far
+            Source::Const(src2) => Source::Const(src.wrapping_add(src2)),
+            // but if it isn't the case, let's try reassociating and then doing a commutative binop (no need to do the rest of the folding for the args; they'll never do anything)
+            Source::Ref(id) => {
+                let instruction = self.core.instructions.get(self.core.id_to_idx[id.0 as usize]);
+                let (src1, src2) = try_associate(
+                    instruction,
+                    CommutativeBinOp::Add,
+                    Reference { ty: ty::I32::TY, id },
+                    Constant::i32(src),
+                );
 
-    pub fn override_pc(&mut self, src: Source<ty::I32>) {
-        self.pc = src;
+                let args =
+                    BinaryArgs { src1, src2: AnySource::Const(src2), op: CommutativeBinOp::Add };
+
+                self.core.typed_instruction(|dest| Instruction::CommutativeBinOp { dest, args })
+            }
+        };
+
+        self.pc
     }
 
     pub fn commutative_binop(
@@ -124,7 +136,8 @@ impl Context {
         src2: AnySource,
     ) -> AnySource {
         let args = CommutativeBinArgs::new_assoc(op, src1, src2, |op, r, c| {
-            try_associate(&self.core.instructions, op, r, c)
+            let instruction = self.core.instructions.get(self.core.id_to_idx[r.id.0 as usize]);
+            try_associate(instruction, op, r, c)
         });
 
         match args {
@@ -445,18 +458,20 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
         }
     }
 
-    ctx.add_pc(AnySource::Const(Constant::i32(len)));
+    ctx.add_pc_u32(len);
 }
 
 #[must_use]
 #[allow(clippy::needless_pass_by_value)]
 pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u32) -> Block {
-    let len = AnySource::Const(Constant::i32(len));
+    let len = len;
 
     match instruction {
         instruction::Instruction::J(instruction::J { opcode: opcode::J::JAL, rd, imm }) => {
             // load pc + len into rd (the link register)
             if let Some(rd) = rd {
+                let len = AnySource::Const(Constant::i32(len));
+
                 // we specifically need to avoid modifying `pc`, since we need the
                 // old value for adding the immediate.
 
@@ -465,9 +480,7 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
                 ctx.write_register(rd, next_pc);
             }
 
-            let imm = AnySource::Const(Constant::i32(imm));
-
-            ctx.add_pc(imm);
+            ctx.add_pc_u32(imm);
 
             ctx.ret()
         }
@@ -485,7 +498,7 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
 
             // load pc + len into rd (the link register)
             if let Some(rd) = rd {
-                let next_pc = ctx.add_pc(len);
+                let next_pc = ctx.add_pc_u32(len);
 
                 ctx.write_register(rd, next_pc.upcast());
             }
@@ -498,13 +511,11 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
                 }
 
                 src = ctx.and(src, AnySource::Const(Constant::i32(!1)));
-                ctx.override_pc(src.downcast().unwrap());
+                ctx.ret_with_addr(src.downcast().unwrap())
             } else {
                 let imm = imm & !1;
-                ctx.override_pc(Source::Const(imm));
+                ctx.ret_with_addr(Source::Const(imm))
             }
-
-            ctx.ret()
         }
 
         instruction::Instruction::Sys(instruction::Sys { opcode }) => {
@@ -513,12 +524,13 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
                 opcode::RSys::ECALL => ReturnCode::ECall,
             };
 
-            let pc = ctx.add_pc(len);
+            let pc = ctx.add_pc_u32(len);
 
             ctx.ret_with_code(pc, return_code)
         }
 
         instruction::Instruction::B(instruction::B { imm, rs1, rs2, cmp_mode }) => {
+            let len = AnySource::Const(Constant::i32(len));
             let imm = AnySource::Const(Constant::i32(imm as i16 as u32));
 
             let src1 = ctx.load_register(rs1);

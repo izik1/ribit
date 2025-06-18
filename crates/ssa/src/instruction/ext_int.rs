@@ -25,11 +25,6 @@ impl ExtInt {
 
         Type::Int(Bitness::from(self.width))
     }
-
-    #[must_use]
-    pub fn id(&self) -> Id {
-        self.dest
-    }
 }
 
 impl fmt::Display for ExtInt {
