@@ -46,7 +46,7 @@ fn print_block(buffer: &[u8], block: &Block) {
         byte_str
     };
 
-    log::debug!("Native block: [{byte_str}]");
+    tracing::debug!("Native block: [{byte_str}]");
 }
 
 impl X86_64 {
@@ -56,7 +56,7 @@ impl X86_64 {
         allocs: &HashMap<ribit_ssa::Id, Register>,
         clobbers: &HashMap<usize, Vec<Register>>,
     ) -> Block {
-        log::debug!("{}", block.display_instructions());
+        tracing::debug!("{}", block.display_instructions());
 
         let raw_buffer = buffer.raw.take().expect("Failed to take buffer");
         let mut raw_buffer = raw_buffer.make_mut().expect("Failed to make buffer mutable");

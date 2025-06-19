@@ -39,23 +39,23 @@ fn sym_iter<S: Entry>(
 
         let name = sym.get_name(file)?;
 
-        log::info!("sym: {name}");
+        tracing::info!("sym: {name}");
 
         let value = sym.value();
 
         if name == "tohost" {
-            log::info!("found tohost: {value:08x}");
+            tracing::info!("found tohost: {value:08x}");
             ctx.to_host = Some(value as u32);
         }
 
         if name == "begin_signature" {
-            log::info!("found begin_signature: {value:08x}");
+            tracing::info!("found begin_signature: {value:08x}");
 
             ctx.begin_signature = Some(value as u32);
         }
 
         if name == "end_signature" {
-            log::info!("found end_signature: {value:08x}");
+            tracing::info!("found end_signature: {value:08x}");
 
             ctx.end_signature = Some(value as u32);
         }
@@ -97,7 +97,7 @@ fn parse_compressed(
         memory[(*pc as usize)..][..2].try_into().expect("bad slice size expected 2???"),
     );
 
-    log::debug!("instruction: {instr:016b}");
+    tracing::debug!("instruction: {instr:016b}");
 
     let instr = ribit_decode::compressed::decode_instruction(instr)?;
     let info = ribit_core::instruction::Info::new(instr, 2);
@@ -117,10 +117,10 @@ fn parse_instruction(
         memory[(*pc as usize)..][..4].try_into().expect("bad slice size expected 4???"),
     );
 
-    // log::debug!("instruction bytes: {:08x}", instr.to_le());
+    // tracing::debug!("instruction bytes: {:08x}", instr.to_le());
 
     if instr & 0b11 == 0b11 {
-        log::debug!("instruction: {instr:032b}");
+        tracing::debug!("instruction: {instr:032b}");
         let instr = ribit_decode::instruction(instr)?;
         let info = ribit_core::instruction::Info::new(instr, 4);
         *pc += 4;
@@ -142,10 +142,13 @@ fn decode_block(
     let mut block_instrs = Vec::new();
     let terminator;
     loop {
-        log::debug!("PC: ${:04x}", current_pc);
+        tracing::debug!("PC: ${:04x}", current_pc);
         let inst_info = parse_instruction(&mut current_pc, memory)?;
 
-        log::debug!("instr: {}", ribit_core::disassemble::FmtInstruction::from_info(&inst_info));
+        tracing::debug!(
+            "instr: {}",
+            ribit_core::disassemble::FmtInstruction::from_info(&inst_info)
+        );
 
         if inst_info.instruction.is_terminator() {
             terminator = inst_info;

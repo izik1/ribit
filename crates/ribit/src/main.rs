@@ -5,7 +5,7 @@ use std::io::{Read, Write};
 use ribit_decode::{CompressedDecodeError, DecodeError};
 
 fn main() {
-    env_logger::init();
+    tracing_subscriber::fmt::init();
 
     let mut args = env::args().skip(1);
 

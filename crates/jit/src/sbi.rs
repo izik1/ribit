@@ -48,7 +48,7 @@ pub fn call(regs: &mut register::File<u32>, mem: &mut [u8]) {
         ),
         (EXT_CONSOLE, 2) => debug_console_write_byte(regs[register::RiscV::X10]),
         _ => {
-            log::warn!("Unsupported!");
+            tracing::warn!("Unsupported!");
             unsupported()
         }
     };
