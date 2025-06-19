@@ -144,9 +144,9 @@ dependencies = [
 
 [[package]]
 name = "humantime"
-version = "2.1.0"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
+checksum = "9b112acc8b3adf4b107a8ec20977da0273a8c386765a3ec0229bd500a1443f9f"
 
 [[package]]
 name = "is_terminal_polyfill"
@@ -265,7 +265,7 @@ dependencies = [
 [[package]]
 name = "rasen"
 version = "0.1.0"
-source = "git+https://github.com/izik1/rasen?rev=f043eaf960703c671b9523b15a727cab8033d783#f043eaf960703c671b9523b15a727cab8033d783"
+source = "git+https://github.com/izik1/rasen?rev=014e808be9d4b3ac7be2f7a71097cf60c85cf704#014e808be9d4b3ac7be2f7a71097cf60c85cf704"
 
 [[package]]
 name = "ribit"
@@ -465,9 +465,9 @@ dependencies = [
 
 [[package]]
 name = "xmas-elf"
-version = "0.9.1"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42c49817e78342f7f30a181573d82ff55b88a35f86ccaf07fc64b3008f56d1c6"
+checksum = "18245fcbb8b3de8dd198ce7944fdd4096986fd6cd306b0fcfa27df817bd545d6"
 dependencies = [
  "zero",
 ]

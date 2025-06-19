@@ -10,12 +10,13 @@ log.workspace = true
 ribit-decode.workspace = true
 ribit-jit.workspace = true
 ribit-ssa.workspace = true
-xmas-elf = "0.9.0"
+xmas-elf = "0.10.0"
 
 [dependencies.env_logger]
 default-features = false
 features = ["color", "auto-color", "humantime"]
-version = "0.11.3"
+# frustratingly `humantime` got replaced with `jiff` which adds serde->serde_derive->syn/quote/proc-macro 2.
+version = "=0.11.5"
 
 [dependencies.ribit-core]
 features = ["disassemble"]
