@@ -7,9 +7,6 @@
 #![warn(clippy::must_use_candidate, clippy::clone_on_copy)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
-#[macro_use]
-extern crate static_assertions;
-
 mod rt;
 mod sbi;
 
@@ -34,8 +31,10 @@ pub type AMD64Runtime = Runtime<rt::x86_64::rt::X86_64>;
 
 pub const MEMORY_SIZE: u32 = 1024 * 1024 * 16;
 
+const _: () = {
+    assert!(MEMORY_SIZE.count_ones() == 1, "memory size must be a power of two");
+};
 // ensure that memory size is a power of two.
-const_assert_eq!(MEMORY_SIZE.count_ones(), 1);
 
 pub enum SourcePair {
     RegReg(Register, Register),

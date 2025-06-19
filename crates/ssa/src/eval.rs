@@ -9,7 +9,7 @@ use crate::{AnySource, Bitness, CmpKind, CommutativeBinOp, ShiftOp};
 #[must_use]
 pub fn commutative_identity(args: CommutativeBinArgs) -> Option<Reference> {
     let CommutativeBinArgs { src1: lhs, src2: rhs, op } = args;
-    assert_eq!(lhs.ty, rhs.ty());
+    ty::assert_types_eq!(lhs.ty, rhs.ty());
 
     match (rhs, op) {
         (AnySource::Const(c), CommutativeBinOp::And) if c == Constant::umax(c.ty()) => Some(lhs),

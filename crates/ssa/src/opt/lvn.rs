@@ -6,7 +6,7 @@ use crate::reference::{Ref, Reference};
 use crate::ty::ConstTy;
 use crate::{
     AnySource, Arg, Block, CommutativeBinOp, Constant, Id, Instruction, ShiftOp, Source,
-    SourcePair, debug_assert_types_eq, eval, ty,
+    SourcePair, eval, ty,
 };
 
 #[cfg(test)]
@@ -98,7 +98,7 @@ impl Context {
         let value = *self.equivalence_map.entry(equivalence).or_insert(dest);
 
         // this being incorrect implies that the `Eq` impl of the instruction is broken.
-        debug_assert_types_eq!(dest.ty, value.ty);
+        ty::debug_assert_types_eq!(dest.ty, value.ty);
 
         self.map_value(dest.id, AnySource::Ref(value));
     }
@@ -201,8 +201,7 @@ fn run_instruction(context: &Context, instruction: &mut Instruction) -> Option<A
                 }
 
                 (lhs, AnySource::Ref(rhs)) => {
-                    *src1 = lhs;
-                    *src2 = rhs;
+                    (*src1, *src2) = (lhs, rhs);
                 }
 
                 (AnySource::Ref(src1), AnySource::Const(src2)) => {

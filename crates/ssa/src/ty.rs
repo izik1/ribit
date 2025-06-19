@@ -292,32 +292,39 @@ impl PartialICmp for Int {
     }
 }
 
-#[macro_export]
 macro_rules! assert_types_eq {
     ($left:expr, $right:expr $(,)?) => {
         match (&$left, &$right) {
             (left_val, right_val) => {
                 if *left_val != *right_val {
-                    $crate::ty::mismatch(*left_val, *right_val)
+                    $crate::ty::mismatch_inner(*left_val, *right_val)
                 }
             }
         }
     };
 }
 
-#[macro_export]
 macro_rules! debug_assert_types_eq {
     ($left:expr, $right:expr $(,)?) => {
         if cfg!(debug_assertions) {
-            $crate::assert_types_eq!($left, $right);
+            $crate::ty::assert_types_eq!($left, $right);
         }
     };
+}
+
+pub(crate) use {assert_types_eq, debug_assert_types_eq};
+
+#[inline(never)]
+#[cold]
+#[track_caller]
+pub(crate) fn mismatch_inner(ty1: Type, ty2: Type) -> ! {
+    panic!("mismatched types: ({ty1} != {ty2})");
 }
 
 #[inline(never)]
 #[cold]
 #[track_caller]
 pub fn mismatch(ty1: Type, ty2: Type) -> ! {
-    assert_ne!(ty1, ty2, "BUG: Fake type mismatch!");
-    panic!("mismatched types: ({ty1} != {ty2})")
+    debug_assert_ne!(ty1, ty2, "BUG: Fake type mismatch!");
+    panic!("mismatched types: ({ty1} != {ty2})");
 }

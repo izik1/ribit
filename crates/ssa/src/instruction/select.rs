@@ -20,9 +20,9 @@ impl fmt::Display for Select {
 impl Select {
     #[must_use]
     pub fn ty(&self) -> Type {
-        let ty = self.if_true.ty();
+        ty::assert_types_eq!(self.if_true.ty(), self.if_false.ty());
 
-        assert_eq!(ty, self.if_false.ty());
+        let ty = self.if_true.ty();
 
         ty
     }

@@ -38,6 +38,17 @@ impl BlockReturn {
 
 #[cfg(all(test, target_arch = "x86_64"))]
 mod test {
+    use core::fmt;
+
+    #[derive(Eq, PartialEq)]
+    struct LowerHex<T: fmt::LowerHex>(T);
+
+    impl<T: fmt::LowerHex> fmt::Debug for LowerHex<T> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{:#0width$x}", self.0, width = std::mem::size_of::<T>() * 2 + 2)
+        }
+    }
+
     use ribit_core::instruction::Instruction;
     use ribit_core::{instruction, opcode, register};
 
@@ -73,16 +84,46 @@ mod test {
         let mut pc = 0;
 
         ctx.execute_basic_block(&mut pc, &mut regs, &mut memory, |_, _| Err(())).unwrap();
-        assert_eq!(pc, 4096);
+        assert_eq!(LowerHex(pc), LowerHex(4096));
 
-        for (idx, &reg) in regs.0.iter().enumerate() {
-            let idx = idx + 1;
-            match idx {
-                0 => unreachable!(),
-                4 => assert_eq!(reg, 4, "reg-num: {idx}"),
-                _ => assert_eq!(reg, 0xaaaa_aaaa, "reg-num: {idx}"),
+        let regs = register::File(regs.0.map(LowerHex));
+
+        expect_test::expect![[r#"
+            {
+                X1: 0xaaaaaaaa,
+                X2: 0xaaaaaaaa,
+                X3: 0xaaaaaaaa,
+                X4: 0x00000004,
+                X5: 0xaaaaaaaa,
+                X6: 0xaaaaaaaa,
+                X7: 0xaaaaaaaa,
+                X8: 0xaaaaaaaa,
+                X9: 0xaaaaaaaa,
+                X10: 0xaaaaaaaa,
+                X11: 0xaaaaaaaa,
+                X12: 0xaaaaaaaa,
+                X13: 0xaaaaaaaa,
+                X14: 0xaaaaaaaa,
+                X15: 0xaaaaaaaa,
+                X16: 0xaaaaaaaa,
+                X17: 0xaaaaaaaa,
+                X18: 0xaaaaaaaa,
+                X19: 0xaaaaaaaa,
+                X20: 0xaaaaaaaa,
+                X21: 0xaaaaaaaa,
+                X22: 0xaaaaaaaa,
+                X23: 0xaaaaaaaa,
+                X24: 0xaaaaaaaa,
+                X25: 0xaaaaaaaa,
+                X26: 0xaaaaaaaa,
+                X27: 0xaaaaaaaa,
+                X28: 0xaaaaaaaa,
+                X29: 0xaaaaaaaa,
+                X30: 0xaaaaaaaa,
+                X31: 0xaaaaaaaa,
             }
-        }
+        "#]]
+        .assert_debug_eq(&regs);
     }
 
     #[test]
@@ -111,17 +152,46 @@ mod test {
 
         ctx.execute_basic_block(&mut pc, &mut regs, &mut memory, |_, _| Err(())).unwrap();
 
-        assert_eq!(pc, 2046 + 1024);
+        assert_eq!(LowerHex(pc), LowerHex(2046 + 1024));
 
-        for (idx, &reg) in regs.0.iter().enumerate() {
-            let idx = idx + 1;
-            match idx {
-                0 => unreachable!(),
-                1 => assert_eq!(reg, 1024, "reg-num={idx}"),
-                4 => assert_eq!(reg, 52, "reg-num={idx}"),
-                _ => assert_eq!(reg, 0xaaaa_aaaa, "reg-num={idx}"),
+        let regs = register::File(regs.0.map(LowerHex));
+
+        expect_test::expect![[r#"
+            {
+                X1: 0x00000400,
+                X2: 0xaaaaaaaa,
+                X3: 0xaaaaaaaa,
+                X4: 0x00000034,
+                X5: 0xaaaaaaaa,
+                X6: 0xaaaaaaaa,
+                X7: 0xaaaaaaaa,
+                X8: 0xaaaaaaaa,
+                X9: 0xaaaaaaaa,
+                X10: 0xaaaaaaaa,
+                X11: 0xaaaaaaaa,
+                X12: 0xaaaaaaaa,
+                X13: 0xaaaaaaaa,
+                X14: 0xaaaaaaaa,
+                X15: 0xaaaaaaaa,
+                X16: 0xaaaaaaaa,
+                X17: 0xaaaaaaaa,
+                X18: 0xaaaaaaaa,
+                X19: 0xaaaaaaaa,
+                X20: 0xaaaaaaaa,
+                X21: 0xaaaaaaaa,
+                X22: 0xaaaaaaaa,
+                X23: 0xaaaaaaaa,
+                X24: 0xaaaaaaaa,
+                X25: 0xaaaaaaaa,
+                X26: 0xaaaaaaaa,
+                X27: 0xaaaaaaaa,
+                X28: 0xaaaaaaaa,
+                X29: 0xaaaaaaaa,
+                X30: 0xaaaaaaaa,
+                X31: 0xaaaaaaaa,
             }
-        }
+        "#]]
+        .assert_debug_eq(&regs);
     }
 
     #[test]
@@ -142,14 +212,45 @@ mod test {
         let mut pc = 0;
 
         ctx.execute_basic_block(&mut pc, &mut regs, &mut memory, |_, _| Err(())).unwrap();
-        assert_eq!(pc, 4096);
 
-        for (idx, &reg) in regs.0.iter().enumerate() {
-            let idx = idx + 1;
-            match idx {
-                0 => unreachable!(),
-                _ => assert_eq!(reg, 0xaaaa_aaaa),
+        assert_eq!(LowerHex(pc), LowerHex(4096));
+
+        let regs = register::File(regs.0.map(LowerHex));
+
+        expect_test::expect![[r#"
+            {
+                X1: 0xaaaaaaaa,
+                X2: 0xaaaaaaaa,
+                X3: 0xaaaaaaaa,
+                X4: 0xaaaaaaaa,
+                X5: 0xaaaaaaaa,
+                X6: 0xaaaaaaaa,
+                X7: 0xaaaaaaaa,
+                X8: 0xaaaaaaaa,
+                X9: 0xaaaaaaaa,
+                X10: 0xaaaaaaaa,
+                X11: 0xaaaaaaaa,
+                X12: 0xaaaaaaaa,
+                X13: 0xaaaaaaaa,
+                X14: 0xaaaaaaaa,
+                X15: 0xaaaaaaaa,
+                X16: 0xaaaaaaaa,
+                X17: 0xaaaaaaaa,
+                X18: 0xaaaaaaaa,
+                X19: 0xaaaaaaaa,
+                X20: 0xaaaaaaaa,
+                X21: 0xaaaaaaaa,
+                X22: 0xaaaaaaaa,
+                X23: 0xaaaaaaaa,
+                X24: 0xaaaaaaaa,
+                X25: 0xaaaaaaaa,
+                X26: 0xaaaaaaaa,
+                X27: 0xaaaaaaaa,
+                X28: 0xaaaaaaaa,
+                X29: 0xaaaaaaaa,
+                X30: 0xaaaaaaaa,
+                X31: 0xaaaaaaaa,
             }
-        }
+        "#]].assert_debug_eq(&regs);
     }
 }

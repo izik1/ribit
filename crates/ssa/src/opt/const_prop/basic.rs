@@ -44,52 +44,37 @@ fn run_instruction<S: BuildHasher>(
             *src2 = lookup(consts, *src2);
 
             let lhs = lookup(consts, AnySource::Ref(*src1)).constant()?;
-            let rhs = {
-                // have to indiana jones this stuff around...
-                // potentially confusing note: if we return early,
-                // this change happens, but if we don't, we ignore it.
-                let src2 = std::mem::replace(src2, AnySource::Const(lhs));
-
-                match src2 {
-                    AnySource::Ref(r) => {
-                        *src1 = r;
-                        return None;
-                    }
-                    AnySource::Const(konst) => konst,
+            match *src2 {
+                // renormalize (c,r) to (r,c)
+                AnySource::Ref(r) => {
+                    (*src1, *src2) = (r, AnySource::Const(lhs));
+                    None
                 }
-            };
-
-            Some((*dest, eval::commutative_binop(lhs, rhs, *op)))
+                AnySource::Const(rhs) => Some((*dest, eval::commutative_binop(lhs, rhs, *op))),
+            }
         }
 
         Instruction::Sub { dest, src1, src2 } => {
-            let lhs = lookup(consts, *src1);
-            let rhs = lookup(consts, AnySource::Ref(*src2));
+            *src1 = lookup(consts, *src1);
 
-            match (lhs, rhs) {
-                (AnySource::Const(lhs), AnySource::Const(rhs)) => {
-                    Some((*dest, eval::sub(lhs, rhs)))
-                }
+            let rhs = lookup(consts, AnySource::Ref(*src2)).constant()?;
 
-                (lhs @ AnySource::Const(_), AnySource::Ref(_)) => {
-                    *src1 = lhs;
-                    None
-                }
-
-                (AnySource::Ref(src1), AnySource::Const(src2)) => {
-                    let src2 = eval::neg(src2);
+            match *src1 {
+                // renormalize (r,c) to... (r,c) but add.
+                AnySource::Ref(src1) => {
                     *instruction = Instruction::CommutativeBinOp {
                         dest: *dest,
                         args: BinaryArgs {
                             src1,
-                            src2: AnySource::Const(src2),
+                            src2: AnySource::Const(eval::neg(rhs)),
                             op: CommutativeBinOp::Add,
                         },
                     };
 
                     None
                 }
-                (AnySource::Ref(_), AnySource::Ref(_)) => None,
+
+                AnySource::Const(lhs) => Some((*dest, eval::sub(lhs, rhs))),
             }
         }
 

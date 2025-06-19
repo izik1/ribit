@@ -1,8 +1,19 @@
+use core::fmt;
 use core::num::NonZeroU8;
 use core::ops::{Index, IndexMut};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct File<T>(pub [T; RiscV::XLEN - 1]);
+
+impl<T: fmt::Debug> fmt::Debug for File<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let iter = ((RiscV::X1).get()..=RiscV::X31.get())
+            .map(|it| RiscV::with_u8(it).unwrap())
+            .map(|it| (it, &self[it]));
+
+        f.debug_map().entries(iter).finish()
+    }
+}
 
 impl<T> File<T> {
     #[must_use]
@@ -35,8 +46,14 @@ impl<T> IndexMut<RiscV> for File<T> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct RiscV(NonZeroU8);
+
+impl fmt::Debug for RiscV {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "X{}", self.0)
+    }
+}
 
 // all of these functions are super trivial and should *always* be inlined.
 #[allow(clippy::inline_always)]

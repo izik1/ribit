@@ -135,7 +135,7 @@ impl Context {
         src1: AnySource,
         src2: AnySource,
     ) -> AnySource {
-        assert_eq!(src1.ty(), src2.ty());
+        ty::assert_types_eq!(src1.ty(), src2.ty());
 
         let args = CommutativeBinArgs::new_assoc(op, src1, src2, |op, r, c| {
             let instruction = self.core.instructions.get(self.core.id_to_idx[r.id.0 as usize]);
@@ -149,7 +149,7 @@ impl Context {
     }
 
     pub fn shift(&mut self, op: ShiftOp, src1: AnySource, src2: AnySource) -> AnySource {
-        assert_eq!(src1.ty(), src2.ty());
+        ty::assert_types_eq!(src1.ty(), src2.ty());
 
         // shift identity.
         if matches!(src2, AnySource::Const(Constant::Int(i)) if i.unsigned() == 0) {
@@ -241,7 +241,7 @@ impl Context {
     }
 
     pub fn cmp(&mut self, src1: AnySource, src2: AnySource, kind: CmpKind) -> Source<ty::Bool> {
-        assert_eq!(src1.ty(), src2.ty());
+        ty::assert_types_eq!(src1.ty(), src2.ty());
 
         match CmpArgs::new(src1, src2, kind) {
             Ok(args) => self.core.typed_instruction(|dest| Instruction::Cmp { dest, args }),

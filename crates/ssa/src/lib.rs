@@ -407,7 +407,7 @@ pub fn assert_well_formed(graph: &Block) {
                     assert_ne!(id, arg);
                 });
             }
-            None => assert_eq!(instruction.ty(), Type::Unit),
+            None => ty::assert_types_eq!(instruction.ty(), Type::Unit),
         }
 
         match instruction {
@@ -473,7 +473,7 @@ pub fn assert_well_formed(graph: &Block) {
                 assert_ref!(ids[reference]);
                 assert_ref!(src => ids[src]);
 
-                assert_eq!(src.ty(), reference.ty);
+                ty::assert_types_eq!(src.ty(), reference.ty);
             }
             Instruction::Select(instruction::Select { dest: _, cond, if_true, if_false }) => {
                 assert_ref_typed!(ids[cond]);

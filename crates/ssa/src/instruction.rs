@@ -165,7 +165,7 @@ impl Instruction {
             Self::ShiftOp { dest: _, src, op: _ } => {
                 let ty = src.lhs().ty();
 
-                assert_eq!(ty, src.rhs().ty());
+                ty::assert_types_eq!(ty, src.rhs().ty());
 
                 // type technically depends on op, but... for now:
                 assert!(matches!(ty, Type::Int(_)));
@@ -179,7 +179,7 @@ impl Instruction {
             | Self::Sub { dest: _, src1: source, src2: reference } => {
                 let ty = reference.ty;
 
-                assert_eq!(ty, source.ty());
+                ty::assert_types_eq!(ty, source.ty());
 
                 // type technically depends on op, but... for now:
                 assert!(matches!(ty, Type::Int(_)));
@@ -188,7 +188,7 @@ impl Instruction {
             }
 
             Self::Cmp { dest: _, args: CmpArgs { src1, src2, op: _ } } => {
-                assert_eq!(src1.ty, src2.ty());
+                ty::assert_types_eq!(src1.ty, src2.ty());
 
                 Type::Boolean
             }
