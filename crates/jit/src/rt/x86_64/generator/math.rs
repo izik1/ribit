@@ -6,6 +6,7 @@ use rasen::params::reg::Reg32;
 use ribit_ssa::{CommutativeBinOp, ShiftOp};
 
 use super::BlockBuilder;
+use crate::rt::x86_64::Assembler;
 use crate::{Source, SourcePair};
 
 pub fn commutative_binop(
@@ -28,18 +29,42 @@ pub fn commutative_binop(
         builder.stream.mov_reg_reg(dest, src1)?;
     }
 
-    match src2 {
-        Source::Val(src2) => match (op, dest == Reg32::ZAX) {
-            (CommutativeBinOp::Add, _) => add_r32_imm(builder, dest, src2),
-            (CommutativeBinOp::Xor, _) if src2 == u32::MAX => builder.stream.not_reg(dest),
+    let if_small = |stream: &mut Assembler<'_, '_>, imm| match op {
+        CommutativeBinOp::And => stream.and_reg_sximm8(dest, imm),
+        CommutativeBinOp::Add => stream.add_reg_sximm8(dest, imm),
+        CommutativeBinOp::Or => stream.or_reg_sximm8(dest, imm),
+        CommutativeBinOp::Xor => stream.xor_reg_sximm8(dest, imm),
+    };
 
-            (CommutativeBinOp::And, true) => builder.stream.and_zax_imm(Imm32(src2)),
-            (CommutativeBinOp::Or, true) => builder.stream.or_zax_imm(Imm32(src2)),
-            (CommutativeBinOp::Xor, true) => builder.stream.xor_zax_imm(Imm32(src2)),
-            (CommutativeBinOp::And, false) => builder.stream.and_reg_imm(dest, Imm32(src2)),
-            (CommutativeBinOp::Or, false) => builder.stream.or_reg_imm(dest, Imm32(src2)),
-            (CommutativeBinOp::Xor, false) => builder.stream.xor_reg_imm(dest, Imm32(src2)),
-        },
+    let if_zax = |stream: &mut Assembler<'_, '_>, imm| match op {
+        CommutativeBinOp::And => stream.and_zax_imm(Imm32(imm)),
+        CommutativeBinOp::Add => stream.add_zax_imm(Imm32(imm)),
+        CommutativeBinOp::Or => stream.or_zax_imm(Imm32(imm)),
+        CommutativeBinOp::Xor => stream.xor_zax_imm(Imm32(imm)),
+    };
+
+    let default = |stream: &mut Assembler<'_, '_>, imm| match op {
+        CommutativeBinOp::And => stream.and_reg_imm(dest, Imm32(imm)),
+        CommutativeBinOp::Add => stream.add_reg_imm(dest, Imm32(imm)),
+        CommutativeBinOp::Or => stream.or_reg_imm(dest, Imm32(imm)),
+        CommutativeBinOp::Xor => stream.xor_reg_imm(dest, Imm32(imm)),
+    };
+
+    match src2 {
+        Source::Val(src2) if op == CommutativeBinOp::Add => add_r32_imm(builder, dest, src2),
+        Source::Val(u32::MAX) if op == CommutativeBinOp::Xor => builder.stream.not_reg(dest),
+
+        Source::Val(src2) => {
+            if let Ok(src2) = i8::try_from(src2.cast_signed()) {
+                return if_small(&mut builder.stream, src2);
+            }
+
+            if dest == Reg32::ZAX {
+                return if_zax(&mut builder.stream, src2);
+            }
+
+            default(&mut builder.stream, src2)
+        }
 
         Source::Register(src2) => {
             let src2 = Reg32(src2);
