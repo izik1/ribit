@@ -5,6 +5,7 @@ use std::mem;
 use std::ops::Range;
 
 use rasen::params::Register;
+use ribit_core::register;
 
 use super::generator::BlockBuilder;
 use crate::rt::common;
@@ -119,7 +120,7 @@ impl crate::rt::Target for X86_64 {
     fn execute_block(
         &mut self,
         pc: u32,
-        regs: &mut [u32; crate::XLEN],
+        regs: &mut register::File<u32>,
         memory: &mut [u8],
     ) -> (u32, ReturnCode) {
         let block = self.lookup_block(pc).unwrap();
@@ -130,7 +131,7 @@ impl crate::rt::Target for X86_64 {
         let func: BasicBlockFunc = unsafe { std::mem::transmute(ptr) };
 
         // safety: the code we generated promises to not invoke UB, which is the best you can do with dynamic code.
-        let ret = unsafe { func(regs.as_mut_ptr(), memory.as_mut_ptr()) };
+        let ret = unsafe { func(regs.0.as_mut_ptr(), memory.as_mut_ptr()) };
 
         ret.into_parts()
     }

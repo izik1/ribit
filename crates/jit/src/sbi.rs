@@ -1,6 +1,8 @@
 use core::ops::Range;
 use std::io::{Read, Write};
 
+use ribit_core::register;
+
 #[repr(u32)]
 #[derive(Copy, Clone, Debug)]
 enum StatusCode {
@@ -20,29 +22,39 @@ enum StatusCode {
 const EXT_BASE: u32 = 0x10;
 const EXT_CONSOLE: u32 = 0x4442_434e;
 
-pub fn call(regs: &mut [u32; crate::XLEN], mem: &mut [u8]) {
-    let extension_id = regs[17]; // x17 -> a7
-    let extension_funct = regs[16]; // x16 -> a6
+pub fn call(regs: &mut register::File<u32>, mem: &mut [u8]) {
+    let extension_id = regs[register::RiscV::X17]; // x17 -> a7
+    let extension_funct = regs[register::RiscV::X16]; // x16 -> a6
 
     let (code, value) = match (extension_id, extension_funct) {
         (EXT_BASE, 0) => get_sbi_spec_version(),
         (EXT_BASE, 1) => get_sbi_impl_id(),
         (EXT_BASE, 2) => get_sbi_impl_version(),
-        (EXT_BASE, 3) => probe_extension(regs[10]),
+        (EXT_BASE, 3) => probe_extension(regs[register::RiscV::X10]),
         (EXT_BASE, 4) => get_mvendorid(),
         (EXT_BASE, 5) => get_marchid(),
         (EXT_BASE, 6) => get_mimpid(),
-        (EXT_CONSOLE, 0) => debug_console_write(mem, regs[10], regs[11], regs[12]),
-        (EXT_CONSOLE, 1) => debug_console_read(mem, regs[10], regs[11], regs[12]),
-        (EXT_CONSOLE, 2) => debug_console_write_byte(regs[10]),
+        (EXT_CONSOLE, 0) => debug_console_write(
+            mem,
+            regs[register::RiscV::X10],
+            regs[register::RiscV::X11],
+            regs[register::RiscV::X12],
+        ),
+        (EXT_CONSOLE, 1) => debug_console_read(
+            mem,
+            regs[register::RiscV::X10],
+            regs[register::RiscV::X11],
+            regs[register::RiscV::X12],
+        ),
+        (EXT_CONSOLE, 2) => debug_console_write_byte(regs[register::RiscV::X10]),
         _ => {
             log::warn!("Unsupported!");
             unsupported()
         }
     };
 
-    regs[10] = code as u32; // a0
-    regs[11] = value; // a1
+    regs[register::RiscV::X10] = code as u32; // a0
+    regs[register::RiscV::X11] = value; // a1
 }
 
 const fn unsupported() -> (StatusCode, u32) {

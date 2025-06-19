@@ -1,4 +1,39 @@
 use core::num::NonZeroU8;
+use core::ops::{Index, IndexMut};
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
+pub struct File<T>(pub [T; RiscV::XLEN - 1]);
+
+impl<T> File<T> {
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl<T> Index<RiscV> for File<T> {
+    type Output = T;
+
+    #[allow(unsafe_code)]
+    #[inline]
+    fn index(&self, index: RiscV) -> &Self::Output {
+        // Safety: index starts in the range `1..XLEN`, subtract 1 and we get `0..{XLEN - 1}` (which is exactly `Self::len`)
+        let index = index.get() as usize - 1;
+
+        unsafe { self.0.get_unchecked(index) }
+    }
+}
+
+impl<T> IndexMut<RiscV> for File<T> {
+    #[allow(unsafe_code)]
+    #[inline]
+    fn index_mut(&mut self, index: RiscV) -> &mut Self::Output {
+        // Safety: index starts in the range `1..XLEN`, subtract 1 and we get `0..{XLEN - 1}` (which is exactly `Self::len`)
+        let index = index.get() as usize - 1;
+
+        unsafe { self.0.get_unchecked_mut(index) }
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct RiscV(NonZeroU8);
@@ -72,4 +107,6 @@ impl RiscV {
     pub const X29: Self = Self::with_u8(29).unwrap();
     pub const X30: Self = Self::with_u8(30).unwrap();
     pub const X31: Self = Self::with_u8(31).unwrap();
+
+    pub const XLEN: usize = 32;
 }

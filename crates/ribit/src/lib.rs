@@ -7,6 +7,7 @@
 )]
 #![warn(clippy::must_use_candidate)]
 
+use ribit_core::register;
 use xmas_elf::ElfFile;
 use xmas_elf::header::Data;
 use xmas_elf::sections::SectionData;
@@ -160,8 +161,7 @@ fn decode_block(
 }
 
 pub struct ExecutionEngine {
-    // xregs[0] is fixed to 0
-    xregs: [u32; ribit_jit::XLEN],
+    xregs: register::File<u32>,
     pc: u32,
     memory: Box<[u8]>,
     jit: ribit_jit::DefaultRuntime,
@@ -180,7 +180,7 @@ impl ExecutionEngine {
         let mut memory = vec![0; ribit_jit::MEMORY_SIZE as usize].into_boxed_slice();
         memory[0x10000..][..program.len()].copy_from_slice(program);
 
-        let xregs = [0; ribit_jit::XLEN];
+        let xregs = register::File([0; 31]);
         let pc = 0x10000;
         let jit = ribit_jit::DefaultRuntime::new();
 
@@ -216,7 +216,7 @@ impl ExecutionEngine {
             }
         }
 
-        let xregs = [0; ribit_jit::XLEN];
+        let xregs = register::File([0; 31]);
         let pc = entry;
         let jit = ribit_jit::DefaultRuntime::new();
 

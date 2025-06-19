@@ -37,7 +37,7 @@ impl CoreContext {
 pub struct Context {
     core: CoreContext,
     pub pc: Source<ty::I32>,
-    registers: [Option<AnySource>; 32],
+    registers: register::File<Option<AnySource>>,
     register_arg: Source<ty::I32>,
     memory_arg: Source<ty::I32>,
     registers_written: u32,
@@ -97,7 +97,7 @@ impl Context {
         Self {
             core,
             pc: Source::Const(start_pc),
-            registers: [None; 32],
+            registers: register::File([None; 31]),
             register_arg,
             memory_arg,
             registers_written: 0x0000_0000,
@@ -135,6 +135,8 @@ impl Context {
         src1: AnySource,
         src2: AnySource,
     ) -> AnySource {
+        assert_eq!(src1.ty(), src2.ty());
+
         let args = CommutativeBinArgs::new_assoc(op, src1, src2, |op, r, c| {
             let instruction = self.core.instructions.get(self.core.id_to_idx[r.id.0 as usize]);
             try_associate(instruction, op, r, c)
@@ -166,7 +168,7 @@ impl Context {
     }
 
     pub fn read_register(&mut self, reg: register::RiscV) -> AnySource {
-        *self.registers[reg.get() as usize].get_or_insert_with(|| {
+        *self.registers[reg].get_or_insert_with(|| {
             let base = self.register_arg;
             self.core.instruction(|dest| Instruction::ReadReg { dest, base, src: reg })
         })
@@ -182,7 +184,7 @@ impl Context {
     }
 
     pub fn write_register(&mut self, reg: register::RiscV, val: AnySource) {
-        let stored = &mut self.registers[reg.get() as usize];
+        let stored = &mut self.registers[reg];
 
         // don't write a value that's already there.
         // this can happen due to non cannonical NOPs (aka, certain HINTs),
@@ -285,8 +287,8 @@ impl Context {
 
     #[must_use]
     pub fn ret_with_code(mut self, addr: Source<ty::I32>, code: ReturnCode) -> Block {
-        for (idx, src) in self.registers.iter().enumerate().skip(1) {
-            let dest = register::RiscV::with_u8(idx as u8).unwrap();
+        for (idx, src) in self.registers.0.iter().enumerate() {
+            let dest = register::RiscV::with_u8((idx + 1) as u8).unwrap();
 
             if let Some(src) = *src
                 && (self.registers_written >> dest.get()) & 1 == 1
@@ -442,7 +444,9 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
             let src2 = ctx.load_register(rs2);
             ctx.write_memory(addr.downcast().unwrap(), src2, width);
         }
-        instruction::Instruction::U(instruction::U { opcode, imm, rd }) => {
+        instruction::Instruction::U(instruction::U { opcode: _, imm: _, rd: None }) => {}
+
+        instruction::Instruction::U(instruction::U { opcode, imm, rd: Some(rd) }) => {
             // ensure that the immediate only uses the upper 20 bits.
             let imm = imm & 0xffff_f000;
             let imm = AnySource::Const(Constant::i32(imm));
@@ -452,9 +456,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
                 opcode::U::AUIPC => ctx.add(ctx.pc.upcast(), imm),
             };
 
-            if let Some(rd) = rd {
-                ctx.write_register(rd, res);
-            }
+            ctx.write_register(rd, res);
         }
     }
 

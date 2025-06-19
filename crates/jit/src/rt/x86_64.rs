@@ -43,9 +43,8 @@ mod test {
 
     use crate::AMD64Runtime;
 
-    fn init() -> ([u32; 32], Vec<u8>) {
-        let mut regs = [0xaaaa_aaaa; 32];
-        regs[0] = 0;
+    fn init() -> (register::File<u32>, Vec<u8>) {
+        let regs = register::File([0xaaaa_aaaa; 31]);
         let memory = vec![0xbb; crate::MEMORY_SIZE as usize];
 
         (regs, memory)
@@ -76,9 +75,10 @@ mod test {
         ctx.execute_basic_block(&mut pc, &mut regs, &mut memory, |_, _| Err(())).unwrap();
         assert_eq!(pc, 4096);
 
-        for (idx, &reg) in regs.iter().enumerate().skip(1) {
+        for (idx, &reg) in regs.0.iter().enumerate() {
+            let idx = idx + 1;
             match idx {
-                0 => assert_eq!(reg, 0, "reg-num: {idx}"),
+                0 => unreachable!(),
                 4 => assert_eq!(reg, 4, "reg-num: {idx}"),
                 _ => assert_eq!(reg, 0xaaaa_aaaa, "reg-num: {idx}"),
             }
@@ -106,16 +106,17 @@ mod test {
 
         let (mut regs, mut memory) = init();
 
-        regs[1] = 1024;
+        regs[register::RiscV::X1] = 1024;
         let mut pc = 48;
 
         ctx.execute_basic_block(&mut pc, &mut regs, &mut memory, |_, _| Err(())).unwrap();
 
         assert_eq!(pc, 2046 + 1024);
 
-        for (idx, &reg) in regs.iter().enumerate() {
+        for (idx, &reg) in regs.0.iter().enumerate() {
+            let idx = idx + 1;
             match idx {
-                0 => assert_eq!(reg, 0, "reg-num={idx}"),
+                0 => unreachable!(),
                 1 => assert_eq!(reg, 1024, "reg-num={idx}"),
                 4 => assert_eq!(reg, 52, "reg-num={idx}"),
                 _ => assert_eq!(reg, 0xaaaa_aaaa, "reg-num={idx}"),
@@ -143,9 +144,10 @@ mod test {
         ctx.execute_basic_block(&mut pc, &mut regs, &mut memory, |_, _| Err(())).unwrap();
         assert_eq!(pc, 4096);
 
-        for (idx, reg) in regs.iter().copied().enumerate() {
+        for (idx, &reg) in regs.0.iter().enumerate() {
+            let idx = idx + 1;
             match idx {
-                0 => assert_eq!(reg, 0),
+                0 => unreachable!(),
                 _ => assert_eq!(reg, 0xaaaa_aaaa),
             }
         }

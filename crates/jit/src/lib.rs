@@ -32,8 +32,6 @@ pub type DefaultRuntime = InterpreterRuntime;
 #[cfg(target_arch = "x86_64")]
 pub type AMD64Runtime = Runtime<rt::x86_64::rt::X86_64>;
 
-pub const XLEN: usize = 32;
-
 pub const MEMORY_SIZE: u32 = 1024 * 1024 * 16;
 
 // ensure that memory size is a power of two.

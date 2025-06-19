@@ -300,8 +300,6 @@ impl CommutativeBinArgs {
     where
         F: FnOnce(CommutativeBinOp, Reference, Constant) -> (Reference, Constant),
     {
-        assert_eq!(src1.ty(), src2.ty());
-
         let (src1, src2) = match (src1, src2) {
             (AnySource::Const(src1), AnySource::Const(src2)) => {
                 return Err(AnySource::Const(eval::commutative_binop(src1, src2, op)));

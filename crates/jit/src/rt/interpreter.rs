@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Range;
 
+use ribit_core::register;
 use ribit_ssa::{AnySource, Bitness, Constant, Id, eval, ty};
 
 use super::common;
@@ -36,7 +37,7 @@ fn unwrap_bool(c: Constant) -> bool {
 impl Block {
     fn execute(
         &self,
-        registers: &mut [u32; crate::XLEN],
+        registers: &mut register::File<u32>,
         memory: &mut [u8],
     ) -> (u32, ribit_core::ReturnCode) {
         let mut evaluated: HashMap<Id, Constant> = HashMap::new();
@@ -57,12 +58,12 @@ impl Block {
                 }
 
                 &ribit_ssa::Instruction::ReadReg { dest, base: _, src } => {
-                    evaluated.insert(dest, Constant::i32(registers[src.get() as usize]));
+                    evaluated.insert(dest, Constant::i32(registers[src]));
                 }
 
                 &ribit_ssa::Instruction::WriteReg { dest, base: _, src } => {
                     let src = unwrap_u32(lookup_source(&evaluated, src));
-                    registers[dest.get() as usize] = src;
+                    registers[dest] = src;
                 }
 
                 &ribit_ssa::Instruction::ReadMem { dest, src, base: _, width, sign_extend } => {
@@ -180,7 +181,7 @@ impl crate::rt::Target for Interpreter {
     fn execute_block(
         &mut self,
         pc: u32,
-        regs: &mut [u32; crate::XLEN],
+        regs: &mut register::File<u32>,
         memory: &mut [u8],
     ) -> (u32, ribit_core::ReturnCode) {
         self.lookup_block(pc).unwrap().execute(regs, memory)

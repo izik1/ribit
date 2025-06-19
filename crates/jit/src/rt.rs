@@ -1,4 +1,4 @@
-use ribit_core::{ReturnCode, instruction};
+use ribit_core::{ReturnCode, instruction, register};
 use ribit_ssa::opt;
 use ribit_ssa::opt::pass_manager::InplacePass;
 
@@ -26,7 +26,7 @@ pub trait Target {
     fn execute_block(
         &mut self,
         pc: u32,
-        regs: &mut [u32; crate::XLEN],
+        regs: &mut register::File<u32>,
         memory: &mut [u8],
     ) -> (u32, ReturnCode);
 }
@@ -37,7 +37,7 @@ impl<Rt: Target + Default> Runtime<Rt> {
     pub fn execute_basic_block<DecodeError>(
         &mut self,
         pc: &mut u32,
-        regs: &mut [u32; crate::XLEN],
+        regs: &mut register::File<u32>,
         memory: &mut [u8],
         decode: impl FnOnce(u32, &[u8]) -> DecodeOutput<DecodeError>,
     ) -> Result<(), DecodeError> {
