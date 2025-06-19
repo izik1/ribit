@@ -17,3 +17,7 @@ ribit-decode.path = "crates/decode"
 ribit-encode.path = "crates/encode"
 ribit-jit.path = "crates/jit"
 ribit-ssa.path = "crates/ssa"
+
+[profile.profiling]
+inherits = "release"
+debug = true

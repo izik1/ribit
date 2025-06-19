@@ -37,6 +37,8 @@
                   cargo-edit
                   cargo-llvm-lines
                   cargo-fuzz
+                  cargo-flamegraph
+                  samply
                 ];
             };
         }
