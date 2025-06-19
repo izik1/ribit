@@ -7,11 +7,28 @@
 )]
 #![warn(clippy::must_use_candidate)]
 
+use core::fmt;
+
 use ribit_core::register;
 use xmas_elf::ElfFile;
 use xmas_elf::header::Data;
 use xmas_elf::sections::SectionData;
 use xmas_elf::symbol_table::{Binding, Entry};
+
+#[derive(Eq, PartialEq)]
+struct LowerHex<T: fmt::LowerHex>(T);
+
+impl<T: fmt::LowerHex> fmt::Display for LowerHex<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:#0width$x}", self.0, width = const { std::mem::size_of::<T>() * 2 + 2 })
+    }
+}
+
+impl<T: fmt::LowerHex> fmt::Debug for LowerHex<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
 
 struct TestAddrs {
     _from_host: u32,
@@ -39,25 +56,27 @@ fn sym_iter<S: Entry>(
 
         let name = sym.get_name(file)?;
 
-        tracing::info!("sym: {name}");
+        tracing::info!(sym = name);
 
         let value = sym.value();
 
-        if name == "tohost" {
-            tracing::info!("found tohost: {value:08x}");
-            ctx.to_host = Some(value as u32);
-        }
+        match name {
+            "tohost" => {
+                tracing::info!(to_host=%LowerHex(value), "found tohost");
+                ctx.to_host = Some(value as u32);
+            }
 
-        if name == "begin_signature" {
-            tracing::info!("found begin_signature: {value:08x}");
+            "begin_signature" => {
+                tracing::info!(begin_signature=%LowerHex(value), "found begin_signaturev");
+                ctx.begin_signature = Some(value as u32);
+            }
 
-            ctx.begin_signature = Some(value as u32);
-        }
+            "end_signature" => {
+                tracing::info!(end_signature=%LowerHex(value), "found end_signaturev");
+                ctx.end_signature = Some(value as u32);
+            }
 
-        if name == "end_signature" {
-            tracing::info!("found end_signature: {value:08x}");
-
-            ctx.end_signature = Some(value as u32);
+            _ => {}
         }
     }
 
@@ -142,12 +161,12 @@ fn decode_block(
     let mut block_instrs = Vec::new();
     let terminator;
     loop {
-        tracing::debug!("PC: ${:04x}", current_pc);
+        let _span =
+            tracing::debug_span!("decode_instruction", pc = %LowerHex(current_pc)).entered();
         let inst_info = parse_instruction(&mut current_pc, memory)?;
 
         tracing::debug!(
-            "instr: {}",
-            ribit_core::disassemble::FmtInstruction::from_info(&inst_info)
+            instruction = %ribit_core::disassemble::FmtInstruction::from_info(&inst_info)
         );
 
         if inst_info.instruction.is_terminator() {
