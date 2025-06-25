@@ -85,26 +85,17 @@ fn parse(mut data: &[u8]) -> Block {
             instruction::Info { instruction, len: 2 }
         };
 
-        if info.instruction.is_terminator() {
-            return ribit_ssa::lower::terminal(ctx, info.instruction, info.len);
-        }
+        let info = match info.into_controlflow() {
+            ControlFlow::Continue(info) => info,
+            ControlFlow::Break(info) => {
+                return ribit_ssa::lower::terminal(ctx, info.instruction, info.len);
+            }
+        };
 
-        match info.instruction {
-            Instruction::R(instruction::R {
-                rs1: _,
-                rs2: _,
-                rd: _,
-                opcode:
-                    opcode::R::MUL
-                    | opcode::R::MULH
-                    | opcode::R::MULHSU
-                    | opcode::R::MULHU
-                    | opcode::R::DIV
-                    | opcode::R::DIVU
-                    | opcode::R::REM
-                    | opcode::R::REMU,
-            }) => continue,
-            _ => {}
+        if let Instruction::R(instruction::R { opcode, .. }) = info.instruction
+            && opcode.is_m_extension()
+        {
+            continue;
         }
 
         ribit_ssa::lower::non_terminal(&mut ctx, info.instruction, info.len);
@@ -626,8 +617,8 @@ fn mutate_instruction<R: rand::Rng + ?Sized>(
             3 => instruction::I::new(imm, rs1, rd, opcode::I::SLLI).into(),
             4 => instruction::I::new(imm, rs1, rd, opcode::I::SRLI).into(),
             5 => instruction::I::new(imm, rs1, rd, opcode::I::SRAI).into(),
-            6 => instruction::I::new(imm, rs1, rd, opcode::I::SICond(opcode::Cmp::Lt)).into(),
-            7 => instruction::I::new(imm, rs1, rd, opcode::I::SICond(opcode::Cmp::Ltu)).into(),
+            6 => instruction::I::new(imm, rs1, rd, opcode::I::SICond(opcode::SCmp::Lt)).into(),
+            7 => instruction::I::new(imm, rs1, rd, opcode::I::SICond(opcode::SCmp::Ltu)).into(),
             8 => instruction::IJump::new(imm, rs1, rd, opcode::IJump::JALR).into(),
             9 => instruction::IMem::new(imm, rs1, rd, opcode::IMem::FENCE).into(),
             10 => instruction::IMem::new(imm, rs1, rd, opcode::IMem::LD(Width::Byte)).into(),
@@ -663,8 +654,8 @@ fn mutate_instruction<R: rand::Rng + ?Sized>(
                         5 => opcode::R::SRA,
                         6 => opcode::R::SUB,
                         7 => opcode::R::XOR,
-                        8 => opcode::R::SCond(opcode::Cmp::Lt),
-                        9 => opcode::R::SCond(opcode::Cmp::Ltu),
+                        8 => opcode::R::SCond(opcode::SCmp::Lt),
+                        9 => opcode::R::SCond(opcode::SCmp::Ltu),
                         _ => unreachable!(),
                     };
 

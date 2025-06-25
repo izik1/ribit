@@ -16,6 +16,8 @@ pub mod instruction;
 pub mod opcode;
 pub mod register;
 
+pub type Never = core::convert::Infallible;
+
 // note: RISC-V would have these be: B, H(W), W
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Ord, PartialOrd, Hash)]
 pub enum Width {

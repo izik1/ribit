@@ -89,10 +89,8 @@ pub fn instruction(instruction: &Instruction) -> Result<u32, EncodeError> {
                 opcode::R::ADD => (0b011_0011, 0b000, 0b000_0000),
                 opcode::R::SUB => (0b011_0011, 0b000, 0b010_0000),
                 opcode::R::SLL => (0b011_0011, 0b001, 0b000_0000),
-                opcode::R::SCond(opcode::Cmp::Lt) => (0b011_0011, 0b010, 0b000_0000),
-                opcode::R::SCond(opcode::Cmp::Ltu) => (0b011_0011, 0b011, 0b000_0000),
-                // these don't exist.
-                opcode::R::SCond(_) => return Err(EncodeError::InvalidInstruction),
+                opcode::R::SCond(opcode::SCmp::Lt) => (0b011_0011, 0b010, 0b000_0000),
+                opcode::R::SCond(opcode::SCmp::Ltu) => (0b011_0011, 0b011, 0b000_0000),
                 opcode::R::XOR => (0b011_0011, 0b100, 0b000_0000),
                 opcode::R::SRL => (0b011_0011, 0b101, 0b000_0000),
                 opcode::R::SRA => (0b011_0011, 0b101, 0b010_0000),
@@ -128,10 +126,8 @@ pub fn instruction(instruction: &Instruction) -> Result<u32, EncodeError> {
 
             let (opcode, func3): (u8, u8) = match opcode {
                 opcode::I::ADDI => (0b001_0011, 0b000),
-                opcode::I::SICond(opcode::Cmp::Lt) => (0b001_0011, 0b010),
-                opcode::I::SICond(opcode::Cmp::Ltu) => (0b001_0011, 0b011),
-                // these don't exist
-                opcode::I::SICond(_) => return Err(EncodeError::InvalidInstruction),
+                opcode::I::SICond(opcode::SCmp::Lt) => (0b001_0011, 0b010),
+                opcode::I::SICond(opcode::SCmp::Ltu) => (0b001_0011, 0b011),
                 opcode::I::XORI => (0b001_0011, 0b100),
                 opcode::I::ORI => (0b001_0011, 0b110),
                 opcode::I::ANDI => (0b001_0011, 0b111),

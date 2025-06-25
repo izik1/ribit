@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod tests;
 
+use std::ops::ControlFlow;
+
+use ribit_core::instruction::{NonTerminal, Terminal};
 use ribit_core::{ReturnCode, Width, instruction, opcode, register};
 
 use super::{AnySource, CmpKind, Id, Instruction, ShiftOp};
@@ -320,14 +323,25 @@ impl Context {
     }
 }
 
-#[allow(clippy::needless_pass_by_value)]
-pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, len: u32) {
-    match instruction {
-        instruction::Instruction::J(_)
-        | instruction::Instruction::Sys(_)
-        | instruction::Instruction::B(_)
-        | instruction::Instruction::IJump(_) => panic!("Instruction was a terminal"),
+#[track_caller]
+pub fn lower<I: Iterator<Item = instruction::Info>>(mut ctx: Context, instructions: I) -> Block {
+    for info in instructions {
+        match info.into_controlflow() {
+            ControlFlow::Continue(info) => non_terminal(&mut ctx, info.instruction, info.len),
+            ControlFlow::Break(info) => return terminal(ctx, info.instruction, info.len),
+        }
+    }
 
+    panic!("No block terminator")
+}
+
+#[allow(clippy::needless_pass_by_value)]
+pub fn non_terminal(
+    ctx: &mut Context,
+    instruction: instruction::Instruction<NonTerminal>,
+    len: u32,
+) {
+    match instruction {
         instruction::Instruction::IMem(instruction::IMem { opcode, imm, rs1, rd }) => {
             match opcode {
                 // todo: finer grained fences.
@@ -388,18 +402,7 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
             ctx.write_register(rd, res);
         }
 
-        instruction::Instruction::R(instruction::R {
-            opcode:
-                opcode::R::MUL
-                | opcode::R::MULH
-                | opcode::R::MULHSU
-                | opcode::R::MULHU
-                | opcode::R::DIV
-                | opcode::R::DIVU
-                | opcode::R::REM
-                | opcode::R::REMU,
-            ..
-        }) => {
+        instruction::Instruction::R(instruction::R { opcode, .. }) if opcode.is_m_extension() => {
             todo!("M-extension instructions have no JIT support")
         }
         // same as with I-type, ignore nops to avoid needing to get rid of them.
@@ -465,9 +468,11 @@ pub fn non_terminal(ctx: &mut Context, instruction: instruction::Instruction, le
 
 #[must_use]
 #[allow(clippy::needless_pass_by_value)]
-pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u32) -> Block {
-    let len = len;
-
+pub fn terminal(
+    mut ctx: Context,
+    instruction: instruction::Instruction<Terminal>,
+    len: u32,
+) -> Block {
     match instruction {
         instruction::Instruction::J(instruction::J { opcode: opcode::J::JAL, rd, imm }) => {
             // load pc + len into rd (the link register)
@@ -548,7 +553,5 @@ pub fn terminal(mut ctx: Context, instruction: instruction::Instruction, len: u3
 
             ctx.ret_with_addr(addr.downcast().unwrap())
         }
-
-        _ => panic!("Instruction wasn't a terminal"),
     }
 }

@@ -1,4 +1,4 @@
-use ribit_core::opcode::{self, Cmp};
+use ribit_core::opcode::{self, Cmp, SCmp};
 use ribit_core::{Width, instruction, register};
 
 use super::{
@@ -11,8 +11,8 @@ pub(super) fn r_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[
         "add" | "ADD" => opcode::R::ADD,
         "sub" | "SUB" => opcode::R::SUB,
         "sll" | "SLL" => opcode::R::SLL,
-        "slt" | "SLT" => opcode::R::SCond(Cmp::Lt),
-        "sltu" | "SLTU" => opcode::R::SCond(Cmp::Ltu),
+        "slt" | "SLT" => opcode::R::SCond(SCmp::Lt),
+        "sltu" | "SLTU" => opcode::R::SCond(SCmp::Ltu),
         "xor" | "XOR" => opcode::R::XOR,
         "srl" | "SRL" => opcode::R::SRL,
         "sra" | "SRA" => opcode::R::SRA,
@@ -57,8 +57,8 @@ fn r_args(
 pub(super) fn i_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
     let opcode = match op {
         "addi" | "ADDI" => opcode::I::ADDI,
-        "slti" | "SLTI" => opcode::I::SICond(Cmp::Lt),
-        "sltiu" | "SLTIU" => opcode::I::SICond(Cmp::Ltu),
+        "slti" | "SLTI" => opcode::I::SICond(SCmp::Lt),
+        "sltiu" | "SLTIU" => opcode::I::SICond(SCmp::Ltu),
         "xori" | "XORI" => opcode::I::XORI,
         "ori" | "ORI" => opcode::I::ORI,
         "andi" | "ANDI" => opcode::I::ANDI,

@@ -8,7 +8,9 @@
 #![warn(clippy::must_use_candidate)]
 
 use core::fmt;
+use std::ops::ControlFlow;
 
+use ribit_core::instruction::{self, NonTerminal, Terminal};
 use ribit_core::register;
 use xmas_elf::ElfFile;
 use xmas_elf::header::Data;
@@ -107,7 +109,7 @@ impl TestAddrs {
 fn parse_compressed(
     pc: &mut u32,
     memory: &[u8],
-) -> Result<ribit_core::instruction::Info, ribit_decode::DecodeError> {
+) -> Result<instruction::Info, ribit_decode::DecodeError> {
     if *pc as usize + 1 >= memory.len() {
         return Err(ribit_decode::DecodeError::Other);
     }
@@ -119,7 +121,7 @@ fn parse_compressed(
     tracing::debug!("instruction: {instr:016b}");
 
     let instr = ribit_decode::compressed::decode_instruction(instr)?;
-    let info = ribit_core::instruction::Info::new(instr, 2);
+    let info = instruction::Info::new(instr, 2);
     *pc += 2;
     Ok(info)
 }
@@ -127,7 +129,7 @@ fn parse_compressed(
 fn parse_instruction(
     pc: &mut u32,
     memory: &[u8],
-) -> Result<ribit_core::instruction::Info, ribit_decode::DecodeError> {
+) -> Result<instruction::Info, ribit_decode::DecodeError> {
     if *pc as usize + 3 >= memory.len() {
         return Err(ribit_decode::DecodeError::Other);
     }
@@ -141,7 +143,7 @@ fn parse_instruction(
     if instr & 0b11 == 0b11 {
         tracing::debug!("instruction: {instr:032b}");
         let instr = ribit_decode::instruction(instr)?;
-        let info = ribit_core::instruction::Info::new(instr, 4);
+        let info = instruction::Info::new(instr, 4);
         *pc += 4;
         Ok(info)
     } else {
@@ -153,33 +155,30 @@ fn decode_block(
     start_pc: u32,
     memory: &[u8],
 ) -> Result<
-    (Vec<ribit_core::instruction::Info>, ribit_core::instruction::Info, u32),
+    (Vec<instruction::Info<NonTerminal>>, instruction::Info<Terminal>, u32),
     ribit_decode::DecodeError,
 > {
     let mut current_pc = start_pc;
 
-    let mut block_instrs = Vec::new();
-    let terminator;
-    loop {
+    let mut instructions = Vec::new();
+    let terminator = loop {
         let _span =
             tracing::debug_span!("decode_instruction", pc = %LowerHex(current_pc)).entered();
-        let inst_info = parse_instruction(&mut current_pc, memory)?;
+        let info = parse_instruction(&mut current_pc, memory)?;
 
         tracing::debug!(
-            instruction = %ribit_core::disassemble::FmtInstruction::from_info(&inst_info)
+            instruction = %ribit_core::disassemble::FmtInstruction::from_info(&info)
         );
 
-        if inst_info.instruction.is_terminator() {
-            terminator = inst_info;
-            break;
-        }
-
-        block_instrs.push(inst_info);
-    }
+        instructions.push(match info.into_controlflow() {
+            ControlFlow::Break(info) => break info,
+            ControlFlow::Continue(info) => info,
+        });
+    };
 
     let end_pc = current_pc;
 
-    Ok((block_instrs, terminator, end_pc))
+    Ok((instructions, terminator, end_pc))
 }
 
 pub struct ExecutionEngine {

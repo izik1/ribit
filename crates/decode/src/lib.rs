@@ -81,10 +81,10 @@ pub fn instruction(instruction: u32) -> Result<Instruction, DecodeError> {
         (0b010_0011, 0b010, _) => Instruction::S(from_instruction::s(instruction, Width::DWord)),
         (0b001_0011, 0b000, _) => Instruction::I(from_instruction::i(instruction, opcode::I::ADDI)),
         (0b001_0011, 0b010, _) => {
-            Instruction::I(from_instruction::i(instruction, opcode::I::SICond(opcode::Cmp::Lt)))
+            Instruction::I(from_instruction::i(instruction, opcode::I::SICond(opcode::SCmp::Lt)))
         }
         (0b001_0011, 0b011, _) => {
-            Instruction::I(from_instruction::i(instruction, opcode::I::SICond(opcode::Cmp::Ltu)))
+            Instruction::I(from_instruction::i(instruction, opcode::I::SICond(opcode::SCmp::Ltu)))
         }
         (0b001_0011, 0b100, _) => Instruction::I(from_instruction::i(instruction, opcode::I::XORI)),
         (0b001_0011, 0b110, _) => Instruction::I(from_instruction::i(instruction, opcode::I::ORI)),
@@ -110,12 +110,12 @@ pub fn instruction(instruction: u32) -> Result<Instruction, DecodeError> {
         (0b011_0011, 0b010, 0b000_0000) => Instruction::R(from_instruction::r(
             instruction,
             // SLT
-            opcode::R::SCond(opcode::Cmp::Lt),
+            opcode::R::SCond(opcode::SCmp::Lt),
         )),
         (0b011_0011, 0b011, 0b000_0000) => Instruction::R(from_instruction::r(
             instruction,
             // SLTU
-            opcode::R::SCond(opcode::Cmp::Ltu),
+            opcode::R::SCond(opcode::SCmp::Ltu),
         )),
         (0b011_0011, 0b100, 0b000_0000) => {
             Instruction::R(from_instruction::r(instruction, opcode::R::XOR))

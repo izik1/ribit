@@ -1,3 +1,4 @@
+use ribit_core::instruction::{NonTerminal, Terminal};
 use ribit_core::{ReturnCode, instruction, register};
 use ribit_ssa::opt;
 use ribit_ssa::opt::pass_manager::InplacePass;
@@ -31,7 +32,8 @@ pub trait Target {
     ) -> (u32, ReturnCode);
 }
 
-pub type DecodeOutput<E> = Result<(Vec<instruction::Info>, instruction::Info, u32), E>;
+pub type DecodeOutput<E> =
+    Result<(Vec<instruction::Info<NonTerminal>>, instruction::Info<Terminal>, u32), E>;
 
 impl<Rt: Target + Default> Runtime<Rt> {
     pub fn execute_basic_block<DecodeError>(
@@ -74,8 +76,8 @@ impl<Rt: Target + Default> Runtime<Rt> {
 
     pub fn generate_basic_block(
         &mut self,
-        block_instrs: Vec<instruction::Info>,
-        branch: instruction::Info,
+        block_instrs: Vec<instruction::Info<NonTerminal>>,
+        branch: instruction::Info<Terminal>,
         start_pc: u32,
         end_pc: u32,
     ) {

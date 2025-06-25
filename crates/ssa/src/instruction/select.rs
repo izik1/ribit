@@ -22,8 +22,6 @@ impl Select {
     pub fn ty(&self) -> Type {
         ty::assert_types_eq!(self.if_true.ty(), self.if_false.ty());
 
-        let ty = self.if_true.ty();
-
-        ty
+        self.if_true.ty()
     }
 }

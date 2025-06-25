@@ -188,7 +188,7 @@ mod test {
 
         let res = super::extend_int(Width::DWord, Constant::Bool(true), true);
 
-        assert_eq!(res.signed(), -1)
+        assert_eq!(res.signed(), -1);
     }
 
     #[test]

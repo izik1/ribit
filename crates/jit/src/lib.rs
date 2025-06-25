@@ -114,7 +114,7 @@ mod test {
     use std::fmt;
 
     use rasen::params::Register;
-    use ribit_ssa::Block;
+    use ribit_ssa::{Block, lower};
 
     pub struct ShowAllocs<'a> {
         pub allocs: &'a HashMap<ribit_ssa::Id, Register>,
@@ -194,17 +194,17 @@ mod test {
 
         assert!(output.errors.is_empty(), "failing due to previous error(s)");
 
-        let mut instructions = output.instructions;
+        let mut instructions = output.instructions.into_iter();
 
-        let mut ctx = ribit_ssa::lower::Context::new(1024, crate::MEMORY_SIZE);
+        let context = ribit_ssa::lower::Context::new(1024, crate::MEMORY_SIZE);
 
-        let last = instructions.remove(instructions.len() - 1);
+        let block = lower::lower(context, &mut instructions);
 
-        for instruction in instructions {
-            ribit_ssa::lower::non_terminal(&mut ctx, instruction.instruction, instruction.len);
-        }
+        let remainder = instructions.as_slice();
 
-        ribit_ssa::lower::terminal(ctx, last.instruction, last.len)
+        assert!(remainder.is_empty(), "Instructions after terminator: {:?}", remainder);
+
+        block
     }
 
     pub fn max_fn() -> Block {

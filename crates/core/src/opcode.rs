@@ -9,7 +9,7 @@ pub enum R {
     ADD,
     SUB,
     SLL,
-    SCond(Cmp),
+    SCond(SCmp),
     XOR,
     SRL,
     SRA,
@@ -26,6 +26,21 @@ pub enum R {
 }
 
 impl R {
+    #[must_use]
+    pub const fn is_m_extension(self) -> bool {
+        matches!(
+            self,
+            Self::MUL
+                | Self::MULH
+                | Self::MULHSU
+                | Self::MULHU
+                | Self::DIV
+                | Self::DIVU
+                | Self::REM
+                | Self::REMU,
+        )
+    }
+
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -45,12 +60,8 @@ impl R {
             R::DIVU => "DIVU",
             R::REM => "REM",
             R::REMU => "REMU",
-            R::SCond(Cmp::Lt) => "SLT",
-            R::SCond(Cmp::Ltu) => "SLTU",
-            R::SCond(Cmp::Eq) => panic!("invalid instruction: SEQ"),
-            R::SCond(Cmp::Ne) => panic!("invalid instruction: SNE"),
-            R::SCond(Cmp::Ge) => panic!("invalid instruction: SGE"),
-            R::SCond(Cmp::Geu) => panic!("invalid instruction: SGEU"),
+            R::SCond(SCmp::Lt) => "SLT",
+            R::SCond(SCmp::Ltu) => "SLTU",
         }
     }
 }
@@ -94,9 +105,15 @@ pub enum Cmp {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum SCmp {
+    Lt,
+    Ltu,
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum I {
     ADDI,
-    SICond(Cmp),
+    SICond(SCmp),
     XORI,
     ORI,
     ANDI,
@@ -107,7 +124,7 @@ pub enum I {
 
 impl I {
     #[must_use]
-    pub fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             I::ADDI => "ADDI",
             I::XORI => "XORI",
@@ -116,13 +133,8 @@ impl I {
             I::SLLI => "SLLI",
             I::SRLI => "SRLI",
             I::SRAI => "SRAI",
-            I::SICond(Cmp::Lt) => "SLTI",
-            I::SICond(Cmp::Ltu) => "SLTIU",
-            // todo: log a warning and return the string
-            I::SICond(Cmp::Eq) => panic!("invalid instruction: SEQI"),
-            I::SICond(Cmp::Ne) => panic!("invalid instruction: SNEI"),
-            I::SICond(Cmp::Ge) => panic!("invalid instruction: SGEI"),
-            I::SICond(Cmp::Geu) => panic!("invalid instruction: SGEIU"),
+            I::SICond(SCmp::Lt) => "SLTI",
+            I::SICond(SCmp::Ltu) => "SLTIU",
         }
     }
 }

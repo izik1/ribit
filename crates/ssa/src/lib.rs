@@ -191,6 +191,15 @@ impl From<opcode::Cmp> for CmpKind {
     }
 }
 
+impl From<opcode::SCmp> for CmpKind {
+    fn from(cmp: opcode::SCmp) -> Self {
+        match cmp {
+            opcode::SCmp::Lt => Self::Inequality(Inequality::Slt),
+            opcode::SCmp::Ltu => Self::Inequality(Inequality::Ult),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub enum CommutativeBinOp {
     And,

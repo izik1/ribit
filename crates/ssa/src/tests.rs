@@ -26,7 +26,7 @@ impl IntoBlock for &'_ str {
 }
 
 #[track_caller]
-pub(crate) fn assemble_block_with_context(mut context: lower::Context, block: &str) -> Block {
+pub(crate) fn assemble_block_with_context(context: lower::Context, block: &str) -> Block {
     let output = ribit_asm::tokenize(block, true);
     for error in &output.errors {
         eprintln!("error: {error}");
@@ -34,15 +34,15 @@ pub(crate) fn assemble_block_with_context(mut context: lower::Context, block: &s
 
     assert!(output.errors.is_empty(), "failing due to previous error(s)");
 
-    let mut instructions = output.instructions;
+    let mut instructions = output.instructions.into_iter();
 
-    let last = instructions.remove(instructions.len() - 1);
+    let block = lower::lower(context, &mut instructions);
 
-    for instruction in instructions {
-        lower::non_terminal(&mut context, instruction.instruction, instruction.len);
-    }
+    let remainder = instructions.as_slice();
 
-    lower::terminal(context, last.instruction, last.len)
+    assert!(remainder.is_empty(), "Instructions after terminator: {:?}", remainder);
+
+    block
 }
 
 #[track_caller]

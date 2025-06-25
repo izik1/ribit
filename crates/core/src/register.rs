@@ -20,6 +20,13 @@ impl<T> File<T> {
     pub const fn len(&self) -> usize {
         self.0.len()
     }
+
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        // "false" but written in a way that makes it painfully clear _why_ it's false
+        // (because this is basically an array with a constant len of > 0).
+        const { File([(); RiscV::XLEN - 1]).0.is_empty() }
+    }
 }
 
 impl<T> Index<RiscV> for File<T> {
