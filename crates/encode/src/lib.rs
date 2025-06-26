@@ -253,8 +253,11 @@ mod tests {
     #[test]
     #[ignore = "test is very slow"]
     fn roundtrip_all() {
-        for raw in 0_u32..=u32::MAX {
+        let mut count: usize = 0;
+        for raw in 0_u32..=(u32::MAX >> 2) {
+            let raw = (raw << 2) | 0b11;
             if let Ok(instruction) = ribit_decode::instruction(raw) {
+                count += 1;
                 let res = super::instruction(&instruction);
 
                 assert!(res.is_ok(), "decode failed: {instruction:?}");
@@ -264,5 +267,7 @@ mod tests {
                 assert!(raw == res, "roundtrip failed ({raw:032b} != {res:032b}): {instruction:?}");
             }
         }
+
+        assert_eq!(count, 193_626_114);
     }
 }
