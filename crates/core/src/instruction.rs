@@ -138,12 +138,14 @@ pub struct Sys {
 
 impl Sys {
     #[must_use]
+    #[inline(always)]
     pub const fn new(opcode: opcode::RSys) -> Self {
         Self { opcode }
     }
 }
 
 impl From<Sys> for Instruction {
+    #[inline(always)]
     fn from(value: Sys) -> Self {
         Self::Sys(value)
     }
@@ -159,6 +161,7 @@ pub struct R {
 
 impl R {
     #[must_use]
+    #[inline(always)]
     pub const fn new(
         rs1: Option<RiscVRegister>,
         rs2: Option<RiscVRegister>,
@@ -170,6 +173,7 @@ impl R {
 }
 
 impl From<R> for Instruction {
+    #[inline(always)]
     fn from(value: R) -> Self {
         Self::R(value)
     }
@@ -185,6 +189,7 @@ pub struct I {
 
 impl I {
     #[must_use]
+    #[inline(always)]
     pub const fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
@@ -196,6 +201,7 @@ impl I {
 }
 
 impl From<I> for Instruction {
+    #[inline(always)]
     fn from(value: I) -> Self {
         Self::I(value)
     }
@@ -211,6 +217,7 @@ pub struct IJump {
 
 impl IJump {
     #[must_use]
+    #[inline(always)]
     pub const fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
@@ -222,6 +229,7 @@ impl IJump {
 }
 
 impl From<IJump> for Instruction {
+    #[inline(always)]
     fn from(value: IJump) -> Self {
         Self::IJump(value)
     }
@@ -237,6 +245,7 @@ pub struct IMem {
 
 impl IMem {
     #[must_use]
+    #[inline(always)]
     pub const fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
@@ -248,6 +257,7 @@ impl IMem {
 }
 
 impl From<IMem> for Instruction {
+    #[inline(always)]
     fn from(value: IMem) -> Self {
         Self::IMem(value)
     }
@@ -263,6 +273,7 @@ pub struct S {
 
 impl S {
     #[must_use]
+    #[inline(always)]
     pub const fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
@@ -274,6 +285,7 @@ impl S {
 }
 
 impl From<S> for Instruction {
+    #[inline(always)]
     fn from(value: S) -> Self {
         Self::S(value)
     }
@@ -289,6 +301,7 @@ pub struct B {
 
 impl B {
     #[must_use]
+    #[inline(always)]
     pub const fn new(
         imm: u16,
         rs1: Option<RiscVRegister>,
@@ -300,6 +313,7 @@ impl B {
 }
 
 impl From<B> for Instruction {
+    #[inline(always)]
     fn from(value: B) -> Self {
         Self::B(value)
     }
@@ -314,12 +328,14 @@ pub struct U {
 
 impl U {
     #[must_use]
+    #[inline(always)]
     pub const fn new(imm: u32, rd: Option<RiscVRegister>, opcode: opcode::U) -> Self {
         Self { imm, rd, opcode }
     }
 }
 
 impl From<U> for Instruction {
+    #[inline(always)]
     fn from(value: U) -> Self {
         Self::U(value)
     }
@@ -334,12 +350,14 @@ pub struct J {
 
 impl J {
     #[must_use]
+    #[inline(always)]
     pub const fn new(imm: u32, rd: Option<RiscVRegister>, opcode: opcode::J) -> Self {
         Self { imm, rd, opcode }
     }
 }
 
 impl From<J> for Instruction {
+    #[inline(always)]
     fn from(value: J) -> Self {
         Self::J(value)
     }

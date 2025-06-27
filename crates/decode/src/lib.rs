@@ -7,12 +7,12 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #![no_std]
 
-use ribit_core::instruction::{self, Instruction};
+use ribit_core::instruction::{self, Instruction, InstructionKind};
 use ribit_core::{Width, opcode, register};
 
 pub mod compressed;
 mod error;
-mod from_instruction;
+mod imm;
 pub use error::{CompressedDecodeError, DecodeError, Extension};
 
 #[inline]
@@ -44,153 +44,104 @@ const fn sign_extend_32(value: u32, data_bits: u8) -> u32 {
     (((value << mask) as i32) >> mask) as u32
 }
 
-#[allow(clippy::too_many_lines)]
 pub fn instruction(instruction: u32) -> Result<Instruction, DecodeError> {
+    struct Opcode;
+
+    impl InstructionKind for Opcode {
+        type R = opcode::R;
+        type I = opcode::I;
+        type IJump = opcode::IJump;
+        type IMem = opcode::IMem;
+        type S = Width;
+        type B = opcode::Cmp;
+        type U = opcode::U;
+        type J = opcode::J;
+        type Sys = opcode::RSys;
+    }
+
     let funct3 = ((instruction >> 12) & 0b0000_0111) as u8;
     let funct7 = ((instruction >> 25) & 0b0111_1111) as u8;
     let opcode = (instruction & 0b0111_1111) as u8;
-    let instruction = match (opcode, funct3, funct7) {
-        (0b110_1111, _, _) => Instruction::J(from_instruction::j(instruction, opcode::J::JAL)),
 
-        (0b001_0111, _, _) => Instruction::U(from_instruction::u(instruction, opcode::U::AUIPC)),
+    let tmp: Instruction<Opcode> = match (opcode, funct3, funct7) {
+        (0b110_1111, _, _) => Instruction::J(opcode::J::JAL),
 
-        (0b0011_0111, _, _) => Instruction::U(from_instruction::u(instruction, opcode::U::LUI)),
+        (0b001_0111, _, _) => Instruction::U(opcode::U::AUIPC),
 
-        (0b110_0111, 0b000, _) => {
-            Instruction::IJump(from_instruction::ijump(instruction, opcode::IJump::JALR))
-        }
+        (0b0011_0111, _, _) => Instruction::U(opcode::U::LUI),
 
-        (0b110_0011, _, _) => Instruction::B(decode_branch(instruction)?),
-        (0b000_0011, 0b000, _) => {
-            Instruction::IMem(from_instruction::imem(instruction, opcode::IMem::LD(Width::Byte)))
-        }
-        (0b000_0011, 0b001, _) => {
-            Instruction::IMem(from_instruction::imem(instruction, opcode::IMem::LD(Width::Word)))
-        }
-        (0b000_0011, 0b010, _) => {
-            Instruction::IMem(from_instruction::imem(instruction, opcode::IMem::LD(Width::DWord)))
-        }
-        (0b000_0011, 0b100, _) => {
-            Instruction::IMem(from_instruction::imem(instruction, opcode::IMem::LDU(Width::Byte)))
-        }
-        (0b000_0011, 0b101, _) => {
-            Instruction::IMem(from_instruction::imem(instruction, opcode::IMem::LDU(Width::Word)))
-        }
-        (0b010_0011, 0b000, _) => Instruction::S(from_instruction::s(instruction, Width::Byte)),
-        (0b010_0011, 0b001, _) => Instruction::S(from_instruction::s(instruction, Width::Word)),
-        (0b010_0011, 0b010, _) => Instruction::S(from_instruction::s(instruction, Width::DWord)),
-        (0b001_0011, 0b000, _) => Instruction::I(from_instruction::i(instruction, opcode::I::ADDI)),
-        (0b001_0011, 0b010, _) => {
-            Instruction::I(from_instruction::i(instruction, opcode::I::SICond(opcode::SCmp::Lt)))
-        }
-        (0b001_0011, 0b011, _) => {
-            Instruction::I(from_instruction::i(instruction, opcode::I::SICond(opcode::SCmp::Ltu)))
-        }
-        (0b001_0011, 0b100, _) => Instruction::I(from_instruction::i(instruction, opcode::I::XORI)),
-        (0b001_0011, 0b110, _) => Instruction::I(from_instruction::i(instruction, opcode::I::ORI)),
-        (0b001_0011, 0b111, _) => Instruction::I(from_instruction::i(instruction, opcode::I::ANDI)),
-        (0b001_0011, 0b001, 0b000_0000) => {
-            Instruction::I(from_instruction::i(instruction, opcode::I::SLLI))
-        }
-        (0b001_0011, 0b101, 0b000_0000) => {
-            Instruction::I(from_instruction::i(instruction, opcode::I::SRLI))
-        }
-        (0b001_0011, 0b101, 0b010_0000) => {
-            Instruction::I(from_instruction::i(instruction, opcode::I::SRAI))
-        }
-        (0b011_0011, 0b000, 0b000_0000) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::ADD))
-        }
-        (0b011_0011, 0b000, 0b010_0000) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::SUB))
-        }
-        (0b011_0011, 0b001, 0b000_0000) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::SLL))
-        }
-        (0b011_0011, 0b010, 0b000_0000) => Instruction::R(from_instruction::r(
-            instruction,
-            // SLT
-            opcode::R::SCond(opcode::SCmp::Lt),
-        )),
-        (0b011_0011, 0b011, 0b000_0000) => Instruction::R(from_instruction::r(
-            instruction,
-            // SLTU
-            opcode::R::SCond(opcode::SCmp::Ltu),
-        )),
-        (0b011_0011, 0b100, 0b000_0000) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::XOR))
-        }
-        (0b011_0011, 0b101, 0b000_0000) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::SRL))
-        }
-        (0b011_0011, 0b101, 0b010_0000) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::SRA))
-        }
-        (0b011_0011, 0b110, 0b000_0000) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::OR))
-        }
-        (0b011_0011, 0b111, 0b000_0000) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::AND))
-        }
-        (0b000_1111, 0b000, _) => {
-            Instruction::IMem(from_instruction::imem(instruction, opcode::IMem::FENCE))
-        }
+        (0b110_0111, 0b000, _) => Instruction::IJump(opcode::IJump::JALR),
+
+        (0b110_0011, 0b000, _) => Instruction::B(opcode::Cmp::Eq),
+        (0b110_0011, 0b001, _) => Instruction::B(opcode::Cmp::Ne),
+        (0b110_0011, 0b100, _) => Instruction::B(opcode::Cmp::Lt),
+        (0b110_0011, 0b101, _) => Instruction::B(opcode::Cmp::Ge),
+        (0b110_0011, 0b110, _) => Instruction::B(opcode::Cmp::Ltu),
+        (0b110_0011, 0b111, _) => Instruction::B(opcode::Cmp::Geu),
+
+        (0b000_0011, 0b000, _) => Instruction::IMem(opcode::IMem::LD(Width::Byte)),
+        (0b000_0011, 0b001, _) => Instruction::IMem(opcode::IMem::LD(Width::Word)),
+        (0b000_0011, 0b010, _) => Instruction::IMem(opcode::IMem::LD(Width::DWord)),
+        (0b000_0011, 0b100, _) => Instruction::IMem(opcode::IMem::LDU(Width::Byte)),
+        (0b000_0011, 0b101, _) => Instruction::IMem(opcode::IMem::LDU(Width::Word)),
+        (0b000_1111, 0b000, _) => Instruction::IMem(opcode::IMem::FENCE),
+        (0b010_0011, 0b000, _) => Instruction::S(Width::Byte),
+        (0b010_0011, 0b001, _) => Instruction::S(Width::Word),
+        (0b010_0011, 0b010, _) => Instruction::S(Width::DWord),
+        (0b001_0011, 0b000, _) => Instruction::I(opcode::I::ADDI),
+        (0b001_0011, 0b010, _) => Instruction::I(opcode::I::SICond(opcode::SCmp::Lt)),
+        (0b001_0011, 0b011, _) => Instruction::I(opcode::I::SICond(opcode::SCmp::Ltu)),
+        (0b001_0011, 0b100, _) => Instruction::I(opcode::I::XORI),
+        (0b001_0011, 0b110, _) => Instruction::I(opcode::I::ORI),
+        (0b001_0011, 0b111, _) => Instruction::I(opcode::I::ANDI),
+        (0b001_0011, 0b001, 0b000_0000) => Instruction::I(opcode::I::SLLI),
+        (0b001_0011, 0b101, 0b000_0000) => Instruction::I(opcode::I::SRLI),
+        (0b001_0011, 0b101, 0b010_0000) => Instruction::I(opcode::I::SRAI),
+        (0b011_0011, 0b000, 0b000_0000) => Instruction::R(opcode::R::ADD),
+        (0b011_0011, 0b000, 0b010_0000) => Instruction::R(opcode::R::SUB),
+        (0b011_0011, 0b001, 0b000_0000) => Instruction::R(opcode::R::SLL),
+        (0b011_0011, 0b010, 0b000_0000) => Instruction::R(opcode::R::SCond(opcode::SCmp::Lt)),
+        (0b011_0011, 0b011, 0b000_0000) => Instruction::R(opcode::R::SCond(opcode::SCmp::Ltu)),
+        (0b011_0011, 0b100, 0b000_0000) => Instruction::R(opcode::R::XOR),
+        (0b011_0011, 0b101, 0b000_0000) => Instruction::R(opcode::R::SRL),
+        (0b011_0011, 0b101, 0b010_0000) => Instruction::R(opcode::R::SRA),
+        (0b011_0011, 0b110, 0b000_0000) => Instruction::R(opcode::R::OR),
+        (0b011_0011, 0b111, 0b000_0000) => Instruction::R(opcode::R::AND),
         (0b111_0011, _, _) if instruction & !0b111_0011 == 0 => {
-            Instruction::Sys(instruction::Sys::new(opcode::RSys::ECALL))
+            Instruction::Sys(opcode::RSys::ECALL)
         }
         (0b111_0011, _, _) if instruction & !0b111_0011 == (1 << 20) => {
-            Instruction::Sys(instruction::Sys::new(opcode::RSys::EBREAK))
+            Instruction::Sys(opcode::RSys::EBREAK)
         }
-        (0b011_0011, 0b000, 0b0000_0001) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::MUL))
-        }
-        (0b011_0011, 0b001, 0b0000_0001) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::MULH))
-        }
-        (0b011_0011, 0b010, 0b0000_0001) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::MULHSU))
-        }
-        (0b011_0011, 0b011, 0b0000_0001) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::MULHU))
-        }
-        (0b011_0011, 0b100, 0b0000_0001) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::DIV))
-        }
-        (0b011_0011, 0b101, 0b0000_0001) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::DIVU))
-        }
-        (0b011_0011, 0b110, 0b0000_0001) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::REM))
-        }
-        (0b011_0011, 0b111, 0b0000_0001) => {
-            Instruction::R(from_instruction::r(instruction, opcode::R::REMU))
-        }
+        (0b011_0011, 0b000, 0b000_0001) => Instruction::R(opcode::R::MUL),
+        (0b011_0011, 0b001, 0b000_0001) => Instruction::R(opcode::R::MULH),
+        (0b011_0011, 0b010, 0b000_0001) => Instruction::R(opcode::R::MULHSU),
+        (0b011_0011, 0b011, 0b000_0001) => Instruction::R(opcode::R::MULHU),
+        (0b011_0011, 0b100, 0b000_0001) => Instruction::R(opcode::R::DIV),
+        (0b011_0011, 0b101, 0b000_0001) => Instruction::R(opcode::R::DIVU),
+        (0b011_0011, 0b110, 0b000_0001) => Instruction::R(opcode::R::REM),
+        (0b011_0011, 0b111, 0b000_0001) => Instruction::R(opcode::R::REMU),
         _ => return Err(DecodeError::InvalidInstruction(instruction)),
     };
 
-    Ok(instruction)
-}
-
-fn decode_branch(instruction: u32) -> Result<instruction::B, DecodeError> {
-    let imm = (((instruction >> 19) & 0b0001_0000_0000_0000)
-        | ((instruction >> 20) & 0b0000_0111_1110_0000)
-        | ((instruction << 4) & 0b0000_1000_0000_0000)
-        | ((instruction >> 7) & 0b0000_0000_0001_1110)) as u16;
-    let imm = sign_extend(imm, 13);
-
     let (rs1, rs2) = decode_rs(instruction);
-    let cmp_mode = match ((instruction >> 12) & 0b111) as u8 {
-        0b000 => opcode::Cmp::Eq,
-        0b001 => opcode::Cmp::Ne,
-        0b100 => opcode::Cmp::Lt,
-        0b101 => opcode::Cmp::Ge,
-        0b110 => opcode::Cmp::Ltu,
-        0b111 => opcode::Cmp::Geu,
-        0b010 | 0b011 => return Err(DecodeError::InvalidInstruction(instruction)),
-        0x08..=0xff => unreachable!(),
-    };
+    let rd = decode_rd(instruction);
 
-    Ok(instruction::B::new(imm, rs1, rs2, cmp_mode))
+    Ok(match tmp {
+        Instruction::R(opcode) => instruction::R::new(rs1, rs2, rd, opcode).into(),
+        Instruction::I(opcode) => instruction::I::new(imm::i(instruction), rs1, rd, opcode).into(),
+        Instruction::IJump(opcode) => {
+            instruction::IJump::new(imm::i(instruction), rs1, rd, opcode).into()
+        }
+        Instruction::IMem(opcode) => {
+            instruction::IMem::new(imm::i(instruction), rs1, rd, opcode).into()
+        }
+        Instruction::S(width) => instruction::S::new(imm::s(instruction), rs1, rs2, width).into(),
+        Instruction::B(cmp) => instruction::B::new(imm::b(instruction), rs1, rs2, cmp).into(),
+        Instruction::U(opcode) => instruction::U::new(instruction & 0xffff_f000, rd, opcode).into(),
+        Instruction::J(opcode) => instruction::J::new(imm::j(instruction), rd, opcode).into(),
+        Instruction::Sys(opcode) => instruction::Sys::new(opcode).into(),
+    })
 }
 
 #[cfg(test)]
