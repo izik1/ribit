@@ -1,39 +1,63 @@
-use ribit_core::opcode::{self, Cmp, SCmp};
+use ribit_core::instruction::Instruction;
+use ribit_core::opcode::{self, Cmp};
 use ribit_core::{Width, instruction, register};
 
 use super::{
     ParseContext, compressed_integer_register, integer_register, parse_imm_sx, parse_imm_sx32,
     parse_immediate, sign_extend, test_len,
 };
+use crate::parse::word::Word;
 
-pub(super) fn r_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
-    let opcode = match op {
-        "add" | "ADD" => opcode::R::ADD,
-        "sub" | "SUB" => opcode::R::SUB,
-        "sll" | "SLL" => opcode::R::SLL,
-        "slt" | "SLT" => opcode::R::SCond(SCmp::Lt),
-        "sltu" | "SLTU" => opcode::R::SCond(SCmp::Ltu),
-        "xor" | "XOR" => opcode::R::XOR,
-        "srl" | "SRL" => opcode::R::SRL,
-        "sra" | "SRA" => opcode::R::SRA,
-        "or" | "OR" => opcode::R::OR,
-        "and" | "AND" => opcode::R::AND,
-        "mul" | "MUL" => opcode::R::MUL,
-        "mulh" | "MULH" => opcode::R::MULH,
-        "mulhsu" | "MULHSU" => opcode::R::MULHSU,
-        "mulhu" | "MULHU" => opcode::R::MULHU,
-        "div" | "DIV" => opcode::R::DIV,
-        "divu" | "DIVU" => opcode::R::DIVU,
-        "rem" | "REM" => opcode::R::REM,
-        "remu" | "REMU" => opcode::R::REMU,
-        _ => return false,
-    };
+const NOP: instruction::I = instruction::I::new(0, None, None, opcode::I::ADDI);
+const RET: instruction::IJump =
+    instruction::IJump::new(0, Some(register::RiscV::X1), None, opcode::IJump::JALR);
 
-    if let Some([rd, rs1, rs2]) = r_args(context, full_op, args) {
-        context.push32(instruction::R::new(rs1, rs2, rd, opcode));
+fn compressed_pseudo_no_args<I: Into<Instruction>>(
+    context: &mut ParseContext,
+    instruction: I,
+    full_op: &str,
+    args: &[&str],
+) {
+    fn inner(context: &mut ParseContext, instruction: Instruction, full_op: &str, argc: usize) {
+        if test_len(context, full_op, 0, argc) {
+            return;
+        }
+
+        context.push16(instruction);
     }
 
-    true
+    inner(context, instruction.into(), full_op, args.len());
+}
+
+fn pseudo_no_args<I: Into<Instruction>>(
+    context: &mut ParseContext,
+    instruction: I,
+    full_op: &str,
+    args: &[&str],
+) {
+    fn inner(context: &mut ParseContext, instruction: Instruction, full_op: &str, argc: usize) {
+        if test_len(context, full_op, 0, argc) {
+            return;
+        }
+
+        context.push32(instruction);
+    }
+
+    inner(context, instruction.into(), full_op, args.len());
+}
+
+pub(super) fn nop(context: &mut ParseContext, full_op: &str, args: &[&str]) {
+    pseudo_no_args(context, NOP, full_op, args)
+}
+
+pub(super) fn ret(context: &mut ParseContext, full_op: &str, args: &[&str]) {
+    pseudo_no_args(context, RET, full_op, args)
+}
+
+pub(super) fn r_32(context: &mut ParseContext, op: opcode::R, full_op: &str, args: &[&str]) {
+    if let Some([rd, rs1, rs2]) = r_args(context, full_op, args) {
+        context.push32(instruction::R::new(rs1, rs2, rd, op));
+    }
 }
 
 fn r_args(
@@ -54,25 +78,10 @@ fn r_args(
     }
 }
 
-pub(super) fn i_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
-    let opcode = match op {
-        "addi" | "ADDI" => opcode::I::ADDI,
-        "slti" | "SLTI" => opcode::I::SICond(SCmp::Lt),
-        "sltiu" | "SLTIU" => opcode::I::SICond(SCmp::Ltu),
-        "xori" | "XORI" => opcode::I::XORI,
-        "ori" | "ORI" => opcode::I::ORI,
-        "andi" | "ANDI" => opcode::I::ANDI,
-        "slli" | "SLLI" => opcode::I::SLLI,
-        "srli" | "SRLI" => opcode::I::SRLI,
-        "srai" | "SRAI" => opcode::I::SRAI,
-        _ => return false,
-    };
-
+pub(super) fn i_32(context: &mut ParseContext, op: opcode::I, full_op: &str, args: &[&str]) {
     if let Some(([rd, rs1], imm)) = i_args(context, full_op, args) {
-        context.push32(instruction::I::new(imm, rs1, rd, opcode));
+        context.push32(instruction::I::new(imm, rs1, rd, op));
     }
-
-    true
 }
 
 fn i_args(
@@ -93,81 +102,46 @@ fn i_args(
     }
 }
 
-pub(super) fn ijump_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
-    let opcode = match op {
-        "jalr" | "JALR" => opcode::IJump::JALR,
-        _ => return false,
-    };
-
+pub(super) fn ijump_32(
+    context: &mut ParseContext,
+    op: opcode::IJump,
+    full_op: &str,
+    args: &[&str],
+) {
     if let Some((rd, imm, rs1)) = rir_args(context, full_op, args, 12) {
-        context.push32(instruction::IJump::new(imm, rs1, rd, opcode));
+        context.push32(instruction::IJump::new(imm, rs1, rd, op));
     }
-
-    true
 }
 
-pub(super) fn imem_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
-    let opcode = match op {
-        "fence" | "FENCE" => opcode::IMem::FENCE,
-        "lb" | "LB" => opcode::IMem::LD(Width::Byte),
-        "lh" | "LH" => opcode::IMem::LD(Width::Word),
-        "lw" | "LW" => opcode::IMem::LD(Width::DWord),
-        "lbu" | "LBU" => opcode::IMem::LDU(Width::Byte),
-        "lhu" | "LHU" => opcode::IMem::LDU(Width::Word),
-        _ => return false,
-    };
-
-    if opcode == opcode::IMem::FENCE {
+pub(super) fn imem_32(context: &mut ParseContext, op: opcode::IMem, full_op: &str, args: &[&str]) {
+    if op == opcode::IMem::FENCE {
         if !test_len(context, full_op, 0, args.len()) {
-            context.push32(instruction::IMem::new(0, None, None, opcode));
+            context.push32(instruction::IMem::new(0, None, None, op));
         }
 
-        return true;
+        return;
     }
 
     if let Some((rd, imm, rs1)) = rir_args(context, full_op, args, 12) {
-        context.push32(instruction::IMem::new(imm, rs1, rd, opcode));
+        context.push32(instruction::IMem::new(imm, rs1, rd, op));
     }
-
-    true
 }
 
-pub(super) fn s_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
-    let width = match op {
-        "sb" | "SB" => Width::Byte,
-        "sh" | "SH" => Width::Word,
-        "sw" | "SW" => Width::DWord,
-        _ => return false,
-    };
-
+pub(super) fn s_32(context: &mut ParseContext, op: Width, full_op: &str, args: &[&str]) {
     if let Some((rs2, imm, rs1)) = rir_args(context, full_op, args, 12) {
-        context.push32(instruction::S::new(imm, rs1, rs2, width));
+        context.push32(instruction::S::new(imm, rs1, rs2, op));
     }
-
-    true
 }
 
-pub(super) fn b_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
-    let cmp = match op {
-        "beq" | "BEQ" => Cmp::Eq,
-        "bne" | "BNE" => Cmp::Ne,
-        "blt" | "BLT" => Cmp::Lt,
-        "bltu" | "BLTU" => Cmp::Ltu,
-        "bge" | "BGE" => Cmp::Ge,
-        "bgeu" | "BGEU" => Cmp::Geu,
-        _ => return false,
-    };
-
+pub(super) fn b_32(context: &mut ParseContext, op: Cmp, full_op: &str, args: &[&str]) {
     if let Some((rs1, imm, rs2)) = rir_args(context, full_op, args, 12) {
         let imm = match context.supports_compressed {
             true => imm << 1,
             false => imm << 2,
         };
 
-        context.push32(instruction::B::new(imm, rs1, rs2, cmp));
+        context.push32(instruction::B::new(imm, rs1, rs2, op));
     }
-
-    true
 }
 
 fn split_offset_index(arg: &str) -> Result<(&str, &str), String> {
@@ -223,36 +197,21 @@ pub(super) fn rir_args_16(
     }
 }
 
-pub(super) fn u_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
-    let opcode = match op {
-        "lui" | "LUI" => opcode::U::LUI,
-        "auipc" | "AUIPC" => opcode::U::AUIPC,
-        _ => return false,
-    };
-
+pub(super) fn u_32(context: &mut ParseContext, op: opcode::U, full_op: &str, args: &[&str]) {
     if let Some((rd, imm)) = ri_args(context, full_op, args, 20) {
-        context.push32(instruction::U::new(imm << 12, rd, opcode));
+        context.push32(instruction::U::new(imm << 12, rd, op));
     }
-
-    true
 }
 
-pub(super) fn j_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
-    let opcode = match op {
-        "jal" | "JAL" => opcode::J::JAL,
-        _ => return false,
-    };
-
+pub(super) fn j_32(context: &mut ParseContext, op: opcode::J, full_op: &str, args: &[&str]) {
     if let Some((rd, imm)) = ri_args(context, full_op, args, 20) {
         let imm = match context.supports_compressed {
             true => imm << 1,
             false => imm << 2,
         };
 
-        context.push32(instruction::J::new(imm, rd, opcode));
+        context.push32(instruction::J::new(imm, rd, op));
     }
-
-    true
 }
 
 fn ri_args(
@@ -273,37 +232,26 @@ fn ri_args(
     }
 }
 
-pub(super) fn sys_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
-    let opcode = match op {
-        "ebreak" | "EBREAK" => opcode::RSys::EBREAK,
-        "ecall" | "ECALL" => opcode::RSys::ECALL,
-        _ => return false,
-    };
-
+pub(super) fn sys_32(context: &mut ParseContext, op: opcode::RSys, full_op: &str, args: &[&str]) {
     if !test_len(context, full_op, 0, args.len()) {
-        context.push32(instruction::Sys::new(opcode));
+        context.push32(instruction::Sys::new(op));
     }
-
-    true
 }
 
-fn compressed_jump(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
-    let rd = match op {
-        "j" | "J" => None,
-        "jal" | "JAL" => Some(register::RiscV::X1),
-        _ => return false,
-    };
-
+fn compressed_jump(
+    context: &mut ParseContext,
+    rd: Option<register::RiscV>,
+    full_op: &str,
+    args: &[&str],
+) {
     if let Some(imm) = compressed_jump_args(context, full_op, args) {
         context.push16(instruction::J::new(imm << 1, rd, opcode::J::JAL));
     }
-
-    true
 }
 
 pub(super) fn compressed(
     context: &mut ParseContext,
-    op: &str,
+    op: Word,
     full_op: &str,
     args: &[&str],
 ) -> bool {
@@ -314,46 +262,26 @@ pub(super) fn compressed(
         return true;
     }
 
-    if compressed_jump(context, op, full_op, args) {
-        return true;
-    }
-
     match op {
-        // "lwsp" | "LWSP" => {}
-        "lw" | "LW" => {
+        Word::Op(Instruction::IMem(op @ opcode::IMem::LD(Width::DWord))) => {
             if let Some((rd, imm, rs1)) = rir_args_16(context, full_op, args, 5, false) {
                 let imm = imm << 2;
 
-                context.push16(instruction::IMem::new(
-                    imm,
-                    rs1,
-                    rd,
-                    opcode::IMem::LD(Width::DWord),
-                ));
+                context.push16(instruction::IMem::new(imm, rs1, rd, op));
             }
         }
-
-        "nop" | "NOP" => {
-            if !test_len(context, full_op, 0, args.len()) {
-                context.push16(instruction::I::new(0, None, None, opcode::I::ADDI));
-            }
+        Word::Op(Instruction::J(opcode::J::JAL)) => {
+            compressed_jump(context, Some(register::RiscV::X1), full_op, args);
         }
-
-        "ret" | "RET" => {
-            if !test_len(context, full_op, 0, args.len()) {
-                context.push16(instruction::IJump::new(
-                    0,
-                    Some(register::RiscV::X1),
-                    None,
-                    opcode::IJump::JALR,
-                ));
-            }
+        Word::J => {
+            compressed_jump(context, None, full_op, args);
         }
-
-        "li" | "LI" => {
+        Word::Ret => compressed_pseudo_no_args(context, RET, full_op, args),
+        Word::Nop => compressed_pseudo_no_args(context, NOP, full_op, args),
+        Word::Li => {
             if let Some((rd, imm)) = ri_args(context, full_op, args, 6) {
                 if rd.is_none() {
-                    context.errors.push(format!("`x0` is not a valid register for `{op}`"));
+                    context.errors.push(format!("`x0` is not a valid register for `li`"));
                     return true;
                 }
 

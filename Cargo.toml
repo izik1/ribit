@@ -10,6 +10,7 @@ version = "0.1.0"
 
 [workspace.dependencies]
 expect-test = "1.2.1"
+hashify2.path = "crates/hashify2"
 ribit-asm.path = "crates/asm"
 ribit-core.path = "crates/core"
 ribit-decode.path = "crates/decode"

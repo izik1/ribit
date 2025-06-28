@@ -1,0 +1,14 @@
+[package]
+authors.workspace = true
+description = "rewrite of https://github.com/stalwartlabs/hashify to better fit local use-cases (it also drops a lot of support in the process)"
+edition.workspace = true
+license = "Apache-2.0 OR MIT"
+name = "hashify2"
+publish = false
+version.workspace = true
+
+[dependencies]
+unsynn = "0.1.1"
+
+[lib]
+proc-macro = true

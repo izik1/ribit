@@ -1,6 +1,10 @@
+use ribit_core::instruction::Instruction;
 use ribit_core::register;
 
+use crate::parse::word::Word;
+
 mod instruction;
+mod word;
 
 #[cfg(test)]
 mod tests;
@@ -37,12 +41,12 @@ impl ParseContext {
         }
     }
 
-    fn push32<I: Into<ribit_core::instruction::Instruction>>(&mut self, instruction: I) {
+    fn push32<I: Into<Instruction>>(&mut self, instruction: I) {
         self.instructions
             .push(ribit_core::instruction::Info { instruction: instruction.into(), len: 4 });
     }
 
-    fn push16<I: Into<ribit_core::instruction::Instruction>>(&mut self, instruction: I) {
+    fn push16<I: Into<Instruction>>(&mut self, instruction: I) {
         self.instructions
             .push(ribit_core::instruction::Info { instruction: instruction.into(), len: 2 });
     }
@@ -69,8 +73,8 @@ pub fn tokenize(input: &str, enable_compressed: bool) -> ParseOutput {
     };
 
     for line in input.lines() {
-        let line = line.trim();
         let line = line.split_once(';').map_or(line, |(line, _comment)| line);
+        let line = line.trim();
 
         tokenize_instruction(&mut output, line);
     }
@@ -103,9 +107,15 @@ fn tokenize_instruction(context: &mut ParseContext, line: &str) {
 
     let args = args;
 
-    let instruction_matched = match has_compressed {
-        true => instruction::compressed(context, op, full_op, &args),
-        false => parse_32(context, op, full_op, &args),
+    let instruction_matched = 'check: {
+        let Ok(op) = op.parse::<Word>() else {
+            break 'check false;
+        };
+
+        match has_compressed {
+            true => instruction::compressed(context, op, full_op, &args),
+            false => parse_32(context, op, full_op, &args),
+        }
     };
 
     if !instruction_matched {
@@ -113,44 +123,25 @@ fn tokenize_instruction(context: &mut ParseContext, line: &str) {
     }
 }
 
-fn parse_32(context: &mut ParseContext, op: &str, full_op: &str, args: &[&str]) -> bool {
-    if instruction::r_32(context, op, full_op, args) {
-        return true;
+fn parse_32(context: &mut ParseContext, op: Word, full_op: &str, args: &[&str]) -> bool {
+    match op {
+        Word::Op(instruction) => match instruction {
+            Instruction::R(op) => instruction::r_32(context, op, full_op, args),
+            Instruction::I(op) => instruction::i_32(context, op, full_op, args),
+            Instruction::IJump(op) => instruction::ijump_32(context, op, full_op, args),
+            Instruction::IMem(op) => instruction::imem_32(context, op, full_op, args),
+            Instruction::S(op) => instruction::s_32(context, op, full_op, args),
+            Instruction::B(op) => instruction::b_32(context, op, full_op, args),
+            Instruction::U(op) => instruction::u_32(context, op, full_op, args),
+            Instruction::J(op) => instruction::j_32(context, op, full_op, args),
+            Instruction::Sys(op) => instruction::sys_32(context, op, full_op, args),
+        },
+        Word::Ret => instruction::ret(context, full_op, args),
+        Word::Nop => instruction::nop(context, full_op, args),
+        Word::J | Word::Li => return false,
     }
 
-    if instruction::i_32(context, op, full_op, args) {
-        return true;
-    }
-
-    if instruction::ijump_32(context, op, full_op, args) {
-        return true;
-    }
-
-    if instruction::imem_32(context, op, full_op, args) {
-        return true;
-    }
-
-    if instruction::s_32(context, op, full_op, args) {
-        return true;
-    }
-
-    if instruction::b_32(context, op, full_op, args) {
-        return true;
-    }
-
-    if instruction::u_32(context, op, full_op, args) {
-        return true;
-    }
-
-    if instruction::j_32(context, op, full_op, args) {
-        return true;
-    }
-
-    if instruction::sys_32(context, op, full_op, args) {
-        return true;
-    }
-
-    false
+    true
 }
 
 fn test_len(context: &mut ParseContext, op: &str, expected: usize, actual: usize) -> bool {
@@ -174,7 +165,10 @@ fn integer_register(register: &str) -> Result<Option<register::RiscV>, String> {
         return Ok(register::RiscV::with_u8(num));
     }
 
-    let reg = match register {
+    let reg = register.as_bytes();
+
+    let reg = hashify2::tiny_map!(
+        reg,
         "zero" => None,
         "ra" => Some(register::RiscV::X1),
         "sp" => Some(register::RiscV::X2),
@@ -183,7 +177,8 @@ fn integer_register(register: &str) -> Result<Option<register::RiscV>, String> {
         "t0" => Some(register::RiscV::X5),
         "t1" => Some(register::RiscV::X6),
         "t2" => Some(register::RiscV::X7),
-        "s0" | "fp" => Some(register::RiscV::X8),
+        "s0" => Some(register::RiscV::X8),
+        "fp" => Some(register::RiscV::X8),
         "s1" => Some(register::RiscV::X9),
         "a0" => Some(register::RiscV::X10),
         "a1" => Some(register::RiscV::X11),
@@ -207,13 +202,9 @@ fn integer_register(register: &str) -> Result<Option<register::RiscV>, String> {
         "t4" => Some(register::RiscV::X29),
         "t5" => Some(register::RiscV::X30),
         "t6" => Some(register::RiscV::X31),
+    );
 
-        _ => return Err(format!("Unexpected register name `{register}`")),
-    };
-
-    Ok(reg)
-
-    // todo: abi names.
+    reg.ok_or_else(|| format!("Unexpected register name `{register}`"))
 }
 fn compressed_integer_register(register: &str) -> Result<Option<register::RiscV>, String> {
     let res = integer_register(register)?;

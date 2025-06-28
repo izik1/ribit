@@ -6,6 +6,7 @@ publish.workspace = true
 version.workspace = true
 
 [dependencies]
+hashify2.workspace = true
 ribit-core.workspace = true
 
 [dev-dependencies]
